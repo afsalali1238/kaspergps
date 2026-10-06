@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Badge, Table, Panel, PanelHeader } from '@/components/ui';
+import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
 
