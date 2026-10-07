@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, EmptyState, Skeleton,
   Button,
@@ -10,25 +13,61 @@ import {
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
-import type { Asset, Session } from '@/domain/types';
+import { isAssetVisible, getRelationship } from '@/server/access';
+import { getReadingForAsset } from '@/server/telemetry/simulator';
+import type { Asset, LatLng } from '@/domain/types';
 
-interface AssetRow {
+// Fix Leaflet default icon issue
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+// Status marker colors
+const STATUS_COLORS: Record<string, string> = {
+  live: '#1F9A6D',
+  idle: '#B89000',
+  stale: '#9A9CA1',
+  offline: '#D64545',
+  unknown: '#9A9CA1',
+  no_tracker: '#9A9CA1',
+};
+
+function createMarkerIcon(status: string, isRented: boolean) {
+  const color = STATUS_COLORS[status] ?? '#9A9CA1';
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
+      <div style="position: relative; width: 24px; height: 36px;">
+        <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);${isRented ? ' outline: 2px solid #FFC400; outline-offset: 2px;' : ''}"></div>
+        <div style="position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${color};"></div>
+      </div>
+    </svg>
+  `;
+  return L.divIcon({
+    html: svg,
+    className: 'marker-custom',
+    iconSize: [24, 36],
+    iconAnchor: [12, 36],
+    popupAnchor: [0, -36],
+  });
+}
+
+interface AssetMarker {
   id: string;
   code: string;
   name: string;
-  status: 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker';
+  status: string;
   lastUpdated: string;
   siteName: string;
   tier: 1 | 2 | 3;
   isRentedIn: boolean;
-  ownerName: string;
+  lat: number;
+  lng: number;
   asset: Asset;
   lastReadingMs: number;
-}
-
-function lastReadingMsFor(_asset: Asset): number {
-  // Simplified: return a recent timestamp for prototype
-  return clock.now() - Math.floor(Math.random() * 7200000);
 }
 
 function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
@@ -36,17 +75,20 @@ function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 
   if (!pairing) return 'no_tracker';
   const tracker = seed.trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'no_tracker';
-  const lastMs = lastReadingMsFor(asset);
+  const reading = getReadingForAsset(asset);
+  if (!reading) return 'no_tracker';
+  const lastMs = new Date(reading.deviceTime).getTime();
   const ageSec = (sessionMs - lastMs) / 1000;
   if (ageSec > 1800) return 'offline';
   if (ageSec > 600) return 'stale';
-  const speed = Math.random() > 0.5 ? Math.floor(Math.random() * 80) : 0;
-  if (speed < 3) return 'idle';
+  if (reading.speedKmh < 3) return 'idle';
   return 'live';
 }
 
 function lastUpdatedStr(asset: Asset): string {
-  const ms = lastReadingMsFor(asset);
+  const reading = getReadingForAsset(asset);
+  if (!reading) return 'No data';
+  const ms = new Date(reading.deviceTime).getTime();
   const ageMin = clock.minutesSinceDubai(ms);
   const ageH = clock.hoursSinceDubai(ms);
   if (ageMin < 60) return `${clock.formatDubaiTime(ms)} · ${Math.round(ageMin)} min ago`;
@@ -56,12 +98,26 @@ function lastUpdatedStr(asset: Asset): string {
 const STATUS_KEYS = ['live', 'idle', 'stale', 'offline', 'unknown', 'no_tracker'] as const;
 type StatusKey = typeof STATUS_KEYS[number];
 
+function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
+  const map = useMap();
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+
+  useEffect(() => {
+    if (assetsRef.current.length === 0) return;
+    const bounds = L.latLngBounds(assetsRef.current.map(a => [a.lat, a.lng]));
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }, [map]);
+
+  return null;
+}
+
 export default function MapPage() {
   const store = useStore;
   const session = store.getState().session;
-  const _phase = store.getState().demoSwitches.phase;
-  const _showHidden = store.getState().demoSwitches.showHidden;
-  const _salesView = store.getState().demoSwitches.salesView;
+  const phase = store.getState().demoSwitches.phase;
+  const showHidden = store.getState().demoSwitches.showHidden;
+  const salesView = store.getState().demoSwitches.salesView;
 
   const [statusFilter, setStatusFilter] = useState<StatusKey | 'all'>('all');
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
@@ -75,7 +131,7 @@ export default function MapPage() {
     setLoading(false);
   }, []);
 
-  const visibleAssets: AssetRow[] = useMemo(() => {
+  const visibleAssets: AssetMarker[] = useMemo(() => {
     if (!session) return [];
 
     return seed.assets.filter(a => {
@@ -102,7 +158,12 @@ export default function MapPage() {
       const status = computeStatus(a);
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       const site = seed.sites.find(s => s.id === a.homeSiteId);
-      const isRented = session.tenantId ? !!seed.bookings.find(b => b.assetId === a.id && b.renterTenantId === session.tenantId) : false;
+      const rel = getRelationship(session!, a.id);
+      const isRented = rel === 'renter';
+      const reading = getReadingForAsset(a);
+      const pos: LatLng | undefined = reading ? { lat: reading.lat, lng: reading.lng } : site?.center;
+      const lat = pos?.lat ?? 25.2048;
+      const lng = pos?.lng ?? 55.2708;
       return {
         id: a.id,
         code: a.code,
@@ -112,12 +173,13 @@ export default function MapPage() {
         siteName: site?.name ?? '',
         tier,
         isRentedIn: isRented,
-        ownerName: seed.tenants.find(t => t.id === a.ownerTenantId)?.name ?? '',
+        lat,
+        lng,
         asset: a,
-        lastReadingMs: lastReadingMsFor(a),
+        lastReadingMs: reading ? new Date(reading.deviceTime).getTime() : clock.now(),
       };
     });
-  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery]);
+  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { live: 0, idle: 0, stale: 0, offline: 0, unknown: 0, no_tracker: 0 };
@@ -194,16 +256,50 @@ export default function MapPage() {
         />
       ) : (
         <>
-          {/* Map placeholder (Leaflet added in later phase) */}
-          <div className="rounded-xl border border-line bg-paper h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px] flex items-center justify-center">
-            <div className="text-center">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-line mx-auto mb-3">
-                <path d="M24 8c-8.8 0-16 7.2-16 16s7.2 16 16 16 16-7.2 16-16-7.2-16-16-16zm-8 16l6-6 1.5 1.5L24 24l-3.5 3.5 1.5 1.5L16 24z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <p className="text-sm text-grey-500">Map view — OpenStreetMap tiles (Leaflet)</p>
-              <p className="text-xs text-grey-500 mt-1">{totalVisible} markers · live position</p>
-              <Button variant="secondary" size="sm" className="mt-3">Replace with Leaflet map (Phase 2)</Button>
-            </div>
+          {/* Map */}
+          <div className="rounded-xl border border-line bg-paper overflow-hidden h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px]">
+            <MapContainer
+              center={[25.2048, 55.2708]}
+              zoom={10}
+              scrollWheelZoom={true}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {visibleAssets.map(a => (
+                <Marker
+                  key={a.id}
+                  position={[a.lat, a.lng]}
+                  icon={createMarkerIcon(a.status, a.isRentedIn)}
+                >
+                  <Popup>
+                    <div className="text-left">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-ink">{a.code}</span>
+                        <span className="text-xs text-grey-500">— {a.name}</span>
+                      </div>
+                      <div className="text-xs text-grey-700 mb-1">{a.status}</div>
+                      <div className="text-xs text-grey-500 mb-2">{a.lastUpdated}</div>
+                      <div className="flex items-center justify-between">
+                        <TierChip tier={a.tier} />
+                        <Link
+                          href={`/app/assets/${a.id}`}
+                          className="text-xs text-yellow hover:text-ink font-medium"
+                        >
+                          Open →
+                        </Link>
+                      </div>
+                      {a.isRentedIn && (
+                        <div className="mt-1 text-xs text-yellow font-medium">Rented</div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+              <MapBoundsUpdater assets={visibleAssets} />
+            </MapContainer>
           </div>
 
           {/* Filters */}
@@ -296,7 +392,7 @@ export default function MapPage() {
                       {a.isRentedIn && <Badge variant="yellow">Rented</Badge>}
                     </div>
                     <div className="text-xs text-grey-500 mt-0.5">
-                      {a.ownerName} · {a.siteName} · {a.lastUpdated}
+                      {a.siteName} · {a.lastUpdated}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -335,19 +431,4 @@ function TierFilterButton({ label, selected, onClick, tier }: { label: string; s
       {label}
     </button>
   );
-}
-
-function isAssetVisible(session: Session, assetId: string): boolean {
-  if (!session) return false;
-  if (session.isKasper) return true;
-  const asset = seed.assets.find(a => a.id === assetId);
-  if (!asset) return false;
-  if (asset.ownerTenantId === session.tenantId) return true;
-  const booking = seed.bookings.find(b => b.assetId === assetId && b.renterTenantId === session.tenantId);
-  if (booking) {
-    const start = new Date(booking.start).getTime();
-    const end = booking.closedAt ? new Date(booking.closedAt).getTime() : new Date(booking.end).getTime();
-    return clock.now() >= start && clock.now() <= end;
-  }
-  return false;
 }

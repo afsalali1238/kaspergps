@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { DemoBar } from '@/components/demo/DemoBar';
 
 export const metadata: Metadata = {
   title: 'Kasper GPS',
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-bg antialiased">
+        <DemoBar />
         {children}
       </body>
     </html>

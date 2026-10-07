@@ -6,6 +6,7 @@ import { seed } from '@/server/seed/data';
 import { hasFeature, featurePhase } from '@/domain/features';
 import { hasRoleCapability } from '@/server/capabilities';
 import type { Capability } from '@/server/capabilities';
+import * as clock from '@/lib/clock';
 
 // ── Capabilities (role-only, no asset context) ────────────────────────────────
 
@@ -20,13 +21,20 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
   if (!asset) return false;
 
   if (session.isKasper) return true;
-  if (asset.ownerTenantId === session.tenantId) return true;
+  if (asset.ownerTenantId === session.tenantId) {
+    // Same-tenant assets: tenant admins see all; site users see only at their sites
+    if (session.role === 'tenant_admin') return true;
+    return session.siteIds.includes(asset.homeSiteId);
+  }
 
-  // Check for active rental grant
+  // Check for active rental grant — must also match a site the session can see
   const booking = findActiveGrantFor(session, assetId);
   if (booking) {
-    const now = Date.now();
-    return new Date(booking.start).getTime() <= now && now <= getGrantEnd(booking);
+    const now = clock.now();
+    if (!(new Date(booking.start).getTime() <= now && now <= getGrantEnd(booking))) return false;
+    // Tenant admins with no site restriction see all sites; site users must match a site
+    if (session.role === 'tenant_admin' && session.siteIds.length === 0) return true;
+    return session.siteIds.includes(booking.renterSiteId!);
   }
 
   return false;
@@ -41,10 +49,22 @@ export function findActiveGrantFor(session: Session, assetId: string): Booking |
   );
   if (!booking) return null;
 
-  const now = Date.now();
+  const now = clock.now();
   // Access starts at booking start
   if (now < new Date(booking.start).getTime()) return null;
   return booking;
+}
+
+/**
+ * Who can cut a rental short: Kasper, or the asset's own Tenant Admin.
+ * The renter never can — it is their rental (spec 5, grant.endEarly).
+ */
+export function canEndAccess(session: Session, assetId: string): boolean {
+  if (!hasCapability(session, 'grant.endEarly')) return false;
+  const asset = seed.assets.find(a => a.id === assetId);
+  if (!asset) return false;
+  if (session.isKasper) return true;
+  return session.tenantId !== null && asset.ownerTenantId === session.tenantId;
 }
 
 export function getGrantEnd(booking: Booking): number {

@@ -37,42 +37,41 @@ export function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'l
 }
 
 function currentTrackerFor(asset: Asset): typeof seed.trackers[0] | null {
-  // Find the current pairing
+  // Find the current pairing (explicit swap tracking)
   const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (!currentPairing) return null;
-  return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  // Fallback: use the tracker's assetId field (implicit pairing from seed)
+  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
+}
+
+// How far back to look for a reading: a stale or offline asset can be days
+// behind, and the status rules need its last reading, not "no data".
+const LOOKBACK_DAYS = 40;
+
+/** The newest day that has a reading for this asset, or null when it never reported. */
+function newestReadingsDay(asset: Asset): Reading[] | null {
+  const tracker = currentTrackerFor(asset);
+  if (!tracker) return null;
+  const now = clock.now();
+  const anchorDayStart = Math.floor(now / 86400000) * 86400000;
+  for (let d = 0; d <= LOOKBACK_DAYS; d++) {
+    const dayMs = anchorDayStart - d * 86400000;
+    const readings = getReadingsForDay(asset, tracker, dayMs)
+      .filter(r => new Date(r.deviceTime).getTime() <= now);
+    if (readings.length > 0) return readings;
+  }
+  return null;
 }
 
 function hasAnyReading(asset: Asset): boolean {
-  const tracker = currentTrackerFor(asset);
-  if (!tracker) return false;
-  const _key = cacheKey(tracker.id, 0);
-  const dayMap = cache.get(tracker.id);
-  if (!dayMap) return false;
-  for (const readings of dayMap.values()) {
-    for (const r of readings) {
-      if (r.trackerId === tracker.id) return true;
-    }
-  }
-  return false;
+  return newestReadingsDay(asset) !== null;
 }
 
 function lastReadingFor(asset: Asset): Reading | null {
-  const tracker = currentTrackerFor(asset);
-  if (!tracker) return null;
-  const dayMap = cache.get(tracker.id);
-  if (!dayMap) return null;
-  let latest: Reading | null = null;
-  const latestTime = new Date(clock.now()).getTime();
-  for (const readings of dayMap.values()) {
-    for (const r of readings) {
-      const t = new Date(r.deviceTime).getTime();
-      if (t <= latestTime && (!latest || t > new Date(latest.deviceTime).getTime())) {
-        latest = r;
-      }
-    }
-  }
-  return latest;
+  const readings = newestReadingsDay(asset);
+  if (!readings) return null;
+  return readings.reduce((latest, r) =>
+    new Date(r.deviceTime).getTime() > new Date(latest.deviceTime).getTime() ? r : latest);
 }
 
 // ── Antenna fitting check ──────────────────────────────────────────────────────
@@ -134,100 +133,100 @@ function assetSeed(asset: Asset): number {
   return s % 2147483647;
 }
 
+// ── Anchor scenarios (spec 8.2) ───────────────────────────────────────────────
+// Where each asset's readings end relative to the clock at anchor, so the status
+// rules in thresholds.ts give the status the asset table documents. Idle assets
+// keep an idling tail (ignition on, speed 0) so they read "Idle", not "Live".
+
+type AnchorTail = { ageMin: number; ignition?: boolean; via?: 'plant' | 'lifting' } | 'none';
+
+const IDLE_AT_ANCHOR: AnchorTail = { ageMin: 0, ignition: true };
+
+const ANCHOR_TAILS: Record<string, AnchorTail> = {
+  // Idle at a site
+  'LB-05': IDLE_AT_ANCHOR,
+  'WL-03': IDLE_AT_ANCHOR,
+  'GR-01': IDLE_AT_ANCHOR,
+  'CR-02': IDLE_AT_ANCHOR,
+  'FL-10': IDLE_AT_ANCHOR,
+  'PU-52': IDLE_AT_ANCHOR,
+  // Stale: last reading 10-30 min old. §13: +1 h turns WT-08 Offline.
+  'WT-08': { ageMin: 12 },
+  'GN-02': { ageMin: 15 },
+  'CR-05': { ageMin: 20, via: 'plant' },
+  // Offline: older than 30 min
+  'EX-07': { ageMin: 190, via: 'plant' },
+  'SL-02': { ageMin: 2880, via: 'lifting' },
+  // Paired but never reported
+  'FL-09': 'none',
+  'LD-09': 'none',
+  'MW-01': 'none',
+};
+
+function generateForBehaviour(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
+  const behaviour = asset.behaviour;
+  if (behaviour === 'parked') return generateParkedReadings(asset, dayMs, endMs, prng);
+  if (behaviour === 'stationary_24h') return generateGeneratorReadings(asset, dayMs, endMs, prng, false);
+  if (behaviour === 'light_vehicle_day') return generateLightVehicleReadings(asset, dayMs, endMs, prng);
+  if (behaviour === 'works_at_site' || behaviour === 'drives_between_sites') {
+    return generateMovingReadings(asset, dayMs, endMs, prng);
+  }
+  return generateParkedReadings(asset, dayMs, endMs, prng);
+}
+
+function tailReadings(asset: Asset, tail: { via?: 'plant' | 'lifting' }, dayMs: number, endMs: number, prng: () => number): Reading[] {
+  if (tail.via === 'plant') return generatePlantReadings(asset, dayMs, endMs, prng, false);
+  if (tail.via === 'lifting') return generateLiftingReadings(asset, dayMs, endMs, prng, false);
+  return generateForBehaviour(asset, dayMs, endMs, prng);
+}
+
+/** Idling tail: engine running, not moving, every 10 minutes up to the clock. */
+function generateIdleTail(asset: Asset, fromMs: number, toMs: number, prng: () => number): Reading[] {
+  const readings: Reading[] = [];
+  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  if (!site) return readings;
+  const tracker = currentTrackerFor(asset);
+  const trackerId = tracker?.id ?? 'unknown';
+  const odometer = rand(prng, 100, 5000) + asset.code.charCodeAt(0);
+  const start = Math.max(fromMs, toMs - 40 * 60000);
+  for (let t = start; t <= toMs; t += 10 * 60000) {
+    readings.push(baseReading(t, trackerId, site.center.lat, site.center.lng, 0, 0, true, false,
+      rand(prng, 12.6, 13.4), rand(prng, 3.9, 4.1), randInt(prng, 2, 4), randInt(prng, 6, 12), odometer, prng));
+  }
+  return readings;
+}
+
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
   const prng = mulberry32(assetSeed(asset) + Math.floor(dayMs / 86400000));
   const dayEndDubai = dayMs + 86400000;
   const now = clock.now();
-
-  // Asset-specific scenarios
-  const isWT08 = asset.code === 'WT-08';
-  const isTP23 = asset.code === 'TP-23';
-  const isGN02 = asset.code === 'GN-02';
-  const isSL02 = asset.code === 'SL-02';
-  const isFL09 = asset.code === 'FL-09';
-  const isMW01 = asset.code === 'MW-01';
-  const isLD09 = asset.code === 'LD-09';
-  const isEX07 = asset.code === 'EX-07';
-  const isCR05 = asset.code === 'CR-05';
-
   const isOutsideAnchor = dayMs > now;
-  const isAnchorDay = Math.floor(now / 86400000) === Math.floor(dayMs / 86400000);
 
-  // Scenario: WT-08 goes offline at 6 Oct (anchor day) 09:00
-  if (isWT08 && isAnchorDay) {
-    const offlineAt = dayMs + 9 * 3600000;
-    const beforeOffline = generatePlantReadings(asset, dayMs, offlineAt, prng, false);
-    const afterOffline: Reading[] = [];
-    return [...beforeOffline, ...afterOffline];
-  }
-
-  // Scenario: TP-23 — power cut 2h ago, then offline 40min ago
-  if (isTP23) {
+  // Scenario: TP-23 — power cut 2 h ago, then offline 40 min ago
+  if (asset.code === 'TP-23' && Math.floor(now / 86400000) === Math.floor(dayMs / 86400000)) {
     const powerCutAt = now - 2 * 3600000;
     const offlineAt = now - 40 * 60000;
-    // Generate readings up to power cut
-    const beforePower = generateTruckReadings(asset, dayMs, powerCutAt, prng);
-    // Generate readings from power cut to offline (on battery)
-    const duringPower = generateBatteryReadings(asset, powerCutAt, offlineAt, prng);
-    return [...beforePower, ...duringPower];
+    return [
+      ...generateTruckReadings(asset, dayMs, powerCutAt, prng),
+      ...generateBatteryReadings(asset, powerCutAt, offlineAt, prng),
+    ];
   }
 
-  // Scenario: GN-02 — low battery, stale, power off for days
-  if (isGN02) {
-    const lastReadingAt = now - 3 * 86400000; // 3 days ago
-    return generateGeneratorReadings(asset, dayMs, Math.min(dayEndDubai, lastReadingAt), prng, true);
-  }
-
-  // Scenario: SL-02 — offline 2 days
-  if (isSL02) {
-    const offlineAt = now - 2 * 86400000;
-    return generateLiftingReadings(asset, dayMs, Math.min(dayEndDubai, offlineAt), prng, false);
-  }
-
-  // Scenario: FL-09 — paired this morning, never reported (Unknown)
-  if (isFL09) {
-    const pairingAt = now - 0.5 * 3600000;
-    if (dayMs + 86400000 <= pairingAt) return [];
-    // No readings — unknown until first fix
-    return [];
-  }
-
-  // Scenario: MW-01 — no tracker
-  if (isMW01 || isLD09) {
-    return [];
-  }
-
-  // Scenario: EX-07 — offline 3 hours (will come online when booking starts tomorrow)
-  if (isEX07 && isAnchorDay) {
-    const offlineAt = now - 3 * 3600000;
-    return generatePlantReadings(asset, dayMs, offlineAt, prng, false);
-  }
-
-  // Scenario: CR-05 — stale (booking cancelled)
-  if (isCR05) {
-    const staleAt = now - 36 * 3600000; // 36 hours ago
-    return generatePlantReadings(asset, dayMs, Math.min(dayEndDubai, staleAt), prng, false);
+  const tail = ANCHOR_TAILS[asset.code];
+  if (tail === 'none') return [];
+  if (tail) {
+    const cutoff = now - tail.ageMin * 60000;
+    if (dayMs > cutoff) return []; // this day comes after the last reading
+    if (isOutsideAnchor) return [];
+    const end = Math.min(dayEndDubai, cutoff, now);
+    const before = tailReadings(asset, tail, dayMs, end, prng);
+    const idling = tail.ignition && dayMs + 86400000 > cutoff ? generateIdleTail(asset, cutoff, now, prng) : [];
+    return [...before, ...idling];
   }
 
   // Future days — no readings yet
   if (isOutsideAnchor) return [];
-
-  // Generate based on behaviour
-  const behaviour = asset.behaviour;
-  if (behaviour === 'parked') {
-    return generateParkedReadings(asset, dayMs, dayEndDubai, prng);
-  }
-  if (behaviour === 'stationary_24h') {
-    return generateGeneratorReadings(asset, dayMs, dayEndDubai, prng, false);
-  }
-  if (behaviour === 'light_vehicle_day') {
-    return generateLightVehicleReadings(asset, dayMs, dayEndDubai, prng);
-  }
-  if (behaviour === 'works_at_site' || behaviour === 'drives_between_sites') {
-    return generateMovingReadings(asset, dayMs, dayEndDubai, prng);
-  }
-
-  return generateParkedReadings(asset, dayMs, dayEndDubai, prng);
+  return generateForBehaviour(asset, dayMs, Math.min(dayEndDubai, now), prng);
 }
 
 // ── Generators ─────────────────────────────────────────────────────────────────
@@ -292,7 +291,7 @@ function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng:
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
     const ignition = inShift;
-    const moving = isMoving && inShift && Math.random() > 0.3;
+    const moving = isMoving && inShift && prng() > 0.3;
     const speed = moving ? rand(prng, 5, 30) : 0;
     const heading = azimuth;
     const lat = site.center.lat + rand(prng, -0.002, 0.002) + (moving ? rand(prng, -0.0005, 0.0005) : 0);
@@ -323,8 +322,8 @@ function generateTruckReadings(asset: Asset, dayMs: number, endMs: number, prng:
 
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
-    const ignition = inShift && Math.random() > 0.2;
-    const moving = ignition && Math.random() > 0.4;
+    const ignition = inShift && prng() > 0.2;
+    const moving = ignition && prng() > 0.4;
     const speed = moving ? rand(prng, 20, 90) : 0;
     const heading = (t / 10000) % 360;
     const dt = interval / 3600000;
@@ -392,8 +391,8 @@ function generateLightVehicleReadings(asset: Asset, dayMs: number, endMs: number
 
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
-    const ignition = inShift && Math.random() > 0.3;
-    const moving = ignition && Math.random() > 0.5;
+    const ignition = inShift && prng() > 0.3;
+    const moving = ignition && prng() > 0.5;
     const speed = moving ? rand(prng, 20, 70) : 0;
     const heading = (t * 0.01) % 360;
     const dt = interval / 3600000;
@@ -429,7 +428,7 @@ function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng
     const inShift = t >= shiftStart && t <= shiftEnd;
     const working = inShift;
     const ignition = working;
-    const moving = working && Math.random() > 0.3;
+    const moving = working && prng() > 0.3;
     const speed = moving ? rand(prng, 5, 25) : 0;
     const heading = (t * 0.005) % 360;
     const dt = interval / 3600000;
@@ -462,7 +461,7 @@ function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prn
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
     const ignition = inShift;
-    const moving = isMoving && inShift && Math.random() > 0.5;
+    const moving = isMoving && inShift && prng() > 0.5;
     const speed = moving ? rand(prng, 5, 15) : 0;
 
     lat += rand(prng, -0.0002, 0.0002) + (moving ? rand(prng, -0.0003, 0.0003) : 0);
@@ -477,9 +476,11 @@ function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prn
 }
 
 function currentTrackerAndAsset(asset: Asset): typeof seed.trackers[0] | null {
+  // Find the current pairing (explicit swap tracking)
   const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (!currentPairing) return null;
-  return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  // Fallback: use the tracker's assetId field (implicit pairing from seed)
+  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
 // ── FB-12 scripted movement (drives to destination) ────────────────────────────
@@ -502,8 +503,9 @@ export function getFB12Readings(startMs: number, endMs: number): Reading[] {
     const t = startAt + (i / steps) * duration;
     if (t > now) break;
     const frac = (t - startAt) / duration;
-    const lat = start.lat + (dest.lat - start.lat) * frac + (Math.random() - 0.5) * 0.001;
-    const lng = start.lng + (dest.lng - start.lng) * frac + (Math.random() - 0.5) * 0.001;
+    const jitter = mulberry32(ANCHOR_MS + i);
+    const lat = start.lat + (dest.lat - start.lat) * frac + (jitter() - 0.5) * 0.001;
+    const lng = start.lng + (dest.lng - start.lng) * frac + (jitter() - 0.5) * 0.001;
     const dist = frac * 35; // ~35 km total
     const speed = Math.min(90, 60 + Math.sin(frac * Math.PI) * 25);
 

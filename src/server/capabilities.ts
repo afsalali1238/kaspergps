@@ -50,16 +50,13 @@ export type Capability =
   | 'console.bookings.view'
   | 'console.bookings.manage'
   | 'console.staff.manage'
-  | 'console.import'
-  | 'console.bookings.view'
-  | 'console.staff.manage';
+  | 'console.import';
 
 const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
   kasper_admin: [
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry', 'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
-    'grant.endEarly',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view', 'alert.acknowledge',
     'users.manage', 'sites.manage',
     'console.tenants.view', 'console.tenants.manage', 'console.assets.manage',
@@ -72,7 +69,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'maintenance.view', 'maintenance.manage',
     'cost.view',
     'muc.view', 'muc.issue', 'muc.void',
-    'billing.view', 'billing.recordPayment',
+    'billing.view', 'billing.recordPayment', 'billing.pay',
     'console.billing.view', 'console.billing.manage',
     'asset.create', 'asset.retire', 'tracker.request',
     'console.assets.transfer', 'console.adapters.manage',
@@ -85,6 +82,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'link.revoke',
     'grant.endEarly',
     'alert.view', 'alert.acknowledge',
+    'label.view',
     'console.tenants.view',
     'console.trackers.view', 'console.trackers.manage', 'console.trackers.configure',
     'console.assets.manage',
@@ -92,19 +90,18 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'playback.view',
     'report.schedule',
     'maintenance.view', 'maintenance.manage',
-    'asset.create', 'asset.retire',
+    'asset.create', 'asset.retire', 'tracker.request',
     'console.assets.transfer', 'console.adapters.manage',
     'console.bookings.view', 'console.bookings.manage',
     'console.import',
+    'muc.view',
   ],
   tenant_admin: [
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry',
     'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
-    'grant.endEarly',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view',
-    'users.manage', 'sites.manage',
     'label.view', 'label.manage',
     'geofence.view', 'geofence.manage',
     'playback.view',
@@ -114,11 +111,13 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'muc.view', 'muc.issue', 'muc.void',
     'billing.view', 'billing.recordPayment', 'billing.pay',
     'asset.create', 'asset.retire', 'tracker.request',
+    'console.assets.transfer',
   ],
   site_user: [
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry',
     'report.run',
     'alert.view',
+    'label.view',
     'geofence.view',
     'playback.view',
     'report.schedule',

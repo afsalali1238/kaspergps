@@ -104,6 +104,7 @@ export interface Asset {
 
 export interface Tracker {
   id: string;
+  assetId?: string | null;
   imei: string;
   model: 'FMC130';
   simIccid: string;
@@ -166,7 +167,9 @@ export type AlertType =
   | 'after_hours_move'
   | 'maintenance_due'
   | 'maintenance_overdue'
-  | 'invoice_overdue';
+  | 'invoice_overdue'
+  | 'idle'
+  | 'low_fuel';
 
 export interface Alert {
   id: string;
@@ -227,6 +230,15 @@ export interface TrackingLink {
   showEta: boolean;
 }
 
+export interface Notification {
+  id: string;
+  userId: string;
+  at: string | number;
+  text: string;
+  read: boolean;
+  href?: string;
+}
+
 export interface AuditEntry {
   id: string;
   at: string | number;
@@ -234,6 +246,7 @@ export interface AuditEntry {
   action: string;
   tenantId?: string;
   assetId?: string;
+  bookingId?: string;
   detail: string;
   reason?: string;
 }
@@ -526,6 +539,8 @@ export interface FeatureDef {
   needs: ParamKey[];
   phase: 'day_one' | 'phase2' | 'later';
   group: string;
+  /** Optional adapter condition — e.g. billing-grade ECU hours need ALL-CAN300 (spec 6.3). */
+  adapter?: Adapter[];
 }
 
 export interface FeatureVisibility {

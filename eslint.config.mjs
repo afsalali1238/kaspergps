@@ -70,10 +70,10 @@ export default [
     },
   },
 
-  // Allow role === in server-side modules (capabilities, capability-reasons, seed, access, api)
-  // The "use can()" rule is for client components; server modules use role checks directly.
+  // Allow role === in server-side modules (capabilities, capability-reasons, seed only).
+  // access.ts and api.ts must use clock.now() — they are NOT exempt from the Date ban.
   {
-    files: ['src/server/capabilities.ts', 'src/server/capability-reasons.ts', 'src/server/seed/**/*.ts', 'src/server/access.ts', 'src/server/api.ts'],
+    files: ['src/server/capabilities.ts', 'src/server/capability-reasons.ts', 'src/server/seed/**/*.ts'],
     rules: {
       'no-restricted-syntax': 'off',
     },
