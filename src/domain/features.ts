@@ -89,6 +89,12 @@ export function featureForSalesView(asset: Asset, key: string, salesView: boolea
   const has = hasFeature(asset, key);
   if (has) return { shown: false }; // already visible normally, no need for locked card
 
+  // The adapter is the blocker (e.g. billing-grade hours on a Tier 2 pickup).
+  if (feature.adapter && !feature.adapter.includes(asset.canProfile.adapter)) {
+    const upgrade = feature.adapter.includes('ALL-CAN300') ? 'ALL-CAN300 (Tier 3)' : feature.adapter.join(' or ');
+    return { shown: true, reason: `Needs ${upgrade}` };
+  }
+
   if (feature.needs.length === 0) return { shown: false };
 
   // Determine why it's locked
