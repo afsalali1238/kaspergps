@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
@@ -17,7 +18,7 @@ function formatTs(ts: string | number): string {
 }
 
 function roleBadge(role: string): React.ReactNode {
-  return <Badge variant={role === 'tenant_admin' ? 'default' : 'secondary'}>
+  return <Badge variant={role === 'tenant_admin' ? 'default' : 'grey'}>
     {role === 'tenant_admin' ? 'Tenant Admin' : 'Site User'}
   </Badge>;
 }
@@ -445,7 +446,7 @@ export default function SettingsPage() {
                           <Link href={`/app/assets/${a.id}`} className="text-xs text-yellow-600 hover:text-yellow font-medium">
                             View
                           </Link>
-                          {a.status !== 'retired' && (
+                          {!a.retiredAt && (
                             <Button variant="danger" size="sm">Retire</Button>
                           )}
                         </div>
