@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { DemoBar } from '@/components/demo/DemoBar';
+import { LanguageProvider } from '@/lib/useT';
+import { LANGUAGE_COOKIE, dirOf, languageFromCookie } from '@/lib/language';
 
 export const metadata: Metadata = {
   title: 'Kasper GPS',
@@ -15,9 +18,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Mirrored customer screens and the public page read their direction from here.
+  const cookieStore = await cookies();
+  const language = languageFromCookie(cookieStore.get(LANGUAGE_COOKIE)?.value);
+
   return (
-    <html lang="en">
+    <html lang={language} dir={dirOf(language)}>
       <head>
         {/* Fonts are loaded here rather than with a CSS @import: an @import after
             the Tailwind import breaks Turbopack's dev CSS parser. */}
@@ -29,8 +36,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-bg antialiased">
-        <DemoBar />
-        {children}
+        <LanguageProvider initial={language}>
+          <DemoBar />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

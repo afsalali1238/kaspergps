@@ -4,11 +4,22 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
+import { LANGUAGES } from '@/lib/language';
 import { signIn } from '@/server/api';
+
+/** The API answers in English; the catalogue has Arabic for these four. */
+const SIGN_IN_ERROR_KEYS: Record<string, string> = {
+  "You don't have an account. Please contact your administrator.": 'signIn.errorNoAccount',
+  'Your account is no longer active. Contact your company admin.': 'signIn.errorDeactivated',
+  "Your company's account is suspended. Contact Kasper.": 'signIn.errorSuspended',
+  'Sign in failed.': 'signIn.errorFailed',
+};
 
 export default function SignInPage() {
   const router = useRouter();
   const store = useStore;
+  const { t, dir, language, setLanguage } = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +41,17 @@ export default function SignInPage() {
         router.replace('/app');
       }
     } else {
-      setError(result.error ?? 'Sign in failed.');
+      const message = result.error ?? 'Sign in failed.';
+      setError(t(SIGN_IN_ERROR_KEYS[message] ?? 'signIn.errorFailed', message));
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col">
+    <div className="min-h-screen bg-bg flex flex-col" dir={dir}>
       {/* Header */}
-      <header className="bg-ink text-paper flex items-center justify-between px-5 py-3">
+      {/* The fixed DEMO bar is 36px tall, so the header clears it (same as the shell). */}
+      <header className="bg-ink text-paper flex items-center justify-between px-5 py-3" style={{ marginTop: '36px' }}>
         <div className="flex items-center gap-2">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect width="20" height="20" rx="4" fill="#FFC400" />
@@ -46,9 +59,27 @@ export default function SignInPage() {
           </svg>
           <span className="text-sm font-semibold text-paper">Kasper</span>
         </div>
-        <span className="text-[10px] font-mono text-grey-500 bg-paper/10 px-2 py-0.5 rounded">
-          DEMO
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg overflow-hidden border border-paper/20">
+            {LANGUAGES.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setLanguage(option.id)}
+                className={
+                  language === option.id
+                    ? 'px-2 py-0.5 text-[10px] font-mono bg-paper text-ink'
+                    : 'px-2 py-0.5 text-[10px] font-mono text-paper/70 hover:bg-paper/10'
+                }
+              >
+                {option.short}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] font-mono text-grey-500 bg-paper/10 px-2 py-0.5 rounded">
+            {t('common.demo', 'DEMO')}
+          </span>
+        </div>
       </header>
 
       {/* Form */}
@@ -63,13 +94,13 @@ export default function SignInPage() {
             <span className="text-lg font-semibold text-ink">Kasper GPS</span>
           </div>
 
-          <h1 className="text-xl font-semibold text-ink text-center mb-1">Sign in</h1>
-          <p className="text-sm text-grey-500 text-center mb-6">Enter your email to continue.</p>
+          <h1 className="text-xl font-semibold text-ink text-center mb-1">{t('signIn.title', 'Sign in')}</h1>
+          <p className="text-sm text-grey-500 text-center mb-6">{t('signIn.subtitle', 'Enter your email to continue.')}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-ink mb-1.5">
-                Email
+                {t('signIn.email', 'Email')}
               </label>
               <input
                 id="email"
@@ -85,7 +116,7 @@ export default function SignInPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">
-                Password
+                {t('signIn.password', 'Password')}
               </label>
               <input
                 id="password"
@@ -106,7 +137,7 @@ export default function SignInPage() {
             )}
 
             <Button type="submit" fullWidth size="md" loading={loading}>
-              Sign in
+              {t('signIn.submit', 'Sign in')}
             </Button>
           </form>
 
@@ -123,7 +154,7 @@ export default function SignInPage() {
                 onClick={() => setShowForgot(true)}
                 className="text-sm text-grey-500 hover:text-ink transition-colors"
               >
-                Forgot password?
+                {t('signIn.forgot', 'Forgot password?')}
               </button>
             )}
           </div>

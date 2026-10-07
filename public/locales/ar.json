@@ -8,10 +8,10 @@
     "notes": [
       "Draft — needs native review before any customer sees it.",
       "Brand names (Kasper GPS, asset codes such as FB-12, INV-EE-0412, MUC numbers, AED) stay in Latin script.",
-      "Keys mirror the existing English screens; no screen reads this file yet."
+      "Keys mirror the existing English screens; no screen reads this file yet.",
+      "Dates are still formatted with English month names (e.g. \"6 Oct\") — left for native review with the rest of the draft."
     ]
   },
-
   "common": {
     "kasperGps": "Kasper GPS",
     "demo": "عرض توضيحي",
@@ -37,7 +37,6 @@
     "apply": "تطبيق",
     "back": "رجوع"
   },
-
   "nav": {
     "map": "الخريطة",
     "alerts": "التنبيهات",
@@ -51,7 +50,6 @@
     "settings": "الإعدادات",
     "signOut": "تسجيل الخروج"
   },
-
   "signIn": {
     "title": "تسجيل الدخول",
     "subtitle": "أدخل بريدك الإلكتروني للمتابعة.",
@@ -64,7 +62,6 @@
     "errorSuspended": "حساب شركتك موقوف. تواصل مع كاسبر.",
     "errorFailed": "تعذّر تسجيل الدخول."
   },
-
   "statuses": {
     "live": "مباشر",
     "idle": "متوقف مع تشغيل المحرك",
@@ -73,7 +70,6 @@
     "unknown": "غير معروف",
     "noTracker": "بدون جهاز تتبع"
   },
-
   "map": {
     "title": "الخريطة",
     "assetCount": "{count} أصل",
@@ -83,7 +79,8 @@
       "stale": "بيانات قديمة",
       "offline": "غير متصل",
       "unknown": "غير معروف",
-      "noTracker": "بدون جهاز تتبع"
+      "noTracker": "بدون جهاز تتبع",
+      "all": "الكل"
     },
     "filters": {
       "site": "الموقع",
@@ -94,14 +91,17 @@
       "owned": "مملوك",
       "rented": "مستأجر",
       "labels": "الملصقات",
-      "clearFilters": "مسح عوامل التصفية"
+      "clearFilters": "مسح عوامل التصفية",
+      "searchPlaceholder": "اكتب للبحث عن الأصول…",
+      "clearSearch": "مسح البحث",
+      "allTypes": "كل الأنواع",
+      "allTiers": "كل الفئات"
     },
     "emptyTitle": "لا توجد أصول مطابقة لعوامل التصفية",
     "emptyDescription": "جرّب مسح بعض عوامل التصفية لعرض أصولك.",
     "rentedBadge": "مستأجر",
     "updated": "آخر تحديث"
   },
-
   "asset": {
     "lastUpdated": "آخر تحديث",
     "noLocationYet": "لا توجد بيانات موقع بعد",
@@ -162,7 +162,6 @@
       "etaHidden": "وقت الوصول مخفي عن المستأجر"
     }
   },
-
   "playback": {
     "play": "تشغيل",
     "pause": "إيقاف مؤقت",
@@ -193,7 +192,6 @@
     "powerCut": "انقطاع التيار",
     "towing": "سحب"
   },
-
   "alerts": {
     "title": "التنبيهات",
     "filters": {
@@ -222,7 +220,6 @@
     "lowFuel": "وقود منخفض",
     "idle": "تشغيل بدون حركة"
   },
-
   "reports": {
     "title": "التقارير",
     "reportType": "نوع التقرير",
@@ -246,7 +243,6 @@
       "geofence": "الأسوار الجغرافية"
     }
   },
-
   "downloads": {
     "title": "التنزيلات",
     "empty": "تظهر التقارير التي تُنشئها هنا.",
@@ -257,7 +253,6 @@
     "skipped": "تم التخطي — لم يعد لديك وصول إلى {code} (انتهى الإيجار في {date})",
     "noAccess": "لم يعد لديك وصول إلى أصول هذا التقرير."
   },
-
   "billing": {
     "title": "الفواتير",
     "subtitle": "فواتير الإيجار وكشوف اشتراك GPS. جميع المبالغ بالدرهم الإماراتي. الأسعار افتراضية.",
@@ -295,7 +290,6 @@
     "emptyReceived": "لا توجد فواتير واردة بعد.",
     "createInvoice": "إنشاء فاتورة"
   },
-
   "certificates": {
     "title": "الشهادات",
     "subtitle": "شهادات الاستخدام الشهرية",
@@ -324,7 +318,6 @@
     "mustBePastPeriod": "يمكن إصدار الشهادات لفترات منتهية فقط.",
     "gapBlocksIssue": "تحتوي هذه الفترة على فجوة بيانات مدتها {hours} ساعة. لا يمكن إصدار الشهادات حتى تتم مراجعتها."
   },
-
   "settings": {
     "title": "الإعدادات",
     "tabs": {
@@ -335,23 +328,52 @@
     },
     "users": {
       "invite": "دعوة مستخدم",
-      "columns": { "name": "الاسم", "email": "البريد الإلكتروني", "role": "الدور", "site": "الموقع", "status": "الحالة", "actions": "إجراءات" },
-      "roles": { "tenantAdmin": "مسؤول الشركة", "siteUser": "مستخدم موقع" },
-      "statuses": { "active": "نشط", "invited": "مدعو", "deactivated": "معطَّل" },
+      "columns": {
+        "name": "الاسم",
+        "email": "البريد الإلكتروني",
+        "role": "الدور",
+        "site": "الموقع",
+        "status": "الحالة",
+        "actions": "إجراءات"
+      },
+      "roles": {
+        "tenantAdmin": "مسؤول الشركة",
+        "siteUser": "مستخدم موقع"
+      },
+      "statuses": {
+        "active": "نشط",
+        "invited": "مدعو",
+        "deactivated": "معطَّل"
+      },
       "deactivate": "تعطيل",
       "reactivate": "إعادة التنشيط",
       "empty": "لا يوجد مستخدمون بعد."
     },
     "sites": {
       "add": "إضافة موقع",
-      "columns": { "name": "الاسم", "location": "الموقع الجغرافي", "radius": "نصف القطر", "assets": "الأصول", "actions": "إجراءات" },
+      "columns": {
+        "name": "الاسم",
+        "location": "الموقع الجغرافي",
+        "radius": "نصف القطر",
+        "assets": "الأصول",
+        "actions": "إجراءات"
+      },
       "save": "حفظ الموقع",
       "selectSite": "اختر موقعًا",
       "empty": "لا توجد مواقع بعد."
     },
     "assets": {
       "add": "إضافة أصل",
-      "columns": { "code": "الرمز", "name": "الاسم", "class": "الفئة", "make": "الصانع", "model": "الطراز", "homeSite": "الموقع الأساسي", "status": "الحالة", "actions": "إجراءات" },
+      "columns": {
+        "code": "الرمز",
+        "name": "الاسم",
+        "class": "الفئة",
+        "make": "الصانع",
+        "model": "الطراز",
+        "homeSite": "الموقع الأساسي",
+        "status": "الحالة",
+        "actions": "إجراءات"
+      },
       "save": "حفظ الأصل",
       "retire": "إخراج من الخدمة",
       "requestTracker": "طلب جهاز تتبع",
@@ -370,7 +392,6 @@
       "empty": "لا توجد ملصقات بعد."
     }
   },
-
   "publicTracking": {
     "wordmark": "Kasper GPS",
     "live": "مباشر",
@@ -391,6 +412,11 @@
     "inactiveCancelled": "تم إلغاء هذا الحجز.",
     "inactiveJobClosed": "تم إغلاق هذه المهمة.",
     "inactiveAccessEnded": "انتهى الوصول إلى هذا الأصل.",
-    "inactiveNotFound": "لم يتم العثور على هذا الرابط."
+    "inactiveNotFound": "لم يتم العثور على هذا الرابط.",
+    "ownerLabel": "المالك",
+    "ownerUnknown": "غير معروف",
+    "yourRentalAsset": "أصل الإيجار الخاص بك",
+    "waitingBody": "لم يُرسل جهاز التتبع أي بيانات منذ إنشاء هذا الرابط.",
+    "languagesLabel": "اللغة"
   }
 }

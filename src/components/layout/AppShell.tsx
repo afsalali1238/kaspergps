@@ -5,9 +5,26 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
-import { anyAssetHasFeature, visibleAssetIds } from '@/server/access';
+import { useT } from '@/lib/useT';
+import { LANGUAGES } from '@/lib/language';
+import { anyAssetHasFeature, hasCapability, visibleAssetIds } from '@/server/access';
+import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import type { Tenant } from '@/domain/types';
+
+/** The gallery of nav labels lives in the Arabic catalogue under `nav.*`. */
+const NAV_KEYS: Record<string, string> = {
+  Map: 'nav.map',
+  Alerts: 'nav.alerts',
+  Reports: 'nav.reports',
+  Downloads: 'nav.downloads',
+  Geofences: 'nav.geofences',
+  Certificates: 'nav.certificates',
+  Billing: 'nav.billing',
+  Maintenance: 'nav.maintenance',
+  'Cost & ROI': 'nav.costAndRoi',
+  Settings: 'nav.settings',
+};
 
 interface NavItem {
   href: string;
@@ -87,6 +104,7 @@ const navItems: NavItem[] = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const store = useStore;
+  const { t, dir, language, setLanguage } = useT();
   const session = store.getState().session;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -94,7 +112,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPhase = store.getState().demoSwitches.phase;
 
   const visibleNavItems = navItems.filter(item => {
-    const hasCap = session ? session.role === 'kasper_admin' || session.role === 'kasper_ops' || (item.capability === 'asset.view') : true;
+    // Real capability check (P3). The old stub only ever let 'asset.view' through,
+    // so customers saw a nav with Map and nothing else.
+    const hasCap = session ? hasCapability(session, item.capability as Capability) : true;
     if (!hasCap) return false;
     if (item.phase === 'phase2' && currentPhase === 'day_one') return false;
     if (item.phase === 'later' && currentPhase !== 'later') return false;
@@ -110,7 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showMobileNav = isCustomer;
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col">
+    <div className="min-h-screen bg-bg flex flex-col" dir={dir}>
       {/* Top bar */}
       <header className="bg-surface border-b border-line px-4 lg:px-6 h-14 flex items-center justify-between sticky top-0 z-40" style={{ marginTop: '36px' }}>
         <div className="flex items-center gap-3">
@@ -139,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Search */}
           <div className="hidden sm:flex items-center gap-1.5 bg-paper border border-line rounded-lg px-2.5 py-1.5 text-sm text-grey-500 w-48">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1"/><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>
-            Type to search assets…
+            {t('map.filters.searchPlaceholder', 'Type to search assets…')}
           </div>
 
           {/* Alerts bell */}
@@ -178,15 +198,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                   {/* Menu items */}
                   <div className="py-1">
-                    {/* Language */}
-                    <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1"/>
-                        <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3.5 3.5l1.5 1.5M9.5 9.5l1.5 1.5M3.5 10.5l1.5-1.5M9.5 4.5l1.5-1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                      </svg>
-                      Language
-                      <span className="ml-auto text-xs text-grey-500">EN / عربي</span>
-                    </button>
+                    {/* Language — customer screens + the public page only (spec 16) */}
+                    {LANGUAGES.map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => setLanguage(option.id)}
+                        className={clsx(
+                          'w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-paper-2',
+                          language === option.id ? 'text-ink font-medium' : 'text-grey-700',
+                        )}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1"/>
+                          <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3.5 3.5l1.5 1.5M9.5 9.5l1.5 1.5M3.5 10.5l1.5-1.5M9.5 4.5l1.5-1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                        </svg>
+                        {option.label}
+                        <span className={clsx('ml-auto text-xs', language === option.id ? 'text-ink' : 'text-grey-500')}>
+                          {option.short}
+                          {language === option.id ? ' ✓' : ''}
+                        </span>
+                      </button>
+                    ))}
 
                     {/* Users & sites (Kasper only) */}
                     {session.isKasper && (
@@ -215,7 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
-                      Sign out
+                      {t('nav.signOut', 'Sign out')}
                     </Link>
                   </div>
                 </div>
@@ -238,52 +270,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left nav (desktop) */}
-        {!showMobileNav && (
-          <nav className="w-56 bg-surface border-r border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
-            <div className="flex flex-col gap-0.5 p-2">
-              {visibleNavItems.map(item => {
-                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={clsx(
-                      'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-yellow/10 text-ink border-l-2 border-yellow border-r-0 -ml-[1px]'
-                        : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
-                    )}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Settings */}
-            {session && (
-              <div className="mt-auto border-t border-line p-2">
+        {/* Left nav (desktop). Both navs render and CSS decides by viewport — the
+            left nav used to be tied to `showMobileNav`, which left customers with no
+            navigation at all on desktop. */}
+        <nav className="w-56 bg-surface border-r border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
+          <div className="flex flex-col gap-0.5 p-2">
+            {visibleNavItems.map(item => {
+              const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
+              return (
                 <Link
-                  href="/app/settings"
+                  key={item.href}
+                  href={item.href}
                   className={clsx(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    pathname === '/app/settings'
+                    isActive
                       ? 'bg-yellow/10 text-ink border-l-2 border-yellow border-r-0 -ml-[1px]'
                       : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
                   )}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Settings
+                  {item.icon}
+                  {t(NAV_KEYS[item.label] ?? '', item.label)}
                 </Link>
-              </div>
-            )}
-          </nav>
-        )}
+              );
+            })}
+          </div>
+
+          {/* Settings */}
+          {session && (
+            <div className="mt-auto border-t border-line p-2">
+              <Link
+                href="/app/settings"
+                className={clsx(
+                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  pathname === '/app/settings'
+                    ? 'bg-yellow/10 text-ink border-l-2 border-yellow border-r-0 -ml-[1px]'
+                    : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
+                )}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t('nav.settings', 'Settings')}
+              </Link>
+            </div>
+          )}
+        </nav>
 
         {/* Mobile bottom nav */}
         {showMobileNav && (
@@ -303,7 +335,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     {item.icon}
-                    {item.label}
+                    {t(NAV_KEYS[item.label] ?? '', item.label)}
                     {isActive && <span className="h-0.5 w-5 bg-yellow rounded-full" />}
                   </Link>
                 );

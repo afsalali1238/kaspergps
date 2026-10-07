@@ -11,6 +11,7 @@ import {
   Button,
 } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship } from '@/server/access';
@@ -114,6 +115,7 @@ function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
 
 export default function MapPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
   const showHidden = store.getState().demoSwitches.showHidden;
@@ -225,12 +227,14 @@ export default function MapPage() {
               key === 'offline' ? 'bg-offline' :
               'bg-grey-500'
             )} />
-            {key === 'no_tracker' ? 'No tracker' : key.charAt(0).toUpperCase() + key.slice(1)}
+            {t(`map.kpi.${key === 'no_tracker' ? 'noTracker' : key}`, key === 'no_tracker' ? 'No tracker' : key.charAt(0).toUpperCase() + key.slice(1))}
             <span className="font-mono text-grey-500 ml-1">{statusCounts[key]}</span>
           </button>
         ))}
         <div className="flex-1" />
-        <span className="text-xs text-grey-500 font-mono">{totalVisible} assets</span>
+        <span className="text-xs text-grey-500 font-mono">
+          {t('map.assetCount', `${totalVisible} assets`, { count: totalVisible })}
+        </span>
       </div>
 
       {loading ? (
@@ -250,9 +254,9 @@ export default function MapPage() {
         </div>
       ) : visibleAssets.length === 0 ? (
         <EmptyState
-          title="No assets match these filters"
-          description="Try clearing some filters to see your assets."
-          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); }}>Clear filters</Button>}
+          title={t('map.emptyTitle', 'No assets match these filters')}
+          description={t('map.emptyDescription', 'Try clearing some filters to see your assets.')}
+          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); }}>{t('map.filters.clearFilters', 'Clear filters')}</Button>}
         />
       ) : (
         <>
@@ -305,7 +309,7 @@ export default function MapPage() {
           {/* Filters */}
           {siteOptions.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Site:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.site', 'Site')}:</span>
               {siteOptions.map(s => (
                 <button
                   key={s.id}
@@ -322,7 +326,7 @@ export default function MapPage() {
           )}
           {classOptions.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Type:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.type', 'Type')}:</span>
               {classOptions.map(cls => (
                 <button
                   key={cls}
@@ -348,7 +352,7 @@ export default function MapPage() {
           )}
           {hasRented && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Show:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.show', 'Show')}:</span>
               {(['all', 'owned', 'rented'] as const).map(r => (
                 <button
                   key={r}
@@ -358,13 +362,19 @@ export default function MapPage() {
                     rentedFilter === r ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                   )}
                 >
-                  {r === 'all' ? 'All' : r === 'owned' ? 'Owned' : 'Rented in'}
+                  {r === 'all'
+                    ? t('common.all', 'All')
+                    : r === 'owned'
+                      ? t('map.filters.owned', 'Owned')
+                      : t('map.filters.rented', 'Rented in')}
                 </button>
               ))}
             </div>
           )}
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-xs text-grey-500 hover:text-ink">Clear search</button>
+            <button onClick={() => setSearchQuery('')} className="text-xs text-grey-500 hover:text-ink">
+              {t('map.filters.clearSearch', 'Clear search')}
+            </button>
           )}
 
           {/* List panel */}
@@ -389,7 +399,7 @@ export default function MapPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-ink truncate">{a.code} — {a.name}</span>
-                      {a.isRentedIn && <Badge variant="yellow">Rented</Badge>}
+                      {a.isRentedIn && <Badge variant="yellow">{t('map.rentedBadge', 'Rented')}</Badge>}
                     </div>
                     <div className="text-xs text-grey-500 mt-0.5">
                       {a.siteName} · {a.lastUpdated}

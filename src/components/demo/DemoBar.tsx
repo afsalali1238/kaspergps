@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clocklib from '@/lib/clock';
+import { readLanguageCookie, type Language } from '@/lib/language';
 
 import { ANCHOR_MS } from '@/server/seed/data';
 import type { Session } from '@/domain/types';
@@ -115,6 +116,23 @@ export function DemoBar() {
   const router = useRouter();
   const session = useStore.getState().session;
 
+  // Read straight from the cookie and re-read whenever it changes: DemoBar sits
+  // outside LanguageProvider, and the language toggle is on the customer screens.
+  const [demoLanguage, setDemoLanguage] = useState<Language>('en');
+  useEffect(() => {
+    const read = () => setDemoLanguage(readLanguageCookie());
+    read();
+    window.addEventListener('focus', read);
+    document.addEventListener('visibilitychange', read);
+    const poll = window.setInterval(read, 1000); // the toggle itself is on the screens below
+    return () => {
+      window.removeEventListener('focus', read);
+      document.removeEventListener('visibilitychange', read);
+      window.clearInterval(poll);
+    };
+  }, []);
+  const demoDir = demoLanguage === 'ar' ? 'rtl' : 'ltr';
+
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
@@ -194,7 +212,18 @@ export function DemoBar() {
   }, [router]);
 
   return (
-    <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: '36px' }}>
+    <div
+      dir={demoDir}
+      className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto"
+      style={{ height: '36px' }}
+    >
+      {/* The demo bar sits outside the shell, so it mirrors itself. It stays in
+          English except for a small tag when the demo language is Arabic. */}
+      {demoLanguage === 'ar' && (
+        <span className="flex-shrink-0 text-[9px] text-paper/60 border border-paper/20 rounded px-1">
+          عربي
+        </span>
+      )}
       {/* DEMO tag */}
       <span className="demo-tag flex-shrink-0 text-[9px]">DEMO</span>
 
