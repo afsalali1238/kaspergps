@@ -663,7 +663,9 @@
     "ownerUnknown": "غير معروف",
     "yourRentalAsset": "أصل الإيجار الخاص بك",
     "waitingBody": "لم يُرسل جهاز التتبع أي بيانات منذ إنشاء هذا الرابط.",
-    "languagesLabel": "اللغة"
+    "languagesLabel": "اللغة",
+    "liveMap": "الخريطة المباشرة",
+    "arrival": "الوصول"
   },
   "schedules": {
     "title": "الجداول",
