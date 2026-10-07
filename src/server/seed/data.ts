@@ -32,6 +32,7 @@ const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
 // Anchor = 6 Oct 2026 10:00 GST (Dubai time)
 // Previous month = September 2026
 const ANCHOR_ISO = '2026-10-06T10:00:00+04:00';
+const DUBAI_ANCHOR_HOUR = 10; // the anchor is 10:00 Dubai time
 export const ANCHOR_MS = new Date(ANCHOR_ISO).getTime();
 
 export function daysAgo(n: number): number {
@@ -43,6 +44,16 @@ export function hoursAgo(n: number): number {
 export function minsAgo(n: number): number {
   return ANCHOR_MS - n * 60000;
 }
+/**
+ * A Dubai-local wall-clock time, `dayOffset` days from the anchor day.
+ * The anchor is 10:00 in Dubai (ANCHOR_ISO), so 08:00 is two hours earlier.
+ * Seeded collections (bookings, links, invoices …) are written in this format
+ * so the demo shows the times section 8 of the prompt lists.
+ */
+export function dubaiOn(dayOffset: number, hour: number, minute = 0): number {
+  return ANCHOR_MS + dayOffset * 86400000 + (hour - DUBAI_ANCHOR_HOUR) * 3600000 + minute * 60000;
+}
+
 export function daysFromNow(n: number): number {
   return ANCHOR_MS + n * 86400000;
 }
@@ -354,36 +365,36 @@ export const assets: Asset[] = assetRows.map(a => ({
 
 export const bookings: Booking[] = [
   // Current bookings
-  { id: 'b-1001', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysAgo(2) + 8*3600000, end: daysFromNow(5) + 18*3600000, status: 'active', reference: 'BK-1001', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8, destination: undefined },
-  { id: 'b-1002', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: daysAgo(6) + 7*3600000, end: daysFromNow(8) + 18*3600000, status: 'active', reference: 'BK-1002', rateType: 'daily', rateAed: 3500, destination: undefined },
-  { id: 'b-1003', assetId: 'a-ex07', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysFromNow(1) + 8*3600000, end: daysFromNow(9) + 18*3600000, status: 'scheduled', reference: 'BK-1003', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
-  { id: 'b-1004', assetId: 'a-wl06', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(1) + 7*3600000, end: daysFromNow(10) + 18*3600000, status: 'active', reference: 'BK-1004', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
-  { id: 'b-1005', assetId: 'a-th01', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(4) + 7*3600000, end: daysFromNow(3) + 18*3600000, status: 'active', reference: 'BK-1005', rateType: 'daily', rateAed: 1200 },
-  { id: 'b-1006', assetId: 'a-gn01', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(5) + 6*3600000, end: daysFromNow(9) + 22*3600000, status: 'active', reference: 'BK-1006', rateType: 'daily', rateAed: 800 },
-  { id: 'b-1007', assetId: 'a-bd02', ownerTenantId: 't-emirates', renterTenantId: 't-gulflift', renterName: 'Gulf Lift Rentals', renterSiteId: 's-gulflift-aq', start: daysAgo(3) + 7*3600000, end: daysFromNow(4) + 18*3600000, status: 'active', reference: 'BK-1007', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
-  { id: 'b-1008', assetId: 'a-tp21', ownerTenantId: 't-alnoor', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-jvc', start: daysAgo(10) + 7*3600000, end: daysAgo(5) + 18*3600000, status: 'closed', closedAt: daysAgo(5) + 18*3600000, reference: 'BK-1008', rateType: 'daily', rateAed: 1100 },
-  { id: 'b-1009', assetId: 'a-cr05', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: daysAgo(2) + 7*3600000, end: daysFromNow(6) + 18*3600000, status: 'cancelled', cancelledAt: daysAgo(3) + 7*3600000, reference: 'BK-1009', rateType: 'daily', rateAed: 2800 },
-  { id: 'b-1010', assetId: 'a-ex11', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(6) + 7*3600000, end: daysFromNow(4) + 18*3600000, status: 'active', reference: 'BK-1010', rateType: 'hourly', rateAed: 175, minHoursPerDay: 8 },
-  { id: 'b-1011', assetId: 'a-fb12', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Al Habtoor Logistics', renterSiteId: null, start: ANCHOR_MS, end: ANCHOR_MS + 14*3600000, status: 'active', reference: 'BK-1011', rateType: 'daily', rateAed: 1400, destination: { name: 'Al Habtoor site, Al Barsha', lat: 25.1130, lng: 55.2000 } },
-  { id: 'b-1012', assetId: 'a-lb02', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Bin Saeed Haulage', renterSiteId: null, start: daysAgo(2) + 6*3600000, end: daysAgo(1) + 17*3600000, status: 'closed', closedAt: daysAgo(1) + 17*3600000, reference: 'BK-1012', rateType: 'daily', rateAed: 1200 },
+  { id: 'b-1001', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(-2, 8), end: dubaiOn(5, 18), status: 'active', reference: 'BK-1001', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8, destination: undefined },
+  { id: 'b-1002', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: dubaiOn(-6, 7), end: dubaiOn(8, 18), status: 'active', reference: 'BK-1002', rateType: 'daily', rateAed: 3500, destination: undefined },
+  { id: 'b-1003', assetId: 'a-ex07', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(1, 8), end: dubaiOn(9, 18), status: 'scheduled', reference: 'BK-1003', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
+  { id: 'b-1004', assetId: 'a-wl06', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-1, 7), end: dubaiOn(10, 18), status: 'active', reference: 'BK-1004', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
+  { id: 'b-1005', assetId: 'a-th01', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-4, 7), end: dubaiOn(3, 18), status: 'active', reference: 'BK-1005', rateType: 'daily', rateAed: 1200 },
+  { id: 'b-1006', assetId: 'a-gn01', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-5, 6), end: dubaiOn(9, 22), status: 'active', reference: 'BK-1006', rateType: 'daily', rateAed: 800 },
+  { id: 'b-1007', assetId: 'a-bd02', ownerTenantId: 't-emirates', renterTenantId: 't-gulflift', renterName: 'Gulf Lift Rentals', renterSiteId: 's-gulflift-aq', start: dubaiOn(-3, 7), end: dubaiOn(4, 18), status: 'active', reference: 'BK-1007', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
+  { id: 'b-1008', assetId: 'a-tp21', ownerTenantId: 't-alnoor', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-jvc', start: dubaiOn(-10, 7), end: dubaiOn(-5, 18), status: 'closed', closedAt: dubaiOn(-5, 18), reference: 'BK-1008', rateType: 'daily', rateAed: 1100 },
+  { id: 'b-1009', assetId: 'a-cr05', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: dubaiOn(-2, 7), end: dubaiOn(6, 18), status: 'cancelled', cancelledAt: dubaiOn(-3, 7), reference: 'BK-1009', rateType: 'daily', rateAed: 2800 },
+  { id: 'b-1010', assetId: 'a-ex11', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-6, 7), end: dubaiOn(4, 18), status: 'active', reference: 'BK-1010', rateType: 'hourly', rateAed: 175, minHoursPerDay: 8 },
+  { id: 'b-1011', assetId: 'a-fb12', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Al Habtoor Logistics', renterSiteId: null, start: dubaiOn(0, 6), end: dubaiOn(0, 20), status: 'active', reference: 'BK-1011', rateType: 'daily', rateAed: 1400, destination: { name: 'Al Habtoor site, Al Barsha', lat: 25.1130, lng: 55.2000 } },
+  { id: 'b-1012', assetId: 'a-lb02', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Bin Saeed Haulage', renterSiteId: null, start: dubaiOn(-2, 6), end: dubaiOn(-1, 17), status: 'closed', closedAt: dubaiOn(-1, 17), reference: 'BK-1012', rateType: 'daily', rateAed: 1200 },
   // Past month bookings
-  { id: 'b-0981', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(35) + 7*3600000, end: daysAgo(16) + 18*3600000, status: 'closed', closedAt: daysAgo(16) + 18*3600000, reference: 'BK-0981', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8 },
-  { id: 'b-0982', assetId: 'a-wl03', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysAgo(31) + 7*3600000, end: daysAgo(11) + 18*3600000, status: 'closed', closedAt: daysAgo(11) + 18*3600000, reference: 'BK-0982', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
-  { id: 'b-0983', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(27) + 7*3600000, end: daysAgo(8) + 18*3600000, status: 'closed', closedAt: daysAgo(8) + 18*3600000, reference: 'BK-0983', rateType: 'daily', rateAed: 3200 },
+  { id: 'b-0981', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-35, 7), end: dubaiOn(-16, 18), status: 'closed', closedAt: dubaiOn(-16, 18), reference: 'BK-0981', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8 },
+  { id: 'b-0982', assetId: 'a-wl03', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(-31, 7), end: dubaiOn(-11, 18), status: 'closed', closedAt: dubaiOn(-11, 18), reference: 'BK-0982', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
+  { id: 'b-0983', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-27, 7), end: dubaiOn(-8, 18), status: 'closed', closedAt: dubaiOn(-8, 18), reference: 'BK-0983', rateType: 'daily', rateAed: 3200 },
 ];
 
 // Early override for BK-1010
 export const grantOverrides: { bookingId: string; endedAt: string | number; endedBy: string; reason: string }[] = [
-  { bookingId: 'b-1010', endedAt: daysAgo(1) + 16.33*3600000, endedBy: 'u-khalid', reason: 'Payment overdue for two weeks' },
+  { bookingId: 'b-1010', endedAt: dubaiOn(-1, 16, 20), endedBy: 'u-khalid', reason: 'Payment overdue for two weeks' },
 ];
 
 // ── Tracking links ─────────────────────────────────────────────────────────────
 
 export const trackingLinks: TrackingLink[] = [
-  { id: 'lk-fb12', token: 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5', assetId: 'a-fb12', bookingId: 'b-1011', createdBy: 'u-omar', createdAt: ANCHOR_MS - 2*3600000, expiresAt: ANCHOR_MS + 14*3600000, showEta: true },
-  { id: 'lk-tp22', token: 'dB8rXp2kN9wQ4mY7hT6vZ1AaCs', assetId: 'a-tp22', bookingId: null, createdBy: 'u-omar', createdAt: ANCHOR_MS - 4*3600000, expiresAt: ANCHOR_MS + 20*3600000, showEta: false },
-  { id: 'lk-lb02', token: 'fH3jKp7wR9xT2nY4qM6vZ1AbCs', assetId: 'a-lb02', bookingId: 'b-1012', createdBy: 'u-omar', createdAt: daysAgo(2) + 6*3600000, expiresAt: daysAgo(1) + 17*3600000, revokedAt: daysAgo(1) + 17*3600000, revokedBy: 'u-omar', revokeReason: 'job_closed' as const, showEta: false },
-  { id: 'lk-cr02', token: 'rT4kWp8nN3yU7mZ2hF5vX1AcDe', assetId: 'a-cr02', bookingId: 'b-1002', createdBy: 'u-priya', createdAt: daysAgo(5) + 7*3600000, expiresAt: daysFromNow(8) + 18*3600000, revokedAt: daysAgo(2) + 7*3600000, revokedBy: 'u-priya', revokeReason: 'manual' as const, showEta: false },
+  { id: 'lk-fb12', token: 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5', assetId: 'a-fb12', bookingId: 'b-1011', createdBy: 'u-omar', createdAt: dubaiOn(0, 8), expiresAt: dubaiOn(0, 20), showEta: true },
+  { id: 'lk-tp22', token: 'dB8rXp2kN9wQ4mY7hT6vZ1AaCs', assetId: 'a-tp22', bookingId: null, createdBy: 'u-omar', createdAt: dubaiOn(0, 6), expiresAt: dubaiOn(1, 2), showEta: false },
+  { id: 'lk-lb02', token: 'fH3jKp7wR9xT2nY4qM6vZ1AbCs', assetId: 'a-lb02', bookingId: 'b-1012', createdBy: 'u-omar', createdAt: dubaiOn(-2, 8), expiresAt: dubaiOn(-1, 17), revokedAt: dubaiOn(-1, 17), revokedBy: 'u-omar', revokeReason: 'job_closed' as const, showEta: false },
+  { id: 'lk-cr02', token: 'rT4kWp8nN3yU7mZ2hF5vX1AcDe', assetId: 'a-cr02', bookingId: 'b-1002', createdBy: 'u-priya', createdAt: dubaiOn(-6, 7), expiresAt: dubaiOn(8, 18), revokedAt: dubaiOn(-2, 7), revokedBy: 'u-priya', revokeReason: 'manual' as const, showEta: false },
 ];
 
 // ── Labels ─────────────────────────────────────────────────────────────────────
