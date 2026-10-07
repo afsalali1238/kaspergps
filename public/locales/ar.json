@@ -242,7 +242,17 @@
     "refuel": "تعبئة وقود",
     "fuelDrop": "انخفاض الوقود",
     "powerCut": "انقطاع التيار",
-    "towing": "سحب"
+    "towing": "سحب",
+    "title": "تشغيل · {code}",
+    "tripTitle": "تشغيل الرحلة · {code}",
+    "tripStarts": "تبدأ {time}",
+    "noDataShort": "لا توجد بيانات",
+    "states": {
+      "moving": "متحرك",
+      "idle": "ثابت والمحرك يعمل",
+      "off": "مطفأ",
+      "nodata": "لا توجد بيانات"
+    }
   },
   "alerts": {
     "title": "التنبيهات",

@@ -426,7 +426,9 @@ export default function AssetDetailPage() {
           geofenceEvents={seed.geofenceEvents}
           clipStartMs={window ? window.start : undefined}
           focusTripId={playback.tripId}
-          title={playback.tripId ? `Trip playback · ${asset.code}` : `Playback · ${asset.code}`}
+          title={playback.tripId
+            ? t('playback.tripTitle', `Trip playback · ${asset.code}`, { code: asset.code })
+            : t('playback.title', `Playback · ${asset.code}`, { code: asset.code })}
           onClose={() => setPlayback(null)}
         />
       )}

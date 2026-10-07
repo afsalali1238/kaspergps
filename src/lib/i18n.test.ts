@@ -28,6 +28,7 @@ const WIRED_SOURCES = [
   'app/app/geofences/page.tsx',
   'app/app/maintenance/page.tsx',
   'app/app/cost/page.tsx',
+  'src/components/playback/Player.tsx',
 ];
 
 function walk(node: unknown, pathSoFar: string[] = []): { path: string; value: string }[] {
@@ -158,6 +159,11 @@ describe('keys the wired screens ask for', () => {
       'geofences.emptyDescription',
       'maintenance.subtitle',
       'cost.subtitle',
+      'playback.title',
+      'playback.tripOf',
+      'playback.events',
+      'playback.states.moving',
+      'playback.reducedMotion',
     ]) {
       expect(hasArabic(key), key).toBe(true);
     }

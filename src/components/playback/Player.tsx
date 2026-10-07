@@ -30,6 +30,8 @@ const PlaybackMap = dynamic<PlaybackMapProps>(() => import('./PlaybackMap').then
   loading: () => <div className="h-full flex items-center justify-center text-xs text-grey-500">Loading map…</div>,
 });
 import { Button } from '@/components/ui';
+import { useT } from '@/lib/useT';
+import type { TFunction } from '@/lib/i18n';
 import * as clock from '@/lib/clock';
 import {
   buildPlaybackData,
@@ -75,6 +77,32 @@ const STATE_COLOURS: Record<PlaybackState, string> = {
   off: '#9A9CA1',
   nodata: 'transparent',
 };
+
+/** Names for the event pins. The domain builds the English label; the Player
+ *  translates the word and keeps any figure the label carries ("+12%"). */
+const EVENT_LABEL_KEYS: Partial<Record<PlaybackEventKind, { key: string; fallback: string }>> = {
+  trip_start: { key: 'playback.tripStart', fallback: 'Trip start' },
+  trip_stop: { key: 'playback.tripStop', fallback: 'Trip stop' },
+  harsh_brake: { key: 'playback.harshBraking', fallback: 'Harsh braking' },
+  harsh_accel: { key: 'playback.harshAcceleration', fallback: 'Harsh acceleration' },
+  harsh_corner: { key: 'playback.harshCornering', fallback: 'Harsh cornering' },
+  harsh_driving: { key: 'playback.harshDriving', fallback: 'Harsh driving' },
+  overspeed: { key: 'playback.overSpeed', fallback: 'Over speed' },
+  geofence_enter: { key: 'playback.geofenceEnter', fallback: 'Entered geofence' },
+  geofence_exit: { key: 'playback.geofenceExit', fallback: 'Left geofence' },
+  refuel: { key: 'playback.refuel', fallback: 'Refuel' },
+  fuel_drop: { key: 'playback.fuelDrop', fallback: 'Fuel drop' },
+  power_cut: { key: 'playback.powerCut', fallback: 'Power cut' },
+  towing: { key: 'playback.towing', fallback: 'Towing' },
+};
+
+function eventLabel(kind: PlaybackEventKind, label: string, t: TFunction): string {
+  const entry = EVENT_LABEL_KEYS[kind];
+  if (!entry) return label;
+  const word = t(entry.key, entry.fallback);
+  const figure = label.match(/[-+]?\d+(?:\.\d+)?\s*%?$/);
+  return figure ? `${word} ${figure[0]}` : word;
+}
 
 export const EVENT_STYLES: Record<PlaybackEventKind, { colour: string; glyph: string }> = {
   trip_start: { colour: '#1F9A6D', glyph: '▶' },
@@ -146,6 +174,8 @@ export function Player({
   title,
   onClose,
 }: PlayerProps) {
+  const { t } = useT();
+
   // ── Data ────────────────────────────────────────────────────────────────────
   const data = useMemo(
     () =>
@@ -312,24 +342,25 @@ export function Player({
 
   // ── Readout rows ────────────────────────────────────────────────────────────
   const supports = (key: string) => canSupported.includes(key);
+  const notMeasured = t('asset.notMeasured', 'Not measured');
   const value = (v: number | undefined, unit: string, digits = 1) =>
-    v === undefined ? 'Not measured' : `${v.toFixed(digits)} ${unit}`;
+    v === undefined ? notMeasured : `${v.toFixed(digits)} ${unit}`;
 
   const readoutRows: { label: string; value: string }[] = [
-    { label: 'Speed', value: reading ? `${reading.speedKmh.toFixed(1)} km/h` : '—' },
-    { label: 'Ignition', value: reading ? (reading.ignition ? 'On' : 'Off') : '—' },
-    { label: 'Heading', value: reading ? `${Math.round(reading.heading)}°` : '—' },
-    { label: 'GPS distance', value: reading ? `${reading.gpsDistanceKm.toFixed(1)} km` : '—' },
+    { label: t('asset.tiles.speed', 'Speed'), value: reading ? `${reading.speedKmh.toFixed(1)} km/h` : '—' },
+    { label: t('asset.tiles.ignition', 'Ignition'), value: reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : '—' },
+    { label: t('asset.tiles.heading', 'Heading'), value: reading ? `${Math.round(reading.heading)}°` : '—' },
+    { label: t('asset.tiles.gpsDistance', 'GPS distance'), value: reading ? `${reading.gpsDistanceKm.toFixed(1)} km` : '—' },
   ];
 
   if (tier >= 2) {
     readoutRows.push(
-      { label: 'Fuel level', value: supports('fuelLevel') ? value(reading?.fuelLevelPct, '%', 0) : 'Not measured' },
-      { label: 'RPM', value: supports('rpm') ? value(reading?.rpm, 'rpm', 0) : 'Not measured' },
-      { label: 'Coolant', value: supports('coolantTemp') ? value(reading?.coolantC, '°C', 0) : 'Not measured' },
-      { label: 'Engine load', value: supports('engineLoad') ? value(reading?.engineLoadPct, '%', 0) : 'Not measured' },
-      { label: 'Engine hours · ECU', value: supports('engineHours') ? value(reading?.engineHours, 'h') : 'Not measured' },
-      { label: 'AdBlue', value: supports('adBlue') ? value(reading?.adBluePct, '%', 0) : 'Not measured' },
+      { label: t('asset.tiles.fuelLevel', 'Fuel level'), value: supports('fuelLevel') ? value(reading?.fuelLevelPct, '%', 0) : notMeasured },
+      { label: t('asset.tiles.engineRpm', 'RPM'), value: supports('rpm') ? value(reading?.rpm, 'rpm', 0) : notMeasured },
+      { label: t('asset.tiles.coolant', 'Coolant'), value: supports('coolantTemp') ? value(reading?.coolantC, '°C', 0) : notMeasured },
+      { label: t('asset.tiles.engineLoad', 'Engine load'), value: supports('engineLoad') ? value(reading?.engineLoadPct, '%', 0) : notMeasured },
+      { label: `${t('asset.tiles.engineHours', 'Engine hours')} · ${t('asset.tiles.sourceEcu', 'ECU')}`, value: supports('engineHours') ? value(reading?.engineHours, 'h') : notMeasured },
+      { label: t('asset.tiles.adBlue', 'AdBlue'), value: supports('adBlue') ? value(reading?.adBluePct, '%', 0) : notMeasured },
     );
   }
 
@@ -339,14 +370,16 @@ export function Player({
     <div className="bg-surface border border-line rounded-lg overflow-hidden" data-testid="playback-player">
       <div className="flex items-center justify-between px-4 py-2 border-b border-line">
         <div className="text-sm font-medium text-ink">
-          {title ?? `Playback · ${assetCode}`}
+          {title ?? t('playback.title', `Playback · ${assetCode}`, { code: assetCode })}
           {assetName && <span className="text-grey-500 font-normal"> — {assetName}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {reducedMotion && <span className="text-xs text-grey-500">Reduced motion: stepping</span>}
+          {reducedMotion && (
+            <span className="text-xs text-grey-500">{t('playback.reducedMotion', 'Reduced motion: stepping')}</span>
+          )}
           {onClose && (
             <Button variant="secondary" size="sm" onClick={onClose}>
-              Close
+              {t('common.close', 'Close')}
             </Button>
           )}
         </div>
@@ -367,12 +400,22 @@ export function Player({
 
             {bannerGap && (
               <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-ink/90 text-white text-xs font-medium px-3 py-1.5 rounded-md">
-                {gapLabel(bannerGap)}
+                {t('playback.noData', gapLabel(bannerGap), {
+                  from: clock.formatDubaiTime(bannerGap.from),
+                  to: clock.formatDubaiTime(bannerGap.to),
+                })}
               </div>
             )}
             {focusTripId && focusedTrip && (
               <div className="absolute bottom-3 left-3 bg-white/90 text-xs px-2 py-1 rounded shadow-sm text-grey-700">
-                Trip {focusedTrip.index + 1} of {data.trips.length} · starts {clock.formatDubaiTime(focusedTrip.startMs)}
+                {t('playback.tripOf', `Trip ${focusedTrip.index + 1} of ${data.trips.length}`, {
+                  index: focusedTrip.index + 1,
+                  total: data.trips.length,
+                })}
+                {' · '}
+                {t('playback.tripStarts', `starts ${clock.formatDubaiTime(focusedTrip.startMs)}`, {
+                  time: clock.formatDubaiTime(focusedTrip.startMs),
+                })}
               </div>
             )}
           </div>
@@ -389,10 +432,10 @@ export function Player({
                 }}
                 data-testid="playback-play"
               >
-                {playing ? 'Pause' : 'Play'}
+                {playing ? t('playback.pause', 'Pause') : t('playback.play', 'Play')}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => { stop(); setCursorMs(fromMs); setJumpedGap(null); }}>
-                Restart
+                {t('playback.restart', 'Restart')}
               </Button>
               <div className="flex items-center gap-1 ml-1">
                 {PLAYBACK_SPEEDS.map(s => (
@@ -436,7 +479,9 @@ export function Player({
                           ? 'repeating-linear-gradient(45deg, #E3E4E7 0 4px, #F6F6F7 4px 8px)'
                           : undefined,
                     }}
-                    title={segment.state === 'nodata' ? 'No data' : segment.state}
+                    title={segment.state === 'nodata'
+                      ? t('playback.noDataShort', 'No data')
+                      : t(`playback.states.${segment.state}`, segment.state)}
                   />
                 ))}
               </div>
@@ -445,7 +490,7 @@ export function Player({
               {visibleEvents.map(event => (
                 <button
                   key={event.id}
-                  title={`${event.label}${event.detail ? ` · ${event.detail}` : ''} · ${clock.formatDubaiTime(event.atMs)}`}
+                  title={`${eventLabel(event.kind, event.label, t)}${event.detail ? ` · ${event.detail}` : ''} · ${clock.formatDubaiTime(event.atMs)}`}
                   onClick={e => {
                     e.stopPropagation();
                     seek(event.atMs);
@@ -467,7 +512,11 @@ export function Player({
             <div className="flex items-center justify-between text-[11px] text-grey-500 font-mono">
               <span>{clock.formatDubaiTime(fromMs)}</span>
               {clipStartMs !== undefined && clipStartMs > data.fromMs && (
-                <span className="text-amber-dark">Your rental starts {clock.formatDubaiDateTime(clipStartMs)}</span>
+                <span className="text-amber-dark">
+                  {t('playback.periodStartsInYourRental', `Your rental history starts ${clock.formatDubaiDateTime(clipStartMs)}`, {
+                    time: clock.formatDubaiDateTime(clipStartMs),
+                  })}
+                </span>
               )}
               <span>{clock.formatDubaiTime(toMs)}</span>
             </div>
@@ -476,18 +525,20 @@ export function Player({
 
         {/* Side readout */}
         <div className="border-t lg:border-t-0 lg:border-l border-line p-3 space-y-2">
-          <div className="text-xs text-grey-500 font-medium uppercase">Readout</div>
+          <div className="text-xs text-grey-500 font-medium uppercase">{t('playback.readout', 'Readout')}</div>
           <div className="space-y-1">
             {readoutRows.map(row => (
               <div key={row.label} className="flex items-center justify-between text-xs">
                 <span className="text-grey-500">{row.label}</span>
-                <span className={clsx('font-mono', row.value === 'Not measured' ? 'text-grey-500' : 'text-ink')}>{row.value}</span>
+                <span className={clsx('font-mono', row.value === notMeasured ? 'text-grey-500' : 'text-ink')}>{row.value}</span>
               </div>
             ))}
           </div>
           {visibleEvents.length > 0 && (
             <>
-              <div className="text-xs text-grey-500 font-medium uppercase pt-2">Events ({visibleEvents.length})</div>
+              <div className="text-xs text-grey-500 font-medium uppercase pt-2">
+                {t('playback.events', 'Events')} ({visibleEvents.length})
+              </div>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {visibleEvents.map(event => (
                   <button
@@ -496,7 +547,7 @@ export function Player({
                     className="w-full text-left text-xs hover:bg-paper-2 rounded px-1 py-0.5"
                   >
                     <span style={{ color: EVENT_STYLES[event.kind].colour }}>{EVENT_STYLES[event.kind].glyph}</span>{' '}
-                    <span className="text-ink">{event.label}</span>
+                    <span className="text-ink">{eventLabel(event.kind, event.label, t)}</span>
                     {event.detail && <span className="text-grey-500"> · {event.detail}</span>}
                     <span className="text-grey-500 font-mono"> · {clock.formatDubaiTime(event.atMs)}</span>
                   </button>
