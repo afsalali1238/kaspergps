@@ -185,6 +185,7 @@ export function DemoBar() {
   const [clockOpen, setClockOpen] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [resetArmed, setResetArmed] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -505,25 +506,39 @@ export function DemoBar() {
               <div className="border-t border-[#2a2c30] pt-1 mt-1">
                 <button
                   onClick={() => {
-                    if (window.confirm('Reset all demo data to the seed?')) {
-                      clocklib.resetOffset();
-                      useStore.getState().resetClock();
-                      setToolsOpen(false);
+                    if (!resetArmed) {
+                      setResetArmed(true);
+                      return;
                     }
+                    // In-app state lives in memory: clearing the saved switches and
+                    // reloading puts the whole prototype back to the seeded day one.
+                    clocklib.resetOffset();
+                    useStore.getState().resetClock();
+                    try { localStorage.removeItem('kasper.store.v2'); } catch { /* private mode */ }
+                    setResetArmed(false);
+                    setToolsOpen(false);
+                    window.location.reload();
                   }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-red/80 hover:bg-red/10 transition-colors"
+                  className={
+                    resetArmed
+                      ? 'w-full text-left px-3 py-1.5 text-xs bg-red/10 text-red hover:bg-red/20 transition-colors'
+                      : 'w-full text-left px-3 py-1.5 text-xs text-red/80 hover:bg-red/10 transition-colors'
+                  }
                 >
-                  Reset demo data
+                  {resetArmed ? 'Click again — this clears every demo change' : 'Reset demo data'}
                 </button>
                 <button
                   onClick={() => {
                     const target = seed.mucs.find(m => m.number === 'MUC-2026-09-EX-04-01') ?? seed.mucs[0];
                     if (!target) return;
                     const result = tamperWithMuc(target.number);
-                    if (result.ok) {
-                      window.alert(`${result.message}\n\nOpen /verify/${target.number} to see it.`);
-                    }
                     setToolsOpen(false);
+                    if (result.ok) {
+                      window.alert(`${result.message}\n\nOpening the verify page…`);
+                      // Client-side navigation: the tamper lives in memory, so a
+                      // full reload would quietly restore the sealed payload.
+                      router.push(`/verify/${target.number}`);
+                    }
                   }}
                   className="w-full text-left px-3 py-1.5 text-xs text-amber/80 hover:bg-amber/10 transition-colors"
                 >

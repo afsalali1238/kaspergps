@@ -7,6 +7,7 @@ import {
   actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName,
 } from '@/server/audit';
 import * as clock from '@/lib/clock';
+import { hasCapability } from '@/server/access';
 
 function formatTs(ts: string | number): string {
   return clock.formatDubaiDateTime(typeof ts === 'number' ? ts : new Date(ts).getTime());
@@ -44,10 +45,10 @@ export default function AuditLogPage() {
     setExportedAt(`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} exported`);
   };
 
-  if (!session || !session.isKasper) {
+  if (!session || !hasCapability(session, 'console.audit.view')) {
     return (
       <div className="text-center py-8">
-        <EmptyState title="Not available" description="Only Kasper staff can access the console." />
+        <EmptyState title="Not available" description="Only Kasper Admin can view the audit log." />
       </div>
     );
   }

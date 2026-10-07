@@ -7,6 +7,8 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasCapability } from '@/server/access';
+import type { Capability } from '@/server/capabilities';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -407,11 +409,12 @@ function UsersImporter() {
 
 // ── page ───────────────────────────────────────────────────────────────────────
 
-const importerTabs = [
-  { id: 'assets', label: 'Assets' },
-  { id: 'trackers', label: 'Trackers' },
-  { id: 'adapters', label: 'CAN adapters' },
-  { id: 'users', label: 'Users' },
+// Spec 5: Ops may import trackers and adapters only.
+const importerTabs: { id: string; label: string; cap: Capability }[] = [
+  { id: 'assets', label: 'Assets', cap: 'console.assets.manage' },
+  { id: 'trackers', label: 'Trackers', cap: 'console.trackers.manage' },
+  { id: 'adapters', label: 'CAN adapters', cap: 'console.adapters.manage' },
+  { id: 'users', label: 'Users', cap: 'console.tenants.manage' },
 ];
 
 export default function ConsoleImportPage() {
@@ -420,30 +423,35 @@ export default function ConsoleImportPage() {
 
   const [activeTab, setActiveTab] = useState('assets');
 
-  if (!session || !session.isKasper) {
+  if (!session || !hasCapability(session, 'console.import')) {
     return (
       <div className="text-center py-8">
-        <EmptyState title="Not available" description="Only Kasper staff can access the console." />
+        <EmptyState title="Not available" description="Only Kasper Admin and Ops can import." />
       </div>
     );
   }
+
+  const allowedTabs = importerTabs.filter(t => hasCapability(session, t.cap));
+  const tab = allowedTabs.some(t => t.id === activeTab) ? activeTab : (allowedTabs[0]?.id ?? '');
 
   return (
     <div className="space-y-4 p-4">
       <div>
         <h1 className="text-lg font-semibold text-ink">Import</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Bulk import assets, trackers, CAN adapters, or users via CSV paste or upload.
+          {allowedTabs.length === importerTabs.length
+            ? 'Bulk import assets, trackers, CAN adapters, or users via CSV paste or upload.'
+            : `Bulk import ${allowedTabs.map(t => t.label.toLowerCase()).join(' or ')} via CSV paste or upload. Ops can import trackers and adapters.`}
         </p>
       </div>
 
-      <Tabs tabs={importerTabs} activeId={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={allowedTabs.map(t => ({ id: t.id, label: t.label }))} activeId={tab} onChange={setActiveTab} />
 
       <div className="bg-surface border border-line rounded-lg p-4">
-        {activeTab === 'assets' && <AssetsImporter />}
-        {activeTab === 'trackers' && <TrackersImporter />}
-        {activeTab === 'adapters' && <AdaptersImporter />}
-        {activeTab === 'users' && <UsersImporter />}
+        {tab === 'assets' && <AssetsImporter />}
+        {tab === 'trackers' && <TrackersImporter />}
+        {tab === 'adapters' && <AdaptersImporter />}
+        {tab === 'users' && <UsersImporter />}
       </div>
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">

@@ -7,7 +7,7 @@ import clsx from 'clsx';
 import { useStore } from '@/store';
 import { anyAssetHasFeature, visibleAssetIds } from '@/server/access';
 import { seed } from '@/server/seed/data';
-import { notificationsFor, markAllRead, markNotificationRead, unreadCount } from '@/server/notifications';
+import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
 
@@ -106,8 +106,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [, setBellVersion] = useState(0);
 
-  const notifications = session ? notificationsFor(session.userId) : [];
-  const unread = session ? unreadCount(session.userId) : 0;
+  const notifications = bellNotifications(session);
+  const unread = bellUnreadCount(session);
 
   const currentPhase = store.getState().demoSwitches.phase;
 
