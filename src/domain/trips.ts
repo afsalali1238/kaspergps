@@ -23,7 +23,7 @@ import {
   PLAYBACK_DOWNSAMPLE_MAX,
   PLAYBACK_INTERPOLATE_MAX_SEC,
 } from '@/config/thresholds';
-import { straightLineKm } from '@/domain/eta';
+import { haversineKm } from '@/domain/eta';
 
 export type PlaybackState = 'moving' | 'stationary' | 'off' | 'nodata';
 
@@ -206,7 +206,7 @@ export function buildTrack(readings: Reading[], fromMs?: number, toMs?: number):
       const deltaMin = (readingTimeMs(sorted[i]) - readingTimeMs(prev)) / 60000;
       // Never add distance across a gap.
       if (deltaMin < TRACK_BREAK_MIN) {
-        distance += straightLineKm(prev, sorted[i]);
+        distance += haversineKm(prev, sorted[i]);
       }
     }
     track.push(toTrackPoint(sorted[i], distance, null));
@@ -283,7 +283,7 @@ function makeTrip(index: number, points: TrackPoint[], allGaps: TrackGap[]): Tri
     if (p.state === 'moving') movingMs += i + 1 < points.length ? points[i + 1].t - p.t : 30000;
     if (i > 0) {
       const deltaMin = (p.t - points[i - 1].t) / 60000;
-      if (deltaMin < TRACK_BREAK_MIN) distanceKm += straightLineKm(points[i - 1], p);
+      if (deltaMin < TRACK_BREAK_MIN) distanceKm += haversineKm(points[i - 1], p);
     }
   }
   const durationMin = Math.round((t1 - t0) / 60000);

@@ -230,6 +230,15 @@ export interface TrackingLink {
   showEta: boolean;
 }
 
+export interface Notification {
+  id: string;
+  userId: string;
+  at: string | number;
+  text: string;
+  read: boolean;
+  href?: string;
+}
+
 export interface AuditEntry {
   id: string;
   at: string | number;
@@ -530,6 +539,8 @@ export interface FeatureDef {
   needs: ParamKey[];
   phase: 'day_one' | 'phase2' | 'later';
   group: string;
+  /** Optional adapter condition — e.g. billing-grade ECU hours need ALL-CAN300 (spec 6.3). */
+  adapter?: Adapter[];
 }
 
 export interface FeatureVisibility {

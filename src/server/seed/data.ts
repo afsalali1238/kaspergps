@@ -7,8 +7,10 @@ import type {
   Tenant, Site, User, Asset, Tracker, Pairing, Booking, TrackingLink,
   Alert, AuditEntry, Label, AssetLabel, Geofence, GeofenceEvent,
   MaintenancePlan, ServiceRecord, Muc, Invoice, Payment, ReportSchedule,
-  ReportRun, Role, AssetClass, CanProfile, SimBehaviour
+  ReportRun, Role, AssetClass, CanProfile, SimBehaviour, Notification,
+  TrackerRequest, AdapterFitting, CanAdapter
 } from '@/domain/types';
+import { makeImei as makeImeiFromBody } from '@/domain/tracker-id';
 
 // ── PRNG ────────────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,7 @@ const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
 // Anchor = 6 Oct 2026 10:00 GST (Dubai time)
 // Previous month = September 2026
 const ANCHOR_ISO = '2026-10-06T10:00:00+04:00';
+const DUBAI_ANCHOR_HOUR = 10; // the anchor is 10:00 Dubai time
 export const ANCHOR_MS = new Date(ANCHOR_ISO).getTime();
 
 export function daysAgo(n: number): number {
@@ -41,6 +44,16 @@ export function hoursAgo(n: number): number {
 export function minsAgo(n: number): number {
   return ANCHOR_MS - n * 60000;
 }
+/**
+ * A Dubai-local wall-clock time, `dayOffset` days from the anchor day.
+ * The anchor is 10:00 in Dubai (ANCHOR_ISO), so 08:00 is two hours earlier.
+ * Seeded collections (bookings, links, invoices …) are written in this format
+ * so the demo shows the times section 8 of the prompt lists.
+ */
+export function dubaiOn(dayOffset: number, hour: number, minute = 0): number {
+  return ANCHOR_MS + dayOffset * 86400000 + (hour - DUBAI_ANCHOR_HOUR) * 3600000 + minute * 60000;
+}
+
 export function daysFromNow(n: number): number {
   return ANCHOR_MS + n * 86400000;
 }
@@ -108,7 +121,7 @@ export const users: User[] = userRows.map(u => ({
 
 // ── CAN adapters ───────────────────────────────────────────────────────────────
 
-export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CAN300'; status: 'in_stock' | 'fitted' | 'faulty' | 'retired'; assetId: string | null; fittedAt?: string; registeredAt: string }[] = [
+export const adapters: CanAdapter[] = [
   // Fitted — one per CAN asset (fitted at various dates)
   { id: 'a-ex04', serial: 'AC3-004123', model: 'ALL-CAN300', status: 'fitted', assetId: 'a-ex04', fittedAt: '2026-01-15T09:00:00Z', registeredAt: '2026-01-15T09:00:00Z' },
   { id: 'a-ex07', serial: 'AC3-004124', model: 'ALL-CAN300', status: 'fitted', assetId: 'a-ex07', fittedAt: '2026-01-20T10:00:00Z', registeredAt: '2026-01-20T10:00:00Z' },
@@ -136,23 +149,24 @@ export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CA
   { id: 'a-faulty-1', serial: 'AC3-005501', model: 'ALL-CAN300', status: 'faulty', assetId: null, registeredAt: '2026-08-15T10:00:00Z' },
 ];
 
+// Dated fitting history, like Pairing (spec §7 / 11.9)
+export const adapterFittings: AdapterFitting[] = adapters
+  .filter(a => a.status === 'fitted' && a.assetId && a.fittedAt)
+  .map((a, i) => ({
+    id: `fit-${i + 1}`,
+    adapterId: a.id,
+    assetId: a.assetId as string,
+    from: a.fittedAt as string,
+    to: null,
+  }));
+
+
+
 // ── Trackers ───────────────────────────────────────────────────────────────────
 
-// IMEI = 35209310 + 6 digits + Luhn check digit
+// IMEI = 35209310 + 6 digits + Luhn check digit (standard Luhn — see src/domain/tracker-id.ts)
 function makeImei(last6: string): string {
-  // Standard IMEI Luhn: for a 15-digit IMEI the check digit (last) is not doubled,
-  // every second digit to its left is (0-based indices 1, 3, 5, … 13). We build the
-  // 14-digit base, then pick the check digit that makes the whole sum ≡ 0 (mod 10).
-  const base = '35209310' + last6;
-  const digits = base.split('').map(Number);
-  let baseSum = 0;
-  for (let i = 0; i < digits.length; i++) {
-    let d = digits[i];
-    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
-    baseSum += d;
-  }
-  const check = (10 - (baseSum % 10)) % 10;
-  return base + check;
+  return makeImeiFromBody('35209310' + last6);
 }
 
 function makeSim(): string {
@@ -247,10 +261,10 @@ export const trackers: Tracker[] = trackerRows.map(row => {
 // ── Pairings ──────────────────────────────────────────────────────────────────
 
 export const pairings: Pairing[] = [
-  // LD-09 tracker was moved to PU-41 10 days ago
-  { id: 'p-ld09-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: 'a-ld09', to: null },
-  // CR-08 tracker swapped 20 days ago
-  { id: 'p-cr08-old', trackerId: 'tr-spare-3', assetId: 'a-cr08', from: 'a-cr08', to: 'a-cr08' },
+  // LD-09's tracker was moved onto PU-41 10 days ago (dated, not asset ids)
+  { id: 'p-ld09-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: new Date(daysAgo(10)).toISOString(), to: null },
+  // CR-08's old tracker ran until the swap 20 days ago, flagged for support
+  { id: 'p-cr08-old', trackerId: 'tr-spare-3', assetId: 'a-cr08', from: new Date(daysAgo(400)).toISOString(), to: new Date(daysAgo(20)).toISOString() },
   // FL-09 paired this morning
   { id: 'p-fl09', trackerId: 'tr-fl09', assetId: 'a-fl09', from: new Date(daysAgo(0.5)).toISOString(), to: null },
 ];
@@ -265,16 +279,22 @@ type AssetRow = {
   behaviour: string; createdBy: string;
 };
 
-const DAY_ONE_PARAMS = ['gnss', 'speed', 'ignition', 'movement', 'extVoltage', 'intBattery', 'gsm', 'gnssOdometer', 'accelEvents'];
-const CAN_PARAMS = ['fuelLevel', 'fuelUsed', 'fuelRate', 'rpm', 'canOdometer', 'coolantTemp', 'engineLoad', 'engineHours', 'faultCodes', 'adBlue'];
+export const DAY_ONE_PARAMS = ['gnss', 'speed', 'ignition', 'movement', 'extVoltage', 'intBattery', 'gsm', 'gnssOdometer', 'accelEvents'];
+// Adapter defaults per spec 6.2.
+const COMMON_CAN_PARAMS = ['fuelLevel', 'fuelUsed', 'rpm', 'canOdometer'];
+const LVCAN_PARAMS = ['coolantTemp', 'engineHours']; // engineHours is partial on Tier 2
+const ALL_CAN_PARAMS = ['fuelRate', 'engineLoad', 'faultCodes', 'adBlue'];
 
-function allParamsExcept(adapter: AssetRow['canProfile']['adapter'], ...exclude: string[]): string[] {
+export function allParamsExcept(adapter: AssetRow['canProfile']['adapter'], ...exclude: string[]): string[] {
   if (adapter === 'none') {
     // Tier 1: day-one params only, no CAN
     return DAY_ONE_PARAMS.filter(p => !exclude.includes(p));
   }
-  // Tier 2 (LVCAN200) and Tier 3 (ALL-CAN300): day-one + all CAN params except excluded
-  const all = [...DAY_ONE_PARAMS, ...CAN_PARAMS];
+  // Tier 2 (LVCAN200) and Tier 3 (ALL-CAN300): day-one + the adapter's CAN params,
+  // minus anything the vehicle's CAN check removed.
+  const all = adapter === 'LVCAN200'
+    ? [...DAY_ONE_PARAMS, ...COMMON_CAN_PARAMS, ...LVCAN_PARAMS]
+    : [...DAY_ONE_PARAMS, ...COMMON_CAN_PARAMS, ...LVCAN_PARAMS, ...ALL_CAN_PARAMS];
   return all.filter(p => !exclude.includes(p));
 }
 
@@ -314,9 +334,9 @@ const assetRows: AssetRow[] = [
   { id: 'a-bl01', code: 'BL-01', name: 'Boom lift', type: 'Boom lift', assetClass: 'lifting', make: 'JLG', model: '600S', year: 2018, plateOrSerial: 'GL-008', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-sl02', code: 'SL-02', name: 'Scissor lift', type: 'Scissor lift', assetClass: 'lifting', make: 'Genie', model: 'GS-3246', year: 2020, plateOrSerial: 'GL-009', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-mw01', code: 'MW-01', name: 'Mobile welder trailer', type: 'Mobile welder', assetClass: 'power', make: 'Lincoln', model: 'Vantage', year: 2023, plateOrSerial: 'GL-010', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
-  { id: 'a-pu41', code: 'PU-41', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Nissan', model: 'Navara', year: 2020, plateOrSerial: 'GL-011', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp', 'engineHours'), checkedAt: new Date(daysAgo(10)).toISOString(), notes: 'coolantTemp and engineHours not supported by this vehicle CAN bus' }, behaviour: 'light_vehicle_day', createdBy: 'u-priya' },
+  { id: 'a-pu41', code: 'PU-41', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Nissan', model: 'Navara', year: 2020, plateOrSerial: 'GL-011', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp'), checkedAt: new Date(daysAgo(10)).toISOString(), notes: 'coolantTemp not supported by this vehicle CAN bus; engine hours are partial' }, behaviour: 'light_vehicle_day', createdBy: 'u-priya' },
   // Tier 2 — Marina Builders
-  { id: 'a-pu51', code: 'PU-51', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hilux', year: 2022, plateOrSerial: 'MB-001', ownerTenantId: 't-marina', homeSiteId: 's-marina-dh', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours partial support — not billing-grade' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
+  { id: 'a-pu51', code: 'PU-51', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hilux', year: 2022, plateOrSerial: 'MB-001', ownerTenantId: 't-marina', homeSiteId: 's-marina-dh', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours partial support — not billing-grade' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
   { id: 'a-pu52', code: 'PU-52', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Ford', model: 'Ranger', year: 2021, plateOrSerial: 'MB-002', ownerTenantId: 't-marina', homeSiteId: 's-marina-bb', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours not supported' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
   { id: 'a-vn01', code: 'VN-01', name: 'Van', type: 'Van', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hiace', year: 2019, plateOrSerial: 'MB-003', ownerTenantId: 't-marina', homeSiteId: 's-marina-jvc', tankLitres: 70, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'coolantTemp and engineHours not supported' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
 ];
@@ -345,36 +365,36 @@ export const assets: Asset[] = assetRows.map(a => ({
 
 export const bookings: Booking[] = [
   // Current bookings
-  { id: 'b-1001', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysAgo(2) + 8*3600000, end: daysFromNow(5) + 18*3600000, status: 'active', reference: 'BK-1001', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8, destination: undefined },
-  { id: 'b-1002', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: daysAgo(6) + 7*3600000, end: daysFromNow(8) + 18*3600000, status: 'active', reference: 'BK-1002', rateType: 'daily', rateAed: 3500, destination: undefined },
-  { id: 'b-1003', assetId: 'a-ex07', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysFromNow(1) + 8*3600000, end: daysFromNow(9) + 18*3600000, status: 'scheduled', reference: 'BK-1003', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
-  { id: 'b-1004', assetId: 'a-wl06', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(1) + 7*3600000, end: daysFromNow(10) + 18*3600000, status: 'active', reference: 'BK-1004', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
-  { id: 'b-1005', assetId: 'a-th01', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(4) + 7*3600000, end: daysFromNow(3) + 18*3600000, status: 'active', reference: 'BK-1005', rateType: 'daily', rateAed: 1200 },
-  { id: 'b-1006', assetId: 'a-gn01', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(5) + 6*3600000, end: daysFromNow(9) + 22*3600000, status: 'active', reference: 'BK-1006', rateType: 'daily', rateAed: 800 },
-  { id: 'b-1007', assetId: 'a-bd02', ownerTenantId: 't-emirates', renterTenantId: 't-gulflift', renterName: 'Gulf Lift Rentals', renterSiteId: 's-gulflift-aq', start: daysAgo(3) + 7*3600000, end: daysFromNow(4) + 18*3600000, status: 'active', reference: 'BK-1007', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
-  { id: 'b-1008', assetId: 'a-tp21', ownerTenantId: 't-alnoor', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-jvc', start: daysAgo(10) + 7*3600000, end: daysAgo(5) + 18*3600000, status: 'closed', closedAt: daysAgo(5) + 18*3600000, reference: 'BK-1008', rateType: 'daily', rateAed: 1100 },
-  { id: 'b-1009', assetId: 'a-cr05', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: daysAgo(2) + 7*3600000, end: daysFromNow(6) + 18*3600000, status: 'cancelled', cancelledAt: daysAgo(3) + 7*3600000, reference: 'BK-1009', rateType: 'daily', rateAed: 2800 },
-  { id: 'b-1010', assetId: 'a-ex11', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(6) + 7*3600000, end: daysFromNow(4) + 18*3600000, status: 'active', reference: 'BK-1010', rateType: 'hourly', rateAed: 175, minHoursPerDay: 8 },
-  { id: 'b-1011', assetId: 'a-fb12', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Al Habtoor Logistics', renterSiteId: null, start: ANCHOR_MS, end: ANCHOR_MS + 14*3600000, status: 'active', reference: 'BK-1011', rateType: 'daily', rateAed: 1400, destination: { name: 'Al Habtoor site, Al Barsha', lat: 25.1130, lng: 55.2000 } },
-  { id: 'b-1012', assetId: 'a-lb02', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Bin Saeed Haulage', renterSiteId: null, start: daysAgo(2) + 6*3600000, end: daysAgo(1) + 17*3600000, status: 'closed', closedAt: daysAgo(1) + 17*3600000, reference: 'BK-1012', rateType: 'daily', rateAed: 1200 },
+  { id: 'b-1001', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(-2, 8), end: dubaiOn(5, 18), status: 'active', reference: 'BK-1001', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8, destination: undefined },
+  { id: 'b-1002', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: dubaiOn(-6, 7), end: dubaiOn(8, 18), status: 'active', reference: 'BK-1002', rateType: 'daily', rateAed: 3500, destination: undefined },
+  { id: 'b-1003', assetId: 'a-ex07', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(1, 8), end: dubaiOn(9, 18), status: 'scheduled', reference: 'BK-1003', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
+  { id: 'b-1004', assetId: 'a-wl06', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-1, 7), end: dubaiOn(10, 18), status: 'active', reference: 'BK-1004', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
+  { id: 'b-1005', assetId: 'a-th01', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-4, 7), end: dubaiOn(3, 18), status: 'active', reference: 'BK-1005', rateType: 'daily', rateAed: 1200 },
+  { id: 'b-1006', assetId: 'a-gn01', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-5, 6), end: dubaiOn(9, 22), status: 'active', reference: 'BK-1006', rateType: 'daily', rateAed: 800 },
+  { id: 'b-1007', assetId: 'a-bd02', ownerTenantId: 't-emirates', renterTenantId: 't-gulflift', renterName: 'Gulf Lift Rentals', renterSiteId: 's-gulflift-aq', start: dubaiOn(-3, 7), end: dubaiOn(4, 18), status: 'active', reference: 'BK-1007', rateType: 'hourly', rateAed: 200, minHoursPerDay: 8 },
+  { id: 'b-1008', assetId: 'a-tp21', ownerTenantId: 't-alnoor', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-jvc', start: dubaiOn(-10, 7), end: dubaiOn(-5, 18), status: 'closed', closedAt: dubaiOn(-5, 18), reference: 'BK-1008', rateType: 'daily', rateAed: 1100 },
+  { id: 'b-1009', assetId: 'a-cr05', ownerTenantId: 't-gulflift', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-bb', start: dubaiOn(-2, 7), end: dubaiOn(6, 18), status: 'cancelled', cancelledAt: dubaiOn(-3, 7), reference: 'BK-1009', rateType: 'daily', rateAed: 2800 },
+  { id: 'b-1010', assetId: 'a-ex11', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-6, 7), end: dubaiOn(4, 18), status: 'active', reference: 'BK-1010', rateType: 'hourly', rateAed: 175, minHoursPerDay: 8 },
+  { id: 'b-1011', assetId: 'a-fb12', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Al Habtoor Logistics', renterSiteId: null, start: dubaiOn(0, 6), end: dubaiOn(0, 20), status: 'active', reference: 'BK-1011', rateType: 'daily', rateAed: 1400, destination: { name: 'Al Habtoor site, Al Barsha', lat: 25.1130, lng: 55.2000 } },
+  { id: 'b-1012', assetId: 'a-lb02', ownerTenantId: 't-alnoor', renterTenantId: null, renterName: 'Bin Saeed Haulage', renterSiteId: null, start: dubaiOn(-2, 6), end: dubaiOn(-1, 17), status: 'closed', closedAt: dubaiOn(-1, 17), reference: 'BK-1012', rateType: 'daily', rateAed: 1200 },
   // Past month bookings
-  { id: 'b-0981', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: daysAgo(35) + 7*3600000, end: daysAgo(16) + 18*3600000, status: 'closed', closedAt: daysAgo(16) + 18*3600000, reference: 'BK-0981', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8 },
-  { id: 'b-0982', assetId: 'a-wl03', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: daysAgo(31) + 7*3600000, end: daysAgo(11) + 18*3600000, status: 'closed', closedAt: daysAgo(11) + 18*3600000, reference: 'BK-0982', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
-  { id: 'b-0983', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: daysAgo(27) + 7*3600000, end: daysAgo(8) + 18*3600000, status: 'closed', closedAt: daysAgo(8) + 18*3600000, reference: 'BK-0983', rateType: 'daily', rateAed: 3200 },
+  { id: 'b-0981', assetId: 'a-ex04', ownerTenantId: 't-emirates', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-pc', start: dubaiOn(-35, 7), end: dubaiOn(-16, 18), status: 'closed', closedAt: dubaiOn(-16, 18), reference: 'BK-0981', rateType: 'hourly', rateAed: 185, minHoursPerDay: 8 },
+  { id: 'b-0982', assetId: 'a-wl03', ownerTenantId: 't-emirates', renterTenantId: 't-marina', renterName: 'Marina Builders', renterSiteId: 's-marina-dh', start: dubaiOn(-31, 7), end: dubaiOn(-11, 18), status: 'closed', closedAt: dubaiOn(-11, 18), reference: 'BK-0982', rateType: 'hourly', rateAed: 160, minHoursPerDay: 8 },
+  { id: 'b-0983', assetId: 'a-cr02', ownerTenantId: 't-gulflift', renterTenantId: 't-palm', renterName: 'Palm Contracting', renterSiteId: 's-palm-ds', start: dubaiOn(-27, 7), end: dubaiOn(-8, 18), status: 'closed', closedAt: dubaiOn(-8, 18), reference: 'BK-0983', rateType: 'daily', rateAed: 3200 },
 ];
 
 // Early override for BK-1010
 export const grantOverrides: { bookingId: string; endedAt: string | number; endedBy: string; reason: string }[] = [
-  { bookingId: 'b-1010', endedAt: daysAgo(1) + 16.33*3600000, endedBy: 'u-khalid', reason: 'Payment overdue for two weeks' },
+  { bookingId: 'b-1010', endedAt: dubaiOn(-1, 16, 20), endedBy: 'u-khalid', reason: 'Payment overdue for two weeks' },
 ];
 
 // ── Tracking links ─────────────────────────────────────────────────────────────
 
 export const trackingLinks: TrackingLink[] = [
-  { id: 'lk-fb12', token: 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5', assetId: 'a-fb12', bookingId: 'b-1011', createdBy: 'u-omar', createdAt: ANCHOR_MS - 2*3600000, expiresAt: ANCHOR_MS + 14*3600000, showEta: true },
-  { id: 'lk-tp22', token: 'dB8rXp2kN9wQ4mY7hT6vZ1AaCs', assetId: 'a-tp22', bookingId: null, createdBy: 'u-omar', createdAt: ANCHOR_MS - 4*3600000, expiresAt: ANCHOR_MS + 20*3600000, showEta: false },
-  { id: 'lk-lb02', token: 'fH3jKp7wR9xT2nY4qM6vZ1AbCs', assetId: 'a-lb02', bookingId: 'b-1012', createdBy: 'u-omar', createdAt: daysAgo(2) + 6*3600000, expiresAt: daysAgo(1) + 17*3600000, revokedAt: daysAgo(1) + 17*3600000, revokedBy: 'u-omar', revokeReason: 'job_closed' as const, showEta: false },
-  { id: 'lk-cr02', token: 'rT4kWp8nN3yU7mZ2hF5vX1AcDe', assetId: 'a-cr02', bookingId: 'b-1002', createdBy: 'u-priya', createdAt: daysAgo(5) + 7*3600000, expiresAt: daysFromNow(8) + 18*3600000, revokedAt: daysAgo(2) + 7*3600000, revokedBy: 'u-priya', revokeReason: 'manual' as const, showEta: false },
+  { id: 'lk-fb12', token: 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5', assetId: 'a-fb12', bookingId: 'b-1011', createdBy: 'u-omar', createdAt: dubaiOn(0, 8), expiresAt: dubaiOn(0, 20), showEta: true },
+  { id: 'lk-tp22', token: 'dB8rXp2kN9wQ4mY7hT6vZ1AaCs', assetId: 'a-tp22', bookingId: null, createdBy: 'u-omar', createdAt: dubaiOn(0, 6), expiresAt: dubaiOn(1, 2), showEta: false },
+  { id: 'lk-lb02', token: 'fH3jKp7wR9xT2nY4qM6vZ1AbCs', assetId: 'a-lb02', bookingId: 'b-1012', createdBy: 'u-omar', createdAt: dubaiOn(-2, 8), expiresAt: dubaiOn(-1, 17), revokedAt: dubaiOn(-1, 17), revokedBy: 'u-omar', revokeReason: 'job_closed' as const, showEta: false },
+  { id: 'lk-cr02', token: 'rT4kWp8nN3yU7mZ2hF5vX1AcDe', assetId: 'a-cr02', bookingId: 'b-1002', createdBy: 'u-priya', createdAt: dubaiOn(-6, 7), expiresAt: dubaiOn(8, 18), revokedAt: dubaiOn(-2, 7), revokedBy: 'u-priya', revokeReason: 'manual' as const, showEta: false },
 ];
 
 // ── Labels ─────────────────────────────────────────────────────────────────────
@@ -442,7 +462,7 @@ export const alerts: Alert[] = [
   // Phase 2 alerts
   { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: daysAgo(1) + 10.167*3600000, detail: 'Power cut at 12:10 — running on tracker battery' },
   { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: new Date(daysAgo(3)).toISOString(), detail: 'Tracker battery low (3.5 V)' },
-  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: hoursAgo(21), closedAt: hoursAgo(21) + 0.5*3600000, detail: 'Over speed: 104 km/h' },
+  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: daysAgo(1) + 15*3600000, closedAt: daysAgo(1) + 15.5*3600000, detail: 'Over speed: 104 km/h' },
   { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: new Date(daysAgo(2)).toISOString(), detail: 'Harsh driving — 3 events in last 2 days' },
   { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: daysAgo(1) + 26.167*3600000, detail: 'Fuel dropped 18% at 02:10 with engine off' },
   { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: daysAgo(0) + 5.667*3600000, detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },
@@ -464,29 +484,34 @@ export const alerts: Alert[] = [
 
 // ── Tracker request ────────────────────────────────────────────────────────────
 
-export const trackerRequests: { id: string; tenantId: string; assetId: string; requestedBy: string; at: string; note: string; status: 'open' | 'done' | 'declined'; handledBy?: string; handledAt?: string }[] = [
+export const trackerRequests: TrackerRequest[] = [
   { id: 'trreq-001', tenantId: 't-gulflift', assetId: 'a-mw01', requestedBy: 'u-priya', at: new Date(daysAgo(2)).toISOString(), note: 'New welder trailer added — needs a tracker for site safety monitoring', status: 'open' },
 ];
 
 // ── Maintenance plans ──────────────────────────────────────────────────────────
 
 export const maintenancePlans: MaintenancePlan[] = [
-  { id: 'mp-ex04', tenantId: 't-emirates', assetId: 'a-ex04', name: '500 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 500, dueSoonAt: 8500, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 8000 },
-  { id: 'mp-bd02', tenantId: 't-emirates', assetId: 'a-bd02', name: '250 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 15250, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 14700 },
-  { id: 'mp-gn01', tenantId: 't-emirates', assetId: 'a-gn01', name: 'Oil change 250 h', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 2500, lastDoneAt: new Date(daysAgo(180)).toISOString(), lastDoneValue: 2000 },
-  { id: 'mp-fb14', tenantId: 't-alnoor', assetId: 'a-fb14', name: '10,000 km service', basis: 'km', kmSource: 'gps', interval: 10000, dueSoonAt: 10000, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 7000 },
-  { id: 'mp-tp22', tenantId: 't-alnoor', assetId: 'a-tp22', name: '400 h service', basis: 'engine_hours', hoursSource: 'estimated', interval: 400, dueSoonAt: 2000, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 1200 },
+  { id: 'mp-ex04', tenantId: 't-emirates', assetId: 'a-ex04', name: '500 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 500, dueSoonAt: 8400, lastDoneAt: new Date(daysAgo(45)).toISOString(), lastDoneValue: 8000 },
+  { id: 'mp-bd02', tenantId: 't-emirates', assetId: 'a-bd02', name: '250 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 14900, lastDoneAt: new Date(daysAgo(40)).toISOString(), lastDoneValue: 14700 },
+  { id: 'mp-gn01', tenantId: 't-emirates', assetId: 'a-gn01', name: 'Oil change 250 h', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 2200, lastDoneAt: new Date(daysAgo(5)).toISOString(), lastDoneValue: 2000 },
+  { id: 'mp-fb14', tenantId: 't-alnoor', assetId: 'a-fb14', name: '10,000 km service', basis: 'km', kmSource: 'gps', interval: 10000, dueSoonAt: 15000, lastDoneAt: new Date(daysAgo(30)).toISOString(), lastDoneValue: 7000 },
+  { id: 'mp-tp22', tenantId: 't-alnoor', assetId: 'a-tp22', name: '400 h service', basis: 'engine_hours', hoursSource: 'estimated', interval: 400, dueSoonAt: 1520, lastDoneAt: new Date(daysAgo(25)).toISOString(), lastDoneValue: 1200 },
   { id: 'mp-cr02', tenantId: 't-gulflift', assetId: 'a-cr02', name: 'Annual crane inspection', basis: 'days', interval: 365, dueSoonAt: 365, lastDoneAt: new Date(daysAgo(350)).toISOString(), lastDoneValue: 0 },
   { id: 'mp-cr08', tenantId: 't-gulflift', assetId: 'a-cr08', name: 'Annual crane inspection', basis: 'days', interval: 365, dueSoonAt: 365, lastDoneAt: new Date(daysAgo(370)).toISOString(), lastDoneValue: 0 },
-  { id: 'mp-pu51', tenantId: 't-marina', assetId: 'a-pu51', name: '10,000 km service', basis: 'km', kmSource: 'can', interval: 10000, dueSoonAt: 10000, lastDoneAt: new Date(daysAgo(200)).toISOString(), lastDoneValue: 3000 },
+  { id: 'mp-pu51', tenantId: 't-marina', assetId: 'a-pu51', name: '10,000 km service', basis: 'km', kmSource: 'can', interval: 10000, dueSoonAt: 11000, lastDoneAt: new Date(daysAgo(90)).toISOString(), lastDoneValue: 3000 },
 ];
 
 // ── Service records ────────────────────────────────────────────────────────────
 
 export const serviceRecords: ServiceRecord[] = [
-  { id: 'sr-001', planId: 'mp-ex04', assetId: 'a-ex04', tenantId: 't-emirates', doneAt: new Date(daysAgo(365)).toISOString(), value: 8000, notes: 'Scheduled 500 h service at Al Quoz Yard', costAed: 6800, createdBy: 'u-khalid' },
-  { id: 'sr-002', planId: 'mp-bd02', assetId: 'a-bd02', tenantId: 't-emirates', doneAt: new Date(daysAgo(365)).toISOString(), value: 14700, notes: '250 h service', costAed: 4500, createdBy: 'u-khalid' },
-  { id: 'sr-003', planId: 'mp-fb14', assetId: 'a-fb14', tenantId: 't-alnoor', doneAt: new Date(daysAgo(365)).toISOString(), value: 7000, notes: 'Scheduled service', costAed: 2200, createdBy: 'u-omar' },
+  { id: 'sr-001', planId: 'mp-ex04', assetId: 'a-ex04', tenantId: 't-emirates', doneAt: new Date(daysAgo(45)).toISOString(), value: 8000, notes: 'Scheduled 500 h service at Al Quoz Yard', costAed: 6800, createdBy: 'u-khalid' },
+  { id: 'sr-002', planId: 'mp-bd02', assetId: 'a-bd02', tenantId: 't-emirates', doneAt: new Date(daysAgo(40)).toISOString(), value: 14700, notes: '250 h service — oil, filters, coolant top-up', costAed: 4500, createdBy: 'u-khalid' },
+  { id: 'sr-003', planId: 'mp-gn01', assetId: 'a-gn01', tenantId: 't-emirates', doneAt: new Date(daysAgo(5)).toISOString(), value: 2000, notes: 'Oil and filter change on site', costAed: 950, createdBy: 'u-khalid' },
+  { id: 'sr-004', planId: 'mp-fb14', assetId: 'a-fb14', tenantId: 't-alnoor', doneAt: new Date(daysAgo(30)).toISOString(), value: 7000, notes: 'Scheduled 10,000 km service', costAed: 2200, createdBy: 'u-omar' },
+  { id: 'sr-005', planId: 'mp-tp22', assetId: 'a-tp22', tenantId: 't-alnoor', doneAt: new Date(daysAgo(25)).toISOString(), value: 1200, notes: '400 h service — hour meter read at the workshop', costAed: 1800, createdBy: 'u-omar' },
+  { id: 'sr-006', planId: 'mp-pu51', assetId: 'a-pu51', tenantId: 't-marina', doneAt: new Date(daysAgo(90)).toISOString(), value: 3000, notes: '10,000 km service at Marina yard', costAed: 1400, createdBy: 'u-lina' },
+  { id: 'sr-007', planId: 'mp-cr02', assetId: 'a-cr02', tenantId: 't-gulflift', doneAt: new Date(daysAgo(350)).toISOString(), value: 0, notes: 'Annual crane inspection — third party certificate issued', costAed: 3000, createdBy: 'u-priya' },
+  { id: 'sr-008', planId: 'mp-cr08', assetId: 'a-cr08', tenantId: 't-gulflift', doneAt: new Date(daysAgo(370)).toISOString(), value: 0, notes: 'Annual crane inspection — third party certificate issued', costAed: 3000, createdBy: 'u-priya' },
 ];
 
 // ── MUCs ──────────────────────────────────────────────────────────────────────
@@ -510,7 +535,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
+    sealSha256: '70bd11f5cdb357ab0f8363332df2beb6a50b5a84efb2dfcc22f97cff072833c0',
     issuedAt: new Date(daysAgo(10)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -533,7 +558,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3',
+    sealSha256: '21712085ae37892f5ae06df99f74baf288a641ae31fbb6e87419aa63940afe85',
     issuedAt: new Date(daysAgo(12)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'voided',
@@ -560,7 +585,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4',
+    sealSha256: '3127b834f8cefd718accae381b9f8eb2091c717a814becac77d8a41bdeea4b81',
     issuedAt: new Date(daysAgo(8)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -583,7 +608,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5',
+    sealSha256: '2e247220fa273d5dd562b98bc2986dbaf273be77db8d72e62b4994d14d424b5a',
     issuedAt: new Date(daysAgo(8)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -698,6 +723,10 @@ export const reportRuns: ReportRun[] = [
   { id: 'rr-002', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(14)).toISOString(), to: new Date(daysAgo(7)).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(14)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-22_to_2026-09-29.pdf' },
 ];
 
+// ── Notifications (bell) ───────────────────────────────────────────────────────
+
+export const notifications: Notification[] = [];
+
 // ── Audit entries ──────────────────────────────────────────────────────────────
 
 export const auditEntries: AuditEntry[] = [
@@ -770,8 +799,10 @@ export const seed = {
   reportSchedules,
   reportRuns,
   auditEntries,
+  notifications,
   onboardingDrafts,
   adapters,
+  adapterFittings,
 };
 
 export default seed;

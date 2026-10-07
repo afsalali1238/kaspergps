@@ -10,6 +10,8 @@ import { LANGUAGES } from '@/lib/language';
 import { anyAssetHasFeature, hasCapability, visibleAssetIds } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
+import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
+import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
 
 /** The gallery of nav labels lives in the Arabic catalogue under `nav.*`. */
@@ -101,6 +103,16 @@ const navItems: NavItem[] = [
   },
 ];
 
+function formatNotificationTime(at: string | number): string {
+  const ms = typeof at === 'number' ? at : new Date(at).getTime();
+  const minutes = Math.round((clock.now() - ms) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return clock.formatDubaiDate(ms);
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -109,6 +121,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const session = store.getState().session;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [, setBellVersion] = useState(0);
+
+  const notifications = bellNotifications(session);
+  const unread = bellUnreadCount(session);
 
   const currentPhase = store.getState().demoSwitches.phase;
 
@@ -163,14 +180,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {t('map.filters.searchPlaceholder', 'Type to search assets…')}
           </div>
 
-          {/* Alerts bell */}
-          <button className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700 transition-colors">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 1a4 4 0 00-4 4v4.5a1 1 0 001 1h6.5a1 1 0 001-1V5a4 4 0 00-4-4zm0 1.5a2.5 2.5 0 012.5 2.5v3.5a1 1 0 01-1 1H6a1 1 0 01-1-1V5a2.5 2.5 0 012.5-2.5zm1.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red text-white text-[10px] font-semibold rounded-full flex items-center justify-center">3</span>
-          </button>
+          {/* Notifications bell */}
+          {session && (
+            <div className="relative">
+              <button
+                onClick={() => setIsBellOpen(!isBellOpen)}
+                className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700 transition-colors"
+                aria-label="Notifications"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1a4 4 0 00-4 4v4.5a1 1 0 001 1h6.5a1 1 0 001-1V5a4 4 0 00-4-4zm0 1.5a2.5 2.5 0 012.5 2.5v3.5a1 1 0 01-1 1H6a1 1 0 01-1-1V5a2.5 2.5 0 012.5-2.5zm1.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                    {unread}
+                  </span>
+                )}
+              </button>
 
+              {isBellOpen && (
+                <div className="absolute right-0 top-full mt-1 w-80 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-line flex items-center justify-between">
+                    <span className="text-sm font-medium text-ink">Notifications</span>
+                    {unread > 0 && (
+                      <button
+                        className="text-xs text-yellow-600 hover:text-yellow font-medium"
+                        onClick={() => { markAllRead(session.userId); setBellVersion(v => v + 1); }}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-grey-500">Nothing yet.</div>
+                  ) : (
+                    <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                      {notifications.map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            markNotificationRead(session.userId, n.id);
+                            setBellVersion(v => v + 1);
+                            setIsBellOpen(false);
+                            if (n.href) router.push(n.href);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-paper-2 transition-colors flex items-start gap-2"
+                        >
+                          <span
+                            className={n.read ? 'w-1.5 h-1.5 rounded-full mt-1.5 bg-line' : 'w-1.5 h-1.5 rounded-full mt-1.5 bg-red'}
+                          />
+                          <span className="flex-1">
+                            <span className={n.read ? 'text-xs text-grey-500 block' : 'text-xs text-ink block'}>
+                              {n.text}
+                            </span>
+                            <span className="text-[11px] text-grey-500">{formatNotificationTime(n.at)}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {/* User menu */}
           {session && (
             <div className="relative">

@@ -1,158 +1,131 @@
-// Features registry tests — verify hasFeature() for every asset.
+// Feature registry (spec 6): a feature is available when the asset's CAN check
+// carries every param it needs, and only from the adapter it belongs to.
 import { describe, it, expect } from 'vitest';
-import { seed } from '../server/seed/data';
-import { hasFeature, featurePhase } from './features';
+import {
+  FEATURES, assetsNeedingFeature, featureForSalesView, featurePhase, featureVisible,
+  hasFeature, hoursSourceLabel, isBillingGradeHours, tierForAsset,
+} from './features';
+import { seed } from '@/server/seed/data';
+import type { Asset, Session } from '@/domain/types';
 
-describe('features — hasFeature (per asset)', () => {
-  it('every asset has location.live and status (Day one, all tiers)', () => {
-    for (const asset of seed.assets) {
-      expect(hasFeature(asset, 'location.live')).toBe(true);
-      expect(hasFeature(asset, 'status')).toBe(true);
-      expect(hasFeature(asset, 'history.track')).toBe(true);
-      expect(hasFeature(asset, 'trips')).toBe(true);
-      expect(hasFeature(asset, 'alerts.offline')).toBe(true);
-    }
+const asset = (code: string): Asset => seed.assets.find(a => a.code === code)!;
+
+const sessionFor = (userId: string): Session => {
+  const user = seed.users.find(u => u.id === userId)!;
+  return {
+    userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
+    isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
+  };
+};
+
+describe('features — hasFeature', () => {
+  it('gates features on the params the CAN check left behind', () => {
+    // Tier 1: day-one only.
+    const fb12 = asset('FB-12');
+    expect(hasFeature(fb12, 'location.live')).toBe(true);
+    expect(hasFeature(fb12, 'trips')).toBe(true);
+    expect(hasFeature(fb12, 'fuel.level')).toBe(false);
+    expect(hasFeature(fb12, 'hours.ecu')).toBe(false);
+    expect(hasFeature(fb12, 'no.such.feature')).toBe(false);
+
+    // Tier 3: full CAN set.
+    expect(hasFeature(asset('EX-07'), 'adblue')).toBe(true);
+    expect(hasFeature(asset('EX-07'), 'hours.ecu')).toBe(true);
+    expect(hasFeature(asset('EX-07'), 'muc')).toBe(true);
+
+    // The CAN check removals (8.2) take the feature away again.
+    expect(hasFeature(asset('EX-04'), 'adblue')).toBe(false); // adBlue sensor faulty
+    expect(hasFeature(asset('EX-11'), 'faults')).toBe(false); // faultCodes not available
+    expect(hasFeature(asset('BH-05'), 'fuel.level')).toBe(false); // no fuelLevel sensor
+    expect(hasFeature(asset('GR-01'), 'fuel.level')).toBe(false);
+    expect(hasFeature(asset('CR-05'), 'faults')).toBe(false);
+    expect(hasFeature(asset('TH-04'), 'adblue')).toBe(false);
   });
 
-  it('Tier 1 assets (no CAN) have no fuel or engine features', () => {
-    const tier1Assets = seed.assets.filter(a => a.canProfile.adapter === 'none');
-    for (const asset of tier1Assets) {
-      expect(hasFeature(asset, 'fuel.level')).toBe(false);
-      expect(hasFeature(asset, 'fuel.used')).toBe(false);
-      expect(hasFeature(asset, 'engine.live')).toBe(false);
-      expect(hasFeature(asset, 'hours.ecu')).toBe(false);
-      expect(hasFeature(asset, 'faults')).toBe(false);
-      expect(hasFeature(asset, 'muc')).toBe(false);
-      expect(hasFeature(asset, 'adblue')).toBe(false);
-    }
+  it('keeps adapter-only features to their adapter', () => {
+    // LVCAN200 never carries the ALL-CAN300-only params.
+    const lv = asset('PU-51');
+    expect(hasFeature(lv, 'hours.ecu')).toBe(false); // ECU billing grade needs ALL-CAN300
+    expect(lv.canProfile.supported.includes('engineHours')).toBe(true);
+    // hours.ecuPartial is the LVCAN200 flavour of engine hours.
+    const partial = FEATURES.find(f => f.key === 'hours.ecuPartial')!;
+    expect(partial.adapter).toEqual(['LVCAN200']);
+    expect(hasFeature(lv, 'hours.ecuPartial')).toBe(true);
+    // PU-52 lost engineHours in its CAN check, so neither hour feature applies.
+    expect(hasFeature(asset('PU-52'), 'hours.ecuPartial')).toBe(false);
+    expect(hasFeature(asset('PU-52'), 'muc')).toBe(false);
   });
 
-  it('Al Noor\'s assets (all Tier 1) have no CAN features at all', () => {
-    const alNoorAssets = seed.assets.filter(a => a.ownerTenantId === 't-alnoor');
-    for (const asset of alNoorAssets) {
-      expect(asset.canProfile.adapter).toBe('none');
-      expect(hasFeature(asset, 'fuel.level')).toBe(false);
-      expect(hasFeature(asset, 'fuel.used')).toBe(false);
-      expect(hasFeature(asset, 'rpm')).toBe(false);
-      expect(hasFeature(asset, 'engineHours')).toBe(false);
-      expect(hasFeature(asset, 'coolantC')).toBe(false);
-      expect(hasFeature(asset, 'faults')).toBe(false);
-      expect(hasFeature(asset, 'muc')).toBe(false);
-    }
-  });
-
-  it('EX-04 (Tier 3, ALL-CAN300) has all Tier 3 features except adBlue (removed by CAN check)', () => {
-    const asset = seed.assets.find(a => a.code === 'EX-04')!;
-    expect(asset.canProfile.adapter).toBe('ALL-CAN300');
-    expect(hasFeature(asset, 'fuel.level')).toBe(true);
-    expect(hasFeature(asset, 'fuel.used')).toBe(true);
-    expect(hasFeature(asset, 'engine.live')).toBe(true); // rpm
-    expect(hasFeature(asset, 'hours.ecu')).toBe(true); // billing-grade ECU hours
-    expect(hasFeature(asset, 'faults')).toBe(true);
-    expect(hasFeature(asset, 'muc')).toBe(true);
-    // adBlue was removed by CAN check
-    expect(asset.canProfile.supported).not.toContain('adBlue');
-    expect(hasFeature(asset, 'adblue')).toBe(false);
-    // coolantTemp was NOT removed — EX-04 supports the param
-    expect(asset.canProfile.supported).toContain('coolantTemp');
-  });
-
-  it('BD-02 (Tier 3, ALL-CAN300) has faultCodes', () => {
-    const asset = seed.assets.find(a => a.code === 'BD-02')!;
-    expect(hasFeature(asset, 'faults')).toBe(true);
-    expect(hasFeature(asset, 'engine.live')).toBe(true);
-    expect(hasFeature(asset, 'muc')).toBe(true);
-  });
-
-  it('GN-01 (Tier 3, ALL-CAN300) has fuel features', () => {
-    const asset = seed.assets.find(a => a.code === 'GN-01')!;
-    expect(hasFeature(asset, 'fuel.level')).toBe(true);
-    expect(hasFeature(asset, 'fuel.used')).toBe(true);
-    expect(hasFeature(asset, 'alerts.fuelDrop')).toBe(true);
-    // GN-01 has ALL-CAN300 and ECU engine hours, so a MUC can be issued for it
-    expect(hasFeature(asset, 'muc')).toBe(true);
-    expect(asset.canProfile.supported).toContain('engineHours');
-    expect(hasFeature(asset, 'hours.ecu')).toBe(true);
-  });
-
-  it('PU-41 (Tier 2, LVCAN200) has partial CAN features', () => {
-    const asset = seed.assets.find(a => a.code === 'PU-41')!;
-    expect(asset.canProfile.adapter).toBe('LVCAN200');
-    expect(hasFeature(asset, 'fuel.level')).toBe(true);
-    expect(hasFeature(asset, 'fuel.used')).toBe(true);
-    expect(hasFeature(asset, 'engine.live')).toBe(true); // rpm
-    // This vehicle's CAN bus does not report engineHours (seed note), so the
-    // partial-hours feature stays off.
-    expect(asset.canProfile.supported).not.toContain('engineHours');
-    expect(hasFeature(asset, 'hours.ecuPartial')).toBe(false);
-    // No billing-grade ECU hours for Tier 2
-    expect(hasFeature(asset, 'hours.ecu')).toBe(false);
-    // KNOWN GAP: spec 6.2 gives faultCodes to Tier 3 only, but the seed keeps
-    // faultCodes in PU-41's supported list (and in expected.ts), so this feature
-    // is on for a Tier 2 asset. Fixing the seed is a Phase 6 concern, not P12.
-    expect(asset.canProfile.supported).toContain('faultCodes');
-    expect(hasFeature(asset, 'faults')).toBe(true);
-    // No MUC for Tier 2
-    expect(hasFeature(asset, 'muc')).toBe(false);
-    // coolantTemp was removed by CAN check for PU-41
-    expect(asset.canProfile.supported).not.toContain('coolantC');
-  });
-
-  it('PU-51 (Tier 2, LVCAN200, engineHours partial) has partial ECU hours', () => {
-    const asset = seed.assets.find(a => a.code === 'PU-51')!;
-    expect(asset.canProfile.adapter).toBe('LVCAN200');
-    // KNOWN GAP: the seed note says "engineHours partial support — not billing-grade",
-    // but engineHours is not in `supported`, so the partial-hours feature is off.
-    expect(hasFeature(asset, 'hours.ecuPartial')).toBe(false);
-    expect(hasFeature(asset, 'hours.ecu')).toBe(false);
-    expect(hasFeature(asset, 'muc')).toBe(false);
-  });
-
-  it('Tier 1 assets have hours.ignition (Estimated) but not hours.ecu', () => {
-    const tier1Assets = seed.assets.filter(a => a.canProfile.adapter === 'none');
-    for (const asset of tier1Assets) {
-      expect(hasFeature(asset, 'hours.ignition')).toBe(true);
-      expect(hasFeature(asset, 'hours.ecu')).toBe(false);
-    }
+  it('lists the assets that would gain a feature', () => {
+    const withFaults = assetsNeedingFeature(seed.assets, 'faults');
+    expect(withFaults.map(a => a.code)).toContain('BD-02');
+    expect(withFaults.map(a => a.code)).not.toContain('EX-11');
+    expect(assetsNeedingFeature(seed.assets, 'labels')).toHaveLength(seed.assets.length); // needs nothing
   });
 });
 
-describe('features — featurePhase', () => {
-  it('Day one features are location.live, status, history.track, trips, alerts.offline', () => {
-    const dayOneFeatures = ['location.live', 'status', 'history.track', 'trips', 'alerts.offline'];
-    for (const key of dayOneFeatures) {
-      expect(featurePhase(key)).toBe('day_one');
-    }
+describe('features — phases and visibility', () => {
+  it('knows each feature phase, and unknown keys have none', () => {
+    expect(featurePhase('location.live')).toBe('day_one');
+    expect(featurePhase('muc')).toBe('phase2');
+    expect(featurePhase('cost.idle')).toBe('later');
+    expect(featurePhase('nope')).toBe(null);
   });
 
-  it('Phase 2 features include fuel, engine, alerts, labels, geofences, playback, ETA, MUC, billing', () => {
-    const phase2Features = [
-      'power.status', 'hours.ignition', 'hours.ecu', 'hours.ecuPartial',
-      'driving.events', 'alerts.power', 'alerts.towing', 'fuel.level', 'fuel.used',
-      'alerts.fuelDrop', 'engine.live', 'odometer.can', 'faults', 'adblue',
-      'utilisation', 'labels', 'geofence.events', 'playback', 'eta', 'muc', 'billing.hours'
-    ];
-    for (const key of phase2Features) {
-      expect(featurePhase(key)).toBe('phase2');
-    }
+  it('hides phase-2 and later features until the demo switch allows them', () => {
+    const ex07 = asset('EX-07');
+    const khalid = sessionFor('u-khalid');
+    expect(featureVisible(khalid, ex07, 'location.live', 'day_one', false)).toBe(true);
+    expect(featureVisible(khalid, ex07, 'muc', 'day_one', false)).toBe(false); // phase 2 on a day-one switch
+    expect(featureVisible(khalid, ex07, 'muc', 'phase2', false)).toBe(true);
+    expect(featureVisible(khalid, ex07, 'cost.idle', 'phase2', false)).toBe(false); // later
+    expect(featureVisible(khalid, ex07, 'cost.idle', 'later', false)).toBe(true);
+    // Hardware still gates even in the right phase.
+    expect(featureVisible(khalid, asset('FB-12'), 'muc', 'phase2', false)).toBe(false);
+    expect(featureVisible(khalid, ex07, 'nope', 'later', false)).toBe(false);
   });
 
-  it('Later features include maintenance and cost', () => {
-    expect(featurePhase('maintenance.hours')).toBe('later');
-    expect(featurePhase('maintenance.km')).toBe('later');
-    expect(featurePhase('cost.fuel')).toBe('later');
+  it('offers locked cards in the sales view only for hardware gaps', () => {
+    const fb12 = asset('FB-12'); // Tier 1
+    expect(featureForSalesView(fb12, 'fuel.level', true)).toEqual({
+      shown: true, reason: 'Needs a CAN adapter (Tier 2 or Tier 3)',
+    });
+    expect(featureForSalesView(fb12, 'fuel.level', false).shown).toBe(false);
+    // Already available → no locked card.
+    expect(featureForSalesView(fb12, 'location.live', true).shown).toBe(false);
+    // Params the asset could have with a stronger adapter.
+    const pu51 = asset('PU-51'); // LVCAN200
+    expect(featureForSalesView(pu51, 'hours.ecu', true)).toEqual({
+      shown: true, reason: 'Needs ALL-CAN300 (Tier 3)',
+    });
+    // Unknown feature, or one that needs nothing at all.
+    expect(featureForSalesView(fb12, 'nope', true).shown).toBe(false);
+    expect(featureForSalesView(fb12, 'labels', true).shown).toBe(false);
   });
 });
 
-describe('features — hasFeature edge cases', () => {
-  it('returns false for unknown feature keys', () => {
-    const asset = seed.assets[0];
-    expect(hasFeature(asset, 'nonexistent.feature')).toBe(false);
+describe('features — tiers and hour sources', () => {
+  it('derives the tier from the fitted adapter', () => {
+    expect(tierForAsset(asset('FB-12'))).toBe(1);
+    expect(tierForAsset(asset('PU-41'))).toBe(2);
+    expect(tierForAsset(asset('EX-04'))).toBe(3);
   });
 
-  it('a feature requiring two params needs both', () => {
-    // utilisation needs ignition (and engineLoad for Tier 3 working/idling split)
-    const tier1Asset = seed.assets.find(a => a.canProfile.adapter === 'none')!;
-    expect(hasFeature(tier1Asset, 'utilisation')).toBe(true); // ignition is enough for Tier 1
+  it('labels engine hours by how they are measured', () => {
+    expect(isBillingGradeHours(asset('EX-04'))).toBe(true);
+    expect(isBillingGradeHours(asset('PU-41'))).toBe(false); // partial
+    expect(hoursSourceLabel(asset('EX-04'))).toBe('ECU');
+    expect(hoursSourceLabel(asset('PU-41'))).toBe('ECU · partial');
+    expect(hoursSourceLabel(asset('FB-12'))).toBe('Estimated (ignition)');
+    expect(hoursSourceLabel(asset('PU-52'))).toBe('Estimated (ignition)'); // engineHours removed
+  });
+
+  it('keeps the registry coherent', () => {
+    const keys = FEATURES.map(f => f.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const f of FEATURES) {
+      expect(f.label.length).toBeGreaterThan(0);
+      expect(f.group.length).toBeGreaterThan(0);
+    }
   });
 });

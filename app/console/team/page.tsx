@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasCapability } from '@/server/access';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -33,10 +34,10 @@ export default function KasperTeamPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  if (!session || !session.isKasper) {
+  if (!session || !hasCapability(session, 'console.staff.manage')) {
     return (
       <div className="text-center py-8">
-        <EmptyState title="Not available" description="Only Kasper staff can access the console." />
+        <EmptyState title="Not available" description="Only Kasper Admin can manage Kasper staff accounts." />
       </div>
     );
   }

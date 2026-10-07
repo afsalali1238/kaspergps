@@ -55,6 +55,18 @@ export function findActiveGrantFor(session: Session, assetId: string): Booking |
   return booking;
 }
 
+/**
+ * Who can cut a rental short: Kasper, or the asset's own Tenant Admin.
+ * The renter never can — it is their rental (spec 5, grant.endEarly).
+ */
+export function canEndAccess(session: Session, assetId: string): boolean {
+  if (!hasCapability(session, 'grant.endEarly')) return false;
+  const asset = seed.assets.find(a => a.id === assetId);
+  if (!asset) return false;
+  if (session.isKasper) return true;
+  return session.tenantId !== null && asset.ownerTenantId === session.tenantId;
+}
+
 export function getGrantEnd(booking: Booking): number {
   const end = new Date(booking.end).getTime();
   if (booking.cancelledAt) return new Date(booking.cancelledAt).getTime();

@@ -50,15 +50,13 @@ export type Capability =
   | 'console.bookings.view'
   | 'console.bookings.manage'
   | 'console.staff.manage'
-  | 'console.import'
-  | 'console.bookings.view'
-  | 'console.staff.manage';
+  | 'console.import';
 
 const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
   kasper_admin: [
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry', 'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view', 'alert.acknowledge',
     'users.manage', 'sites.manage',
     'console.tenants.view', 'console.tenants.manage', 'console.assets.manage',
@@ -102,7 +100,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry',
     'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view',
     'label.view', 'label.manage',
     'geofence.view', 'geofence.manage',
@@ -135,7 +133,7 @@ export function hasRoleCapability(role: Role, cap: Capability): boolean {
 const COMPANY_CAPABILITIES: Record<Role, Capability[]> = {
   kasper_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'console.billing.view', 'console.billing.manage', 'asset.create', 'asset.retire', 'console.assets.transfer', 'console.adapters.manage', 'console.bookings.view', 'console.bookings.manage', 'console.staff.manage', 'console.import'],
   kasper_ops: ['geofence.view', 'geofence.manage', 'asset.create', 'asset.retire', 'console.adapters.manage', 'console.bookings.view', 'console.bookings.manage', 'console.import'],
-  tenant_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'asset.create', 'asset.retire', 'tracker.request'],
+  tenant_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'asset.create', 'asset.retire', 'tracker.request', 'users.manage', 'sites.manage'],
   site_user: ['geofence.view'],
 };
 

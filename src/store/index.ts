@@ -1,5 +1,6 @@
 // Client state store for the Kasper GPS prototype.
-// Uses Zustand with persistence for demo switches and clock offset.
+// Uses Zustand with persistence for the demo switches, clock offset and the
+// signed-in session, so a refresh (or a pasted URL) keeps the demo context.
 
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
@@ -82,11 +83,11 @@ export const useStore = create<Store>()(
       name: 'kasper.store.v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        session: state.session,
         demoSwitches: state.demoSwitches,
         clockOffsetMs: state.clockOffsetMs,
         // The session is persisted so a hard refresh does not throw you out of
         // the app (it used to leave both shells stuck on "Loading…").
-        session: state.session,
       }),
       // The offset lives in two places — the store (for display) and the clock
       // module (for every timestamp in the app). Rehydration has to feed the

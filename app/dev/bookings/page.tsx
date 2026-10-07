@@ -8,6 +8,9 @@ import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import type { Session, Booking } from '@/domain/types';
+import {
+  cancelBooking, closeBooking, extendBooking, shortenBooking,
+} from '@/server/bookings';
 
 function bookingStatusWords(booking: Booking): string {
   const start = new Date(booking.start).getTime();
@@ -40,7 +43,8 @@ export default function BookingsSimulatorPage() {
   const store = useStore;
   const session = store.getState().session;
 
-  const [bookings, setBookings] = useState<Booking[]>(seed.bookings);
+  const [version, setVersion] = useState(0);
+  const bookings = seed.bookings;
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [_phase] = useState<'day_one' | 'phase2' | 'later'>(store.getState().demoSwitches.phase);
@@ -55,7 +59,8 @@ export default function BookingsSimulatorPage() {
       const asset = seed.assets.find(a => a.id === b.assetId);
       return asset && asset.ownerTenantId === session.tenantId;
     });
-  }, [bookings, session]);
+    // version busts the memo after a booking write
+  }, [bookings, session, version]);
 
   const activeBookings = useMemo(() => visibleBookings.filter(b => bookingStatusWords(b) === 'Active'), [visibleBookings]);
   const upcomingBookings = useMemo(() => visibleBookings.filter(b => bookingStatusWords(b) === 'Upcoming'), [visibleBookings]);
@@ -67,14 +72,21 @@ export default function BookingsSimulatorPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const run = (result: { ok: boolean; error?: string; message?: string }) => {
+    if (result.ok) {
+      showToast(result.message ?? 'Done.');
+      setVersion(v => v + 1);
+    } else {
+      showToast(result.error ?? 'Could not do that.');
+    }
+  };
+
   const handleExtend = (booking: Booking) => {
     if (!canModifyBooking(session!, booking)) {
       showToast('You do not have permission to modify this booking.');
       return;
     }
-    const newEnd = new Date(booking.end).getTime() + 86400000; // Extend by 1 day
-    setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, end: newEnd } : b));
-    showToast(`Extended ${seed.tenants.find(t => t.id === booking.renterTenantId)?.name}'s access by 1 day`);
+    run(extendBooking(session!, booking.id, new Date(booking.end).getTime() + 86400000));
   };
 
   const handleShorten = (booking: Booking) => {
@@ -82,9 +94,7 @@ export default function BookingsSimulatorPage() {
       showToast('You do not have permission to modify this booking.');
       return;
     }
-    const newEnd = new Date(booking.end).getTime() - 86400000; // Shorten by 1 day
-    setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, end: newEnd } : b));
-    showToast(`Shortened ${seed.tenants.find(t => t.id === booking.renterTenantId)?.name}'s access by 1 day`);
+    run(shortenBooking(session!, booking.id, new Date(booking.end).getTime() - 86400000));
   };
 
   const handleCancel = (booking: Booking) => {
@@ -92,8 +102,7 @@ export default function BookingsSimulatorPage() {
       showToast('You do not have permission to modify this booking.');
       return;
     }
-    setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'cancelled' } : b));
-    showToast(`Cancelled ${seed.tenants.find(t => t.id === booking.renterTenantId)?.name}'s booking`);
+    run(cancelBooking(session!, booking.id, 'Cancelled from the booking simulator'));
   };
 
   const handleClose = (booking: Booking) => {
@@ -101,8 +110,7 @@ export default function BookingsSimulatorPage() {
       showToast('You do not have permission to modify this booking.');
       return;
     }
-    setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'closed', closedAt: clock.now() } : b));
-    showToast(`Closed ${seed.tenants.find(t => t.id === booking.renterTenantId)?.name}'s job`);
+    run(closeBooking(session!, booking.id, 'Job finished'));
   };
 
   const handleNightlyCheck = () => {
