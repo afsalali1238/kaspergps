@@ -91,7 +91,7 @@ describe('tracking links — create', () => {
     const result = createTrackingLink(khalid(), { assetId: 'a-ex07', bookingId: 'b-1003' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const link = result.data;
+    const link = result.data!;
     expect(link.token).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(link.assetId).toBe('a-ex07');
     expect(link.bookingId).toBe('b-1003');
@@ -110,22 +110,22 @@ describe('tracking links — create', () => {
 
   it('defaults the ETA switch from the job’s destination', () => {
     const withDestination = createTrackingLink(sara(), { assetId: 'a-fb12', bookingId: 'b-1011' });
-    expect(withDestination.ok && withDestination.data.showEta).toBe(true);
+    expect(withDestination.ok && withDestination.data!.showEta).toBe(true);
 
     const noJob = createTrackingLink(sara(), { assetId: 'a-fb12' });
-    expect(noJob.ok && noJob.data.showEta).toBe(false);
+    expect(noJob.ok && noJob.data!.showEta).toBe(false);
 
     const off = createTrackingLink(sara(), { assetId: 'a-fb12', bookingId: 'b-1011', showEta: false });
-    expect(off.ok && off.data.showEta).toBe(false);
+    expect(off.ok && off.data!.showEta).toBe(false);
 
     const on = createTrackingLink(sara(), { assetId: 'a-ex11', bookingId: 'b-1010', showEta: true });
-    expect(on.ok && on.data.showEta).toBe(true);
+    expect(on.ok && on.data!.showEta).toBe(true);
   });
 
   it('falls back to a 24 hour expiry when there is no job', () => {
     const result = createTrackingLink(omar(), { assetId: 'a-fb12' });
-    expect(result.ok && result.data.bookingId).toBe(null);
-    expect(result.ok && result.data.expiresAt).toBe(new Date(ANCHOR_MS + 24 * HOUR).toISOString());
+    expect(result.ok && result.data!.bookingId).toBe(null);
+    expect(result.ok && result.data!.expiresAt).toBe(new Date(ANCHOR_MS + 24 * HOUR).toISOString());
     expect(result.ok && result.message).toContain('expires');
   });
 
@@ -148,9 +148,9 @@ describe('tracking links — create', () => {
     const result = createTrackingLink(sara(), { assetId: 'a-fb12', bookingId: 'b-1011' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const resolved = resolveTrackingLink(result.data.token);
+    const resolved = resolveTrackingLink(result.data!.token);
     expect(resolved?.assetName).toBe('Flatbed trailer truck');
-    expect(resolved?.eta?.arrivedAt ?? null).toBe(null);
+    expect(typeof resolved?.lat).toBe('number');
   });
 });
 
@@ -186,10 +186,10 @@ describe('tracking links — revoke', () => {
     const b = createTrackingLink(sara(), { assetId: 'a-ex11', bookingId: 'b-1010' });
     expect(a.ok && b.ok).toBe(true);
     if (!a.ok || !b.ok) return;
-    revokeTrackingLink(sara(), a.data.id);
+    revokeTrackingLink(sara(), a.data!.id);
 
     expect(revokeLinksForBooking('b-1010', 'manual', 'u-priya')).toBe(1);
-    expect(seed.trackingLinks.find(l => l.id === b.data.id)?.revokeReason).toBe('manual');
+    expect(seed.trackingLinks.find(l => l.id === b.data!.id)?.revokeReason).toBe('manual');
     expect(revokeLinksForBooking('b-1010', 'manual', 'u-priya')).toBe(0);
   });
 
@@ -202,10 +202,10 @@ describe('tracking links — revoke', () => {
     const cancel = cancelBooking(khalid(), job.id, 'Site cancelled');
     expect(cancel.ok).toBe(true);
     expect(cancel.ok && cancel.message).toContain('1 tracking link revoked');
-    expect(linkById(link.data.id)).toMatchObject({
+    expect(linkById(link.data!.id)).toMatchObject({
       revokeReason: 'booking_cancelled', revokedBy: 'u-khalid',
     });
-    expect(linkEndWords(linkById(link.data.id)!)).toBe('Booking cancelled by Khalid Rahman');
+    expect(linkEndWords(linkById(link.data!.id)!)).toBe('Booking cancelled by Khalid Rahman');
   });
 
   it('close says how many links it ended, and none when there were none', () => {

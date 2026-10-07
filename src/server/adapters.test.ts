@@ -43,7 +43,7 @@ function freshAdapter(model: CanAdapter['model'] = 'ALL-CAN300'): CanAdapter {
   const serial = `${prefix}-009${String(++serialSeq).padStart(3, '0')}`;
   const result = registerAdapter(sara(), { serial, model });
   if (!result.ok) throw new Error(result.error);
-  return result.data;
+  return result.data!;
 }
 
 afterEach(() => {
@@ -89,9 +89,9 @@ describe('adapters — register', () => {
     const result = registerAdapter(ravi(), { serial: 'ac3-006103', model: 'ALL-CAN300' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.serial).toBe('AC3-006103'); // normalised to upper case
-    expect(result.data.status).toBe('in_stock');
-    expect(result.data.assetId).toBe(null);
+    expect(result.data!.serial).toBe('AC3-006103'); // normalised to upper case
+    expect(result.data!.status).toBe('in_stock');
+    expect(result.data!.assetId).toBe(null);
     expect(result.message).toBe('AC3-006103 registered.');
     expect(stockAdapters('ALL-CAN300').some(a => a.serial === 'AC3-006103')).toBe(true);
     expect(seed.auditEntries.some(e => e.action === 'adapter.register' && e.detail.includes('AC3-006103'))).toBe(true);
