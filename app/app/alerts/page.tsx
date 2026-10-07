@@ -59,13 +59,17 @@ export default function AlertsPage() {
 
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('unacknowledged');
   const [_statusFilter] = useState<StatusFilter>('open');
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
 
   const visibleAssets = useMemo(() => {
     if (!session) return [];
     return seed.assets.filter(a => isAssetVisible(session, a.id));
   }, [session]);
 
-  // Generate sample alerts for visible assets (Day one: only offline alerts)
+  const visibleAssetIds = useMemo(() => new Set(visibleAssets.map(a => a.id)), [visibleAssets]);
+
+  // Use seed alerts, filtered by what the current user can see.
+  // Day one: only offline alerts. Phase 2+: all alert types the fleet can produce.
   const alerts = useMemo(() => {
     if (!session) return [];
 
@@ -84,54 +88,44 @@ export default function AlertsPage() {
       siteName: string;
     }[] = [];
 
-    for (const asset of visibleAssets) {
-      // Day one phase: only offline alerts
-      if (phase === 'day_one') {
-        // Only add offline alert if asset is not live
-        const status = seed.pairings.find(p => p.assetId === asset.id && p.to === null)
-          ? 'offline'
-          : 'no_tracker';
-        if (status === 'offline') {
-          result.push({
-            id: `alert-${asset.id}-offline`,
-            assetId: asset.id,
-            assetCode: asset.code,
-            assetName: asset.name,
-            type: 'offline',
-            typeLabel: 'Offline',
-            typeWords: 'Offline since 14:32',
-            status: 'open',
-            acknowledgedBy: null,
-            acknowledgedAt: null,
-            since: '14:32',
-            siteName: seed.sites.find(s => s.id === asset.homeSiteId)?.name ?? '',
-          });
-        }
+    for (const alert of seed.alerts) {
+      // Tenant-level alerts (no assetId) are shown to the tenant's users
+      if (!alert.assetId) {
+        if (alert.tenantId !== session.tenantId && !session.isKasper) continue;
       } else {
-        // Phase 2+: add various alert types
-        const types: AlertType[] = ['offline', 'low_battery', 'overspeed', 'harsh_driving'];
-        for (const type of types) {
-          const isAcknowledged = Math.random() > 0.5;
-          result.push({
-            id: `alert-${asset.id}-${type}`,
-            assetId: asset.id,
-            assetCode: asset.code,
-            assetName: asset.name,
-            type,
-            typeLabel: ALERT_TYPE_LABELS[type],
-            typeWords: ALERT_TYPE_WORDS[type],
-            status: isAcknowledged ? 'acknowledged' : 'open',
-            acknowledgedBy: isAcknowledged ? session.user.name : null,
-            acknowledgedAt: isAcknowledged ? clock.formatDubaiTime(clock.now() - Math.random() * 86400000) : null,
-            since: clock.formatDubaiTime(clock.now() - Math.random() * 86400000),
-            siteName: seed.sites.find(s => s.id === asset.homeSiteId)?.name ?? '',
-          });
-        }
+        // Asset-level alerts: only if the user can see that asset
+        if (!visibleAssetIds.has(alert.assetId)) continue;
       }
+
+      // Day one: only offline alerts
+      if (phase === 'day_one' && alert.type !== 'offline') continue;
+
+      const asset = alert.assetId ? seed.assets.find(a => a.id === alert.assetId) : null;
+
+      // Determine if this alert is open or closed
+      const isClosed = alert.closedAt != null;
+      const isAcknowledged = acknowledged.has(alert.id);
+
+      result.push({
+        id: alert.id,
+        assetId: alert.assetId ?? '',
+        assetCode: asset?.code ?? '',
+        assetName: asset?.name ?? '',
+        type: alert.type,
+        typeLabel: ALERT_TYPE_LABELS[alert.type] ?? alert.type,
+        typeWords: alert.detail ?? ALERT_TYPE_WORDS[alert.type] ?? alert.type,
+        status: isAcknowledged ? 'acknowledged' : (isClosed ? 'acknowledged' : 'open'),
+        acknowledgedBy: isAcknowledged ? session.user.name : null,
+        acknowledgedAt: isAcknowledged
+          ? clock.formatDubaiTime(clock.now())
+          : (alert.closedAt != null ? clock.formatDubaiTime(typeof alert.closedAt === 'string' ? new Date(alert.closedAt).getTime() : alert.closedAt) : null),
+        since: clock.formatDubaiTime(typeof alert.openedAt === 'string' ? new Date(alert.openedAt).getTime() : alert.openedAt),
+        siteName: asset ? seed.sites.find(s => s.id === asset.homeSiteId)?.name ?? '' : '',
+      });
     }
 
     return result;
-  }, [session, visibleAssets, phase]);
+  }, [session, visibleAssetIds, phase, acknowledged]);
 
   const filteredAlerts = useMemo(() => {
     return alerts.filter(a => {
@@ -229,7 +223,9 @@ export default function AlertsPage() {
                   )}
                 </div>
                 {alert.status === 'open' && canAcknowledge && (
-                  <Button size="sm" variant="secondary">
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    setAcknowledged(prev => new Set(prev).add(alert.id));
+                  }}>
                     Acknowledge
                   </Button>
                 )}

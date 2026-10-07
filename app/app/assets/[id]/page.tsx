@@ -13,7 +13,7 @@ import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
-import { getReadingForAsset, computeStatus } from '@/server/telemetry/simulator';
+import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server/telemetry/simulator';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,6 +68,23 @@ export default function AssetDetailPage() {
   const rel = useMemo(() => asset && session ? getRelationship(session, asset.id) : null, [asset, session]);
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);
   const reading = useMemo(() => asset ? getReadingForAsset(asset) : null, [asset]);
+  const positions = useMemo(() => {
+    if (!asset || !reading) return [];
+    const endMs = typeof reading.deviceTime === 'number' ? reading.deviceTime : new Date(reading.deviceTime).getTime();
+    const startMs = endMs - 86400000; // last 24 hours
+    const readings = getReadingsForAsset(asset, startMs, endMs);
+    return readings
+      .filter(r => {
+        const t = typeof r.deviceTime === 'number' ? r.deviceTime : new Date(r.deviceTime).getTime();
+        return t >= startMs && t <= endMs;
+      })
+      .sort((a, b) => {
+        const ta = typeof a.deviceTime === 'number' ? a.deviceTime : new Date(a.deviceTime).getTime();
+        const tb = typeof b.deviceTime === 'number' ? b.deviceTime : new Date(b.deviceTime).getTime();
+        return tb - ta;
+      })
+      .slice(0, 10);
+  }, [asset, reading]);
 
   const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
@@ -324,9 +341,17 @@ export default function AssetDetailPage() {
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">Engine hours</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {reading ? `${reading.gnssOdometerKm.toFixed(1)} km` : '—'}
+                  {asset.canProfile.supported.includes('engineHours') && reading?.engineHours !== undefined
+                    ? `${reading.engineHours.toFixed(1)} h`
+                    : 'Not measured'}
                 </div>
-                <div className="text-xs text-grey-500 mt-1">ECU · today</div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {asset.canProfile.adapter === 'ALL-CAN300'
+                    ? 'ECU · billing-grade'
+                    : asset.canProfile.supported.includes('engineHours')
+                    ? 'ECU · partial, not for billing'
+                    : 'Ignition · Estimated'}
+                </div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">Fuel level</div>
@@ -342,8 +367,8 @@ export default function AssetDetailPage() {
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">Engine RPM</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('rpm') && reading?.fuelRateLph !== undefined
-                    ? `${Math.floor(Math.random() * 3000)} rpm`
+                  {asset.canProfile.supported.includes('rpm') && reading?.rpm !== undefined
+                    ? `${Math.round(reading.rpm)} rpm`
                     : 'Not measured'}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
@@ -383,20 +408,22 @@ export default function AssetDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reading ? (
-                    <tr className="border-b border-line">
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
-                      </td>
-                      <td className="px-3 py-2 font-mono">{reading.speedKmh} km/h</td>
-                      <td className="px-3 py-2">{reading.ignition ? 'On' : 'Off'}</td>
-                      <td className="px-3 py-2 font-mono">{reading.heading}°</td>
-                      {asset.canProfile.supported.includes('fuelLevel') && (
-                        <td className="px-3 py-2 font-mono">
-                          {reading.fuelLevelPct !== undefined ? `${reading.fuelLevelPct.toFixed(0)}%` : '—'}
+                  {positions.length > 0 ? (
+                    positions.map((pos, i) => (
+                      <tr key={i} className="border-b border-line">
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {clock.formatDubaiTime(typeof pos.deviceTime === 'number' ? pos.deviceTime : new Date(pos.deviceTime).getTime())}
                         </td>
-                      )}
-                    </tr>
+                        <td className="px-3 py-2 font-mono">{pos.speedKmh} km/h</td>
+                        <td className="px-3 py-2">{pos.ignition ? 'On' : 'Off'}</td>
+                        <td className="px-3 py-2 font-mono">{pos.heading}°</td>
+                        {asset.canProfile.supported.includes('fuelLevel') && (
+                          <td className="px-3 py-2 font-mono">
+                            {pos.fuelLevelPct !== undefined ? `${pos.fuelLevelPct.toFixed(0)}%` : '—'}
+                          </td>
+                        )}
+                      </tr>
+                    ))
                   ) : (
                     <tr>
                       <td colSpan={5} className="px-3 py-4 text-center text-grey-500">No data</td>
