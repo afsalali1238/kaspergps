@@ -17,6 +17,10 @@ const WIRED_SOURCES = [
   'app/sign-in/page.tsx',
   'app/t/[token]/page.tsx',
   'app/app/page.tsx',
+  'app/app/billing/page.tsx',
+  'app/app/downloads/page.tsx',
+  'app/app/schedules/page.tsx',
+  'app/app/reports/page.tsx',
 ];
 
 function walk(node: unknown, pathSoFar: string[] = []): { path: string; value: string }[] {
@@ -84,6 +88,33 @@ describe('keys the wired screens ask for', () => {
       'map.rentedBadge',
       'common.all',
       'common.demo',
+    ]) {
+      expect(hasArabic(key), key).toBe(true);
+    }
+  });
+
+  it('covers the reports, downloads and schedules screens', () => {
+    for (const key of [
+      'billing.title',
+      'billing.columns.issuer',
+      'billing.statuses.partPaid',
+      'billing.recordPayment',
+      'downloads.title',
+      'downloads.downloadAgain',
+      'downloads.noAccess',
+      'downloads.bySchedule',
+      'downloads.byYou',
+      'downloads.skipped',
+      'downloads.outbox',
+      'schedules.title',
+      'schedules.frequency.daily',
+      'schedules.weekday.mon',
+      'schedules.pausedAfterSkips',
+      'schedules.resume',
+      'reports.run',
+      'reports.scheduleThis',
+      'reports.types.locationHistory',
+      'reports.types.drivingEvents',
     ]) {
       expect(hasArabic(key), key).toBe(true);
     }

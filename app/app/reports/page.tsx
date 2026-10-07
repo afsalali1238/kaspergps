@@ -6,10 +6,13 @@ import {
   Button, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, hasCapability } from '@/server/access';
 import { FEATURES } from '@/domain/features';
+import { createRun, createSchedule, nextRunAfter, type ScheduleFrequency } from '@/server/reports';
+import { buildReportFile } from '@/lib/report-file';
 
 type ReportType = 'trip_mileage' | 'location_history' | 'operating_hours' | 'fuel' | 'utilisation' | 'driving_events';
 type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
@@ -72,8 +75,18 @@ const DATE_PRESETS = [
   { label: 'Last 30 days', days: 30 },
 ];
 
+const REPORT_LABELS: Record<ReportType, { key: string; fallback: string }> = {
+  trip_mileage: { key: 'reports.types.tripMileage', fallback: 'Trip & Mileage' },
+  location_history: { key: 'reports.types.locationHistory', fallback: 'Location history' },
+  operating_hours: { key: 'reports.types.operatingHours', fallback: 'Operating hours' },
+  fuel: { key: 'reports.types.fuel', fallback: 'Fuel' },
+  utilisation: { key: 'reports.types.utilisation', fallback: 'Utilisation' },
+  driving_events: { key: 'reports.types.drivingEvents', fallback: 'Driving events' },
+};
+
 export default function ReportsPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
@@ -82,7 +95,12 @@ export default function ReportsPage() {
   const [format, setFormat] = useState<FormatType>('excel');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
-  const [presetDays, setPresetDays] = useState<number | null>(null);
+  const [presetDays, setPresetDays] = useState<number | null>(7);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [frequency, setFrequency] = useState<ScheduleFrequency>('daily');
+  const [hour, setHour] = useState(7);
 
   // Visible assets for the current user
   const visibleAssets = useMemo(() => {
@@ -124,6 +142,67 @@ export default function ReportsPage() {
   const canRunReport = hasCapability(session!, 'report.run');
 
   if (!session) return null;
+
+  const chosenAssetIds = selectedAssetIds.length > 0 ? selectedAssetIds : visibleAssets.slice(0, 1).map(a => a.id);
+  const reportName = selectedReport
+    ? `${t(REPORT_LABELS[selectedReport].key, REPORT_LABELS[selectedReport].fallback)} — ${chosenAssetIds
+        .map(id => seed.assets.find(a => a.id === id)?.code ?? id)
+        .join(', ')}`
+    : '';
+  // The label describes what was actually chosen, not the scope radio.
+  const reportScope =
+    scope === 'site' ? 'Site' : chosenAssetIds.length > 1 ? 'Multiple assets' : 'Single asset';
+
+  const periodBounds = () => {
+    const toMs = effectiveDateTo
+      ? new Date(`${effectiveDateTo}T23:59:59+04:00`).getTime()
+      : clock.now();
+    const fromMs = effectiveDateFrom
+      ? new Date(`${effectiveDateFrom}T00:00:00+04:00`).getTime()
+      : toMs - 24 * 3600000;
+    return { fromMs, toMs };
+  };
+
+  const onRunReport = async () => {
+    if (!selectedReport) return;
+    setStatus(null);
+    const { fromMs, toMs } = periodBounds();
+    const run = createRun(session, {
+      type: selectedReport,
+      name: reportName,
+      scopeLabel: reportScope,
+      assetIds: chosenAssetIds,
+      fromMs,
+      toMs,
+      format,
+    });
+    if (run.status === 'skipped') {
+      setStatus(run.skippedReason ?? '');
+      return;
+    }
+    const file = await buildReportFile(run);
+    const url = URL.createObjectURL(file.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(t('reports.runCreated', 'Report generated — it is listed in Downloads.'));
+  };
+
+  const onScheduleReport = () => {
+    if (!selectedReport) return;
+    createSchedule(session, {
+      type: selectedReport,
+      name: reportName,
+      assetIds: chosenAssetIds,
+      format,
+      frequency,
+      hour,
+    });
+    setScheduleOpen(false);
+    setStatus(t('reports.scheduleCreated', 'Schedule saved — see Schedules for its next run.'));
+  };
 
   return (
     <div className="space-y-4">
@@ -206,18 +285,32 @@ export default function ReportsPage() {
                 {scope === 'single_asset' ? 'Select an asset' : 'Select assets (hold Ctrl/Cmd to multi-select)'}
               </div>
               <div className="flex flex-wrap gap-2">
-                {visibleAssets.map(asset => (
-                  <button
-                    key={asset.id}
-                    className={clsx(
-                      'px-3 py-2 text-xs rounded-lg border transition-colors flex items-center gap-1',
-                      'bg-paper border-line text-grey-700 hover:border-grey-500'
-                    )}
-                  >
-                    <span className="font-mono font-medium">{asset.code}</span>
-                    <span className="text-grey-500">{asset.name}</span>
-                  </button>
-                ))}
+                {visibleAssets.map(asset => {
+                  const chosen = selectedAssetIds.includes(asset.id);
+                  return (
+                    <button
+                      key={asset.id}
+                      onClick={() =>
+                        setSelectedAssetIds(prev =>
+                          scope === 'single_asset'
+                            ? [asset.id]
+                            : chosen
+                              ? prev.filter(id => id !== asset.id)
+                              : [...prev, asset.id],
+                        )
+                      }
+                      className={clsx(
+                        'px-3 py-2 text-xs rounded-lg border transition-colors flex items-center gap-1',
+                        chosen
+                          ? 'bg-ink text-white border-ink'
+                          : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                      )}
+                    >
+                      <span className="font-mono font-medium">{asset.code}</span>
+                      <span className={chosen ? 'text-paper/70' : 'text-grey-500'}>{asset.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -293,20 +386,77 @@ export default function ReportsPage() {
           </div>
 
           {/* Run button */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
             <div className="text-xs text-grey-500">
               {effectiveDateFrom && effectiveDateTo && (
                 <span>
-                  From {effectiveDateFrom} to {effectiveDateTo}
+                  {t('reports.fromTo', `From ${effectiveDateFrom} to ${effectiveDateTo}`, {
+                    from: effectiveDateFrom,
+                    to: effectiveDateTo,
+                  })}
+                  {' · '}
+                  {t(
+                    'reports.assetCount',
+                    chosenAssetIds.length === 1 ? '1 asset' : `${chosenAssetIds.length} assets`,
+                    { count: chosenAssetIds.length },
+                  )}
                 </span>
               )}
             </div>
             {canRunReport && (
-              <Button onClick={() => {}}>
-                Run report
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setScheduleOpen(!scheduleOpen)}>
+                  {t('reports.scheduleThis', 'Schedule this report')}
+                </Button>
+                <Button onClick={() => void onRunReport()}>
+                  {t('reports.run', 'Run report')}
+                </Button>
+              </div>
             )}
           </div>
+
+          {scheduleOpen && (
+            <div className="bg-paper-2 border border-line rounded-lg p-3 flex flex-wrap items-end gap-2">
+              <label className="text-xs text-grey-500">
+                {t('schedules.frequencyLabel', 'Frequency')}
+                <select
+                  value={frequency}
+                  onChange={e => setFrequency(e.target.value as ScheduleFrequency)}
+                  className="block mt-1 px-2 py-1.5 text-xs rounded-lg border border-line bg-paper text-grey-700"
+                >
+                  <option value="daily">{t('schedules.frequency.daily', 'Daily')}</option>
+                  <option value="weekly">{t('schedules.frequency.weekly', 'Weekly')}</option>
+                  <option value="monthly">{t('schedules.frequency.monthly', 'Monthly')}</option>
+                </select>
+              </label>
+              <label className="text-xs text-grey-500">
+                {t('schedules.hourLabel', 'Hour (Dubai)')}
+                <select
+                  value={hour}
+                  onChange={e => setHour(Number(e.target.value))}
+                  className="block mt-1 px-2 py-1.5 text-xs rounded-lg border border-line bg-paper text-grey-700"
+                >
+                  {Array.from({ length: 24 }).map((_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </label>
+              <div className="text-xs text-grey-500 pb-2">
+                {t('schedules.deliverTo', `Deliver to ${session.user.email}`, { email: session.user.email })}
+                {' · '}
+                {t('schedules.firstRun', `first run ${clock.formatDubaiDateTime(nextRunAfter(clock.now(), frequency, hour))}`, {
+                  time: clock.formatDubaiDateTime(nextRunAfter(clock.now(), frequency, hour)),
+                })}
+              </div>
+              <Button size="sm" onClick={onScheduleReport}>
+                {t('common.save', 'Save')}
+              </Button>
+            </div>
+          )}
+
+          {status && (
+            <div className="text-sm text-ink bg-paper-2 border border-line rounded-lg px-3 py-2">{status}</div>
+          )}
         </div>
       )}
 

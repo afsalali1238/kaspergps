@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ToastProvider } from '@/components/ui';
-import { DemoBar } from '@/components/demo/DemoBar';
 import { AppShell } from '@/components/layout/AppShell';
 import { useHydrated, useSession } from '@/store';
 
@@ -30,8 +29,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!hydrated || !session) return <ShellLoading />;
 
   return (
+    // The demo bar itself lives in the root layout (it is on every screen,
+    // including the public tracking page) — rendering it twice stacked two
+    // bars and made the lower one unreachable.
     <ToastProvider>
-      <DemoBar />
       <AppShell>{children}</AppShell>
     </ToastProvider>
   );

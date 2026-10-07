@@ -6,6 +6,7 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
 import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {
@@ -20,19 +21,33 @@ function fmtAed(amount: number): string {
   return `AED ${amount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}`;
 }
 
-function statusBadge(status: string): React.ReactNode {
-  const variants: Record<string, 'green' | 'yellow' | 'red' | 'grey'> = {
-    paid: 'green',
-    part_paid: 'yellow',
-    unpaid: 'grey',
-    overdue: 'red',
-    void: 'grey',
-  };
-  return <Badge variant={variants[status] ?? 'grey'}>{status}</Badge>;
+const STATUS_KEYS: Record<string, string> = {
+  paid: 'billing.statuses.paid',
+  part_paid: 'billing.statuses.partPaid',
+  unpaid: 'billing.statuses.unpaid',
+  overdue: 'billing.statuses.overdue',
+  void: 'billing.statuses.void',
+};
+
+const STATUS_VARIANTS: Record<string, 'green' | 'yellow' | 'red' | 'grey'> = {
+  paid: 'green',
+  part_paid: 'yellow',
+  unpaid: 'grey',
+  overdue: 'red',
+  void: 'grey',
+};
+
+function statusBadge(status: string, t: (key: string, fallback: string) => string): React.ReactNode {
+  return (
+    <Badge variant={STATUS_VARIANTS[status] ?? 'grey'}>
+      {t(STATUS_KEYS[status] ?? '', status)}
+    </Badge>
+  );
 }
 
 export default function BillingPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
   const [payConfirm, setPayConfirm] = useState<string | null>(null);
@@ -42,8 +57,11 @@ export default function BillingPage() {
   if (phase === 'day_one') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Billing</h1>
-        <EmptyState title="Not available" description="Billing is available in Phase 2." />
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('billing.title', 'Billing')}</h1>
+        <EmptyState
+          title={t('billing.notAvailable', 'Not available')}
+          description={t('billing.phase2', 'Billing is available in Phase 2.')}
+        />
       </div>
     );
   }
@@ -63,17 +81,15 @@ export default function BillingPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Billing</h1>
-        <p className="text-sm text-grey-500 mt-1">
-          Rental invoices and GPS subscription statements. All amounts in AED. Dummy rates apply.
-        </p>
+        <h1 className="text-lg font-semibold text-ink">{t('billing.title', 'Billing')}</h1>
+        <p className="text-sm text-grey-500 mt-1">{t('billing.subtitle', 'Rental invoices and GPS subscription statements. All amounts in AED. Dummy rates apply.')}</p>
       </div>
 
       <Tabs
         tabs={[
-          { id: 'issued', label: 'Issued' },
-          { id: 'received', label: 'Received' },
-          { id: 'gps', label: 'GPS subscription' },
+          { id: 'issued', label: t('billing.tabs.issued', 'Issued') },
+          { id: 'received', label: t('billing.tabs.received', 'Received') },
+          { id: 'gps', label: t('billing.tabs.gpsSubscription', 'GPS subscription') },
         ]}
         activeId="issued"
         onChange={() => {}}
@@ -82,25 +98,25 @@ export default function BillingPage() {
       {/* Issued invoices */}
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-ink">Rental invoices issued</h2>
-          <Button variant="secondary" size="sm">Create invoice</Button>
+          <h2 className="text-sm font-medium text-ink">{t('billing.issuedInvoices', 'Rental invoices issued')}</h2>
+          <Button variant="secondary" size="sm">{t('billing.createInvoice', 'Create invoice')}</Button>
         </div>
         {issuedInvoices.length === 0 ? (
           <div className="text-sm text-grey-500 bg-paper-2 rounded-lg p-4 border border-line">
-            No invoices issued yet.
+            {t('billing.emptyIssued', 'No invoices issued yet.')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">Invoice</th>
-                  <th className="px-3 py-2 text-left font-medium">Customer</th>
-                  <th className="px-3 py-2 text-right font-medium">Total</th>
-                  <th className="px-3 py-2 text-right font-medium">Issued</th>
-                  <th className="px-3 py-2 text-right font-medium">Due</th>
-                  <th className="px-3 py-2 text-center font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('billing.columns.invoice', 'Invoice')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('billing.columns.customer', 'Customer')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.total', 'Total')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.issued', 'Issued')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.due', 'Due')}</th>
+                  <th className="px-3 py-2 text-center font-medium">{t('billing.columns.status', 'Status')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.actions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,14 +134,14 @@ export default function BillingPage() {
                       {formatTs(inv.dueAt).split(',')[0]}
                     </td>
                     <td className="px-3 py-2 border-b border-line text-center">
-                      {statusBadge(inv.status)}
+                      {statusBadge(inv.status, t)}
                     </td>
                     <td className="px-3 py-2 text-right border-b border-line">
                       {inv.status !== 'paid' && inv.status !== 'void' && (
-                        <Button size="sm" variant="secondary">Record payment</Button>
+                        <Button size="sm" variant="secondary">{t('billing.recordPayment', 'Record payment')}</Button>
                       )}
                       {inv.status === 'paid' && (
-                        <span className="text-grey-400 text-xs">Done</span>
+                        <span className="text-grey-400 text-xs">{t('billing.done', 'Done')}</span>
                       )}
                     </td>
                   </tr>
@@ -139,27 +155,27 @@ export default function BillingPage() {
       {/* Received invoices */}
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-ink">Invoices received</h2>
+          <h2 className="text-sm font-medium text-ink">{t('billing.receivedInvoices', 'Invoices received')}</h2>
           <span className="text-xs text-grey-500">
-            Customer: {seed.tenants.find(t => t.id === myTenantId)?.name ?? 'Unknown'}
+            {t('billing.customerLabel', 'Customer')}: {seed.tenants.find(x => x.id === myTenantId)?.name ?? t('billing.unknown', 'Unknown')}
           </span>
         </div>
         {receivedInvoices.length === 0 ? (
           <div className="text-sm text-grey-500 bg-paper-2 rounded-lg p-4 border border-line">
-            No invoices received.
+            {t('billing.emptyReceived', 'No invoices received.')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">Invoice</th>
-                  <th className="px-3 py-2 text-left font-medium">Issuer</th>
-                  <th className="px-3 py-2 text-right font-medium">Total</th>
-                  <th className="px-3 py-2 text-right font-medium">Issued</th>
-                  <th className="px-3 py-2 text-right font-medium">Due</th>
-                  <th className="px-3 py-2 text-center font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('billing.columns.invoice', 'Invoice')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('billing.columns.issuer', 'Issuer')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.total', 'Total')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.issued', 'Issued')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.due', 'Due')}</th>
+                  <th className="px-3 py-2 text-center font-medium">{t('billing.columns.status', 'Status')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('billing.columns.actions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,18 +195,18 @@ export default function BillingPage() {
                       </td>
                       <td className="px-3 py-2 border-b border-line text-right text-xs font-mono text-grey-500">
                         {formatTs(inv.dueAt).split(',')[0]}
-                        {isOverdue && <span className="text-red text-xs ml-1">Overdue</span>}
+                        {isOverdue && <span className="text-red text-xs ml-1">{t('billing.overdueTag', 'Overdue')}</span>}
                       </td>
                       <td className="px-3 py-2 border-b border-line text-center">
-                        {statusBadge(inv.status)}
+                        {statusBadge(inv.status, t)}
                       </td>
                       <td className="px-3 py-2 text-right border-b border-line">
                         {inv.status === 'unpaid' || inv.status === 'part_paid' ? (
                           <Button size="sm" variant="yellow" onClick={() => handlePay(inv.id)}>
-                            Pay AED {fmtAed(inv.totalAed).replace('AED ', '')}
+                            {t('billing.payAmount', `Pay ${fmtAed(inv.totalAed)}`, { amount: fmtAed(inv.totalAed) })}
                           </Button>
                         ) : (
-                          <span className="text-grey-400 text-xs">Paid</span>
+                          <span className="text-grey-400 text-xs">{t('billing.paidTag', 'Paid')}</span>
                         )}
                       </td>
                     </tr>
@@ -206,15 +222,20 @@ export default function BillingPage() {
       {payConfirm && (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/50 z-50">
           <div className="bg-surface border border-line rounded-lg p-4 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-medium text-ink mb-2">Pay invoice?</h3>
+            <h3 className="text-sm font-medium text-ink mb-2">{t('billing.payInvoice', 'Pay invoice?')}</h3>
             <p className="text-xs text-grey-500 mb-4">
-              This is a demo. No money moves. You are confirming payment of{' '}
-              {fmtAed(seed.invoices.find(i => i.id === payConfirm)?.totalAed ?? 0)} to{' '}
-              {seed.invoices.find(i => i.id === payConfirm)?.customerName ?? 'Unknown'}.
+              {t('billing.payConfirmBody', 'This is a demo. No money moves. You are confirming payment of {amount} to {customer}.', {
+                amount: fmtAed(seed.invoices.find(i => i.id === payConfirm)?.totalAed ?? 0),
+                customer: seed.invoices.find(i => i.id === payConfirm)?.customerName ?? t('billing.unknown', 'Unknown'),
+              })}
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="secondary" size="sm" onClick={() => setPayConfirm(null)}>Cancel</Button>
-              <Button size="sm" variant="yellow" onClick={confirmPay}>Confirm payment</Button>
+              <Button variant="secondary" size="sm" onClick={() => setPayConfirm(null)}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button size="sm" variant="yellow" onClick={confirmPay}>
+                {t('billing.confirmPayment', 'Confirm payment')}
+              </Button>
             </div>
           </div>
         </div>
@@ -223,11 +244,11 @@ export default function BillingPage() {
       {/* GPS subscription */}
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-ink">GPS subscription statements</h2>
-          <Button variant="secondary" size="sm">Download</Button>
+          <h2 className="text-sm font-medium text-ink">{t('billing.gpsStatements', 'GPS subscription statements')}</h2>
+          <Button variant="secondary" size="sm">{t('billing.download', 'Download')}</Button>
         </div>
         <p className="text-xs text-grey-500 mb-3">
-          Monthly GPS tracker subscription from Kasper. Paid by the tenant. Dummy rates: AED 75/T1 · 110/T2 · 165/T3 per tracker-month.
+          {t('billing.gpsNote', 'Monthly GPS tracker subscription from Kasper. Paid by the tenant. Dummy rates: AED 75/T1 · 110/T2 · 165/T3 per tracker-month.')}
         </p>
         {(() => {
           const tenantAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
@@ -239,30 +260,30 @@ export default function BillingPage() {
             <div className="bg-paper-2 rounded-lg p-4 border border-line">
               <div className="grid grid-cols-3 gap-3 text-sm mb-3">
                 <div>
-                  <div className="text-xs text-grey-500">Tier 1 trackers ({t1})</div>
+                  <div className="text-xs text-grey-500">{t('billing.tierTrackers', `Tier 1 trackers (${t1})`, { tier: 1, count: t1 })}</div>
                   <div className="text-ink font-medium">{t1 > 0 ? fmtAed(t1 * 75) : '—'}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-grey-500">Tier 2 trackers ({t2})</div>
+                  <div className="text-xs text-grey-500">{t('billing.tierTrackers', `Tier 2 trackers (${t2})`, { tier: 2, count: t2 })}</div>
                   <div className="text-ink font-medium">{t2 > 0 ? fmtAed(t2 * 110) : '—'}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-grey-500">Tier 3 trackers ({t3})</div>
+                  <div className="text-xs text-grey-500">{t('billing.tierTrackers', `Tier 3 trackers (${t3})`, { tier: 3, count: t3 })}</div>
                   <div className="text-ink font-medium">{t3 > 0 ? fmtAed(t3 * 165) : '—'}</div>
                 </div>
               </div>
               <div className="border-t border-line pt-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-ink">Total</span>
+                <span className="text-sm font-medium text-ink">{t('billing.total', 'Total')}</span>
                 <span className="text-sm font-mono text-ink font-medium">{fmtAed(total)}</span>
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <Badge variant="yellow">Unpaid</Badge>
-                <span className="text-xs text-grey-500">Due by end of month</span>
+                <Badge variant="yellow">{t('billing.statuses.unpaid', 'Unpaid')}</Badge>
+                <span className="text-xs text-grey-500">{t('billing.dueByEndOfMonth', 'Due by end of month')}</span>
               </div>
               {total > 0 && (
                 <div className="mt-3">
                   <Button size="sm" variant="yellow" onClick={() => handlePay('gps')}>
-                    Pay AED {fmtAed(total).replace('AED ', '')}
+                    {t('billing.payAmount', `Pay ${fmtAed(total)}`, { amount: fmtAed(total) })}
                   </Button>
                 </div>
               )}
@@ -272,7 +293,7 @@ export default function BillingPage() {
       </div>
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">
-        <strong className="text-ink">Dummy rates:</strong> GPS subscription AED 75/T1 · 110/T2 · 165/T3 per tracker-month. VAT 5%. All amounts are dummy values for the prototype.
+        <strong className="text-ink">{t('billing.dummyRatesLabel', 'Dummy rates:')}</strong> {t('billing.dummyRatesBody', 'GPS subscription AED 75/T1 · 110/T2 · 165/T3 per tracker-month. VAT 5%. All amounts are dummy values for the prototype.')}
       </div>
     </div>
   );

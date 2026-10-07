@@ -114,6 +114,11 @@ export function startOfDubaiDay(ms: number): number {
   return fromZonedTime(startOfDay(toZonedTime(new Date(ms), DUBAI_TZ)), DUBAI_TZ).getTime();
 }
 
+/** The Dubai hour (0-23) of a moment — used for schedule times. */
+export function toDubaiHour(ms: number): number {
+  return toZonedTime(new Date(ms), DUBAI_TZ).getHours();
+}
+
 export function hoursSinceDubai(ms: number): number {
   return differenceInHours(now(), ms);
 }

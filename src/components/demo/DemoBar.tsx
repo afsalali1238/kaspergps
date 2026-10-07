@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { useStore } from '@/store';
+import { useSession, useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clocklib from '@/lib/clock';
 import { readLanguageCookie, type Language } from '@/lib/language';
@@ -96,10 +96,32 @@ function jumpToPresets(): { label: string; jump: () => void }[] {
     makePreset('End of last month', thisMonthStart - 60000),
     makePreset('FB-12 link expires (7 Oct 00:00)', ANCHOR_MS + 14 * 3600000),
     makePreset('EX-07 rental starts (7 Oct 08:00)', ANCHOR_MS + 22 * 3600000),
+    ...rentalEndPresets(),
   ];
 }
 
 // ── Tools ──────────────────────────────────────────────────────────────────────
+
+/**
+ * S30: for a signed-in renter, offer a jump to two days past their rental end —
+ * the moment scheduled reports start coming back "Skipped".
+ */
+function rentalEndPresets(): { label: string; jump: () => void }[] {
+  const session = useStore.getState().session;
+  if (!session || session.isKasper) return [];
+  const booking = seed.bookings.find(
+    b => b.renterTenantId === session.tenantId && (b.status === 'active' || b.status === 'scheduled'),
+  );
+  if (!booking) return [];
+  const asset = seed.assets.find(a => a.id === booking.assetId);
+  const end = booking.closedAt ? new Date(booking.closedAt).getTime() : new Date(booking.end).getTime();
+  return [
+    makePreset(
+      `${asset?.code ?? 'Rental'} rental ends (+2 d)`,
+      end + 2 * 24 * 3600000,
+    ),
+  ];
+}
 
 function toolsItems(): { label: string; desc: string; href?: string }[] {
   return [
@@ -114,7 +136,12 @@ function toolsItems(): { label: string; desc: string; href?: string }[] {
 
 export function DemoBar() {
   const router = useRouter();
-  const session = useStore.getState().session;
+  // Subscribed (not getState) so the chip re-renders on sign-in/sign-out, and
+  // blank until hydration: the persisted session is unknown to the server.
+  const persistedSession = useSession();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  const session = hydrated ? persistedSession : null;
 
   // Read straight from the cookie and re-read whenever it changes: DemoBar sits
   // outside LanguageProvider, and the language toggle is on the customer screens.
@@ -187,8 +214,10 @@ export function DemoBar() {
     }))
     .filter(g => g.users.length > 0);
 
-  const currentTimeStr = clocklib.formatDubaiTime(clocklib.now());
-  const currentDateStr = clocklib.formatDubaiDate(clocklib.now());
+  // A jumped demo clock only exists on the client, so the label waits for
+  // hydration rather than mismatching the server's HTML.
+  const currentTimeStr = hydrated ? clocklib.formatDubaiTime(clocklib.now()) : '--:--';
+  const currentDateStr = hydrated ? clocklib.formatDubaiDate(clocklib.now()) : '…';
 
   const selectUser = useCallback((userId: string) => {
     const user = seed.users.find(u => u.id === userId);

@@ -67,11 +67,13 @@ export const useStore = create<Store>()(
       setClockOffsetMs: (ms) => {
         set({ clockOffsetMs: ms });
         clock.setOffsetMs(ms);
+        announceClockChange();
       },
 
       resetClock: () => {
         set({ clockOffsetMs: 0 });
         clock.resetOffset();
+        announceClockChange();
       },
 
       getClockOffsetMs: () => get().clockOffsetMs,
@@ -86,9 +88,22 @@ export const useStore = create<Store>()(
         // the app (it used to leave both shells stuck on "Loading…").
         session: state.session,
       }),
+      // The offset lives in two places — the store (for display) and the clock
+      // module (for every timestamp in the app). Rehydration has to feed the
+      // module too, or a refresh quietly undoes a demo clock jump.
+      onRehydrateStorage: () => (state) => {
+        if (state) clock.setOffsetMs(state.clockOffsetMs);
+      },
     }
   )
 );
+
+/** Screens that catch schedules up (Downloads, Schedules) listen for this. */
+export const CLOCK_CHANGED_EVENT = 'kasper:clock';
+
+function announceClockChange(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(CLOCK_CHANGED_EVENT));
+}
 
 // ── Convenience getters ────────────────────────────────────────────────────────
 
