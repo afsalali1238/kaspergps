@@ -169,6 +169,8 @@ function toolsItems(): { label: string; desc: string; href?: string }[] {
     { label: '/dev/seed', desc: 'Seed data tables', href: '/dev/seed' },
     { label: '/dev/access', desc: 'Access explorer', href: '/dev/access' },
     { label: '/dev/bookings', desc: 'Booking simulator', href: '/dev/bookings' },
+    { label: '/dev/audit', desc: 'Audit log (Demo view)', href: '/dev/audit' },
+    { label: '/dev/outbox', desc: 'Email outbox (simulated)', href: '/dev/outbox' },
   ];
 }
 
