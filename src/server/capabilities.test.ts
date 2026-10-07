@@ -65,7 +65,8 @@ describe('capabilities — hasRoleCapability', () => {
     expect(hasRoleCapability('tenant_admin', 'asset.edit')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'link.create')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'link.revoke')).toBe(true);
-    expect(hasRoleCapability('tenant_admin', 'grant.endEarly')).toBe(false);
+    // Spec 5: a Tenant Admin can end a rental early on their own asset (owner side).
+    expect(hasRoleCapability('tenant_admin', 'grant.endEarly')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'alert.view')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'muc.view')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'muc.issue')).toBe(true);

@@ -231,12 +231,21 @@ describe('access — hasCapability', () => {
     expect(access.hasCapability(s, 'console.tenants.view')).toBe(false);
   });
 
-  it('Lina (Marina) can view and edit own assets, create links, but not end grants', () => {
+  it('Lina (Marina) can act on her own assets but never on a rental she is renting in', () => {
     const s = sessionFor('u-lina');
     expect(access.hasCapability(s, 'asset.view')).toBe(true);
     expect(access.hasCapability(s, 'asset.edit')).toBe(true);
     expect(access.hasCapability(s, 'link.create')).toBe(true);
-    expect(access.hasCapability(s, 'grant.endEarly')).toBe(false);
+    // Owner side: the role has the capability…
+    expect(access.hasCapability(s, 'grant.endEarly')).toBe(true);
+    // …but as the renter on EX-04 she cannot end the rental.
+    expect(access.canEndAccess(s, 'a-ex04')).toBe(false);
+    expect(access.canEndAccess(s, 'a-pu51')).toBe(true);
+    // Khalid owns EX-04, so he can.
+    expect(access.canEndAccess(sessionFor('u-khalid'), 'a-ex04')).toBe(true);
+    expect(access.canEndAccess(sessionFor('u-ahmed'), 'a-ex04')).toBe(false);
+    expect(access.canEndAccess(sessionFor('u-ravi'), 'a-ex04')).toBe(true);
+    expect(access.canEndAccess(sessionFor('u-ravi'), 'a-nope')).toBe(false);
   });
 
   it('Site Users cannot edit assets', () => {
