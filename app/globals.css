@@ -1,0 +1,149 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap");
+
+:root {
+  /* Brand */
+  --ink: #141518;
+  --Kasper-yellow: #FFC400;
+  --yellow-dark: #E6AF00;
+  --paper: #F1F1EC;
+  --paper-2: #F6F6F3;
+  --line: #E8E8E3;
+  --grey-700: #5B5F66;
+  --grey-500: #9A9CA1;
+  --red: #D64545;
+  --green: #1F9A6D;
+
+  /* Status */
+  --live: #1F9A6D;
+  --idle: #E6AF00;
+  --stale: #D6457F;
+  --offline: #D64545;
+  --unknown: #9A9CA1;
+  --no-tracker: #C8C8C3;
+
+  /* Surfaces */
+  --bg: #F1F1EC;
+  --surface: #FFFFFF;
+  --surface-2: #F6F6F3;
+  --border: #E8E8E3;
+  --text: #141518;
+  --text-secondary: #5B5F66;
+  --text-muted: #9A9CA1;
+  --demo-bar-bg: #141518;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-yellow: var(--Kasper-yellow);
+  --color-yellow-dark: var(--yellow-dark);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-line: var(--line);
+  --color-grey-700: var(--grey-700);
+  --color-grey-500: var(--grey-500);
+  --color-red: var(--red);
+  --color-green: var(--green);
+  --color-live: var(--live);
+  --color-idle: var(--idle);
+  --color-stale: var(--stale);
+  --color-offline: var(--offline);
+  --color-unknown: var(--unknown);
+  --color-no-tracker: var(--no-tracker);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-demo-bar-bg: var(--demo-bar-bg);
+
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-body: "Hanken Grotesk", sans-serif;
+  --font-mono: "Space Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* No device / Dozr lint visual checks — NEVER use these words in UI */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+code, pre, .mono {
+  font-family: var(--font-mono);
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  font-family: var(--font-body);
+  background: var(--paper);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(20, 21, 24, 0.12);
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--line);
+}
+
+.recharts-text {
+  fill: var(--text-secondary);
+  font-family: var(--font-body);
+}
+
+/* Demo bar */
+.demo-bar {
+  background: var(--demo-bar-bg);
+  color: #F1F1EC;
+  font-family: var(--font-body);
+}
+
+.demo-bar .demo-tag {
+  background: var(--Kasper-yellow);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--grey-500);
+}
