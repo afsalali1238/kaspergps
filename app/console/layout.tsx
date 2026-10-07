@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { useStore } from '@/store';
+import { useHydrated, useSession } from '@/store';
 
 interface NavItem {
   href: string;
@@ -47,14 +47,21 @@ const navItems: NavItem[] = [
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const store = useStore;
-  const session = store.getState().session;
+  const router = useRouter();
+  const session = useSession();
+  const hydrated = useHydrated();
 
-  // Guard: only Kasper staff can access the console
-  if (!session || !session.isKasper) {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/app';
-    }
+  // Guard: only Kasper staff can access the console. This waits for the
+  // persisted session before deciding — the check used to run on the first
+  // render, when the session was still null, and bounced every hard refresh
+  // out to /app.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!session) router.replace('/sign-in');
+    else if (!session.isKasper) router.replace('/app');
+  }, [hydrated, session, router]);
+
+  if (!hydrated || !session || !session.isKasper) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-bg">
         <div className="text-sm text-grey-500">Loading…</div>

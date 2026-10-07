@@ -1,6 +1,7 @@
 // Client state store for the Kasper GPS prototype.
 // Uses Zustand with persistence for demo switches and clock offset.
 
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Session, DemoSwitches, User } from '@/domain/types';
@@ -18,6 +19,7 @@ interface StoreState {
 
 interface StoreActions {
   setSession: (s: Session | null) => void;
+  signOut: () => void;
   setDemoSwitches: (s: Partial<DemoSwitches>) => void;
   setSelectedAssetId: (id: string | null) => void;
   setCurrentPath: (p: string) => void;
@@ -51,6 +53,8 @@ export const useStore = create<Store>()(
       // Actions
       setSession: (s) => set({ session: s }),
 
+      signOut: () => set({ session: null }),
+
       setDemoSwitches: (s) =>
         set((state) => ({
           demoSwitches: { ...state.demoSwitches, ...s },
@@ -78,6 +82,9 @@ export const useStore = create<Store>()(
       partialize: (state) => ({
         demoSwitches: state.demoSwitches,
         clockOffsetMs: state.clockOffsetMs,
+        // The session is persisted so a hard refresh does not throw you out of
+        // the app (it used to leave both shells stuck on "Loading…").
+        session: state.session,
       }),
     }
   )
@@ -95,4 +102,21 @@ export function getUser(): User | null {
 
 export function getClockOffsetMs(): number {
   return useStore.getState().clockOffsetMs;
+}
+
+// ── Shell helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * False on the server and on the very first client render, true afterwards.
+ * Layouts gate on this so the server HTML and the first client render match,
+ * and the persisted session is not read before it exists.
+ */
+export function useHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated;
+}
+
+export function useSession(): Session | null {
+  return useStore(s => s.session);
 }

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
 import { useT } from '@/lib/useT';
@@ -103,6 +103,7 @@ const navItems: NavItem[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const store = useStore;
   const { t, dir, language, setLanguage } = useT();
   const session = store.getState().session;
@@ -242,13 +243,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     )}
 
-                    {/* Sign out */}
-                    <Link href="/sign-in" className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red hover:bg-paper-2 transition-colors">
+                    {/* Sign out — clears the persisted session, then leaves */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        useStore.getState().signOut();
+                        router.push('/sign-in');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red hover:bg-paper-2 transition-colors"
+                    >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                       {t('nav.signOut', 'Sign out')}
-                    </Link>
+                    </button>
                   </div>
                 </div>
               )}
