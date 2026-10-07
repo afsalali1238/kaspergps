@@ -491,22 +491,27 @@ export const trackerRequests: TrackerRequest[] = [
 // ── Maintenance plans ──────────────────────────────────────────────────────────
 
 export const maintenancePlans: MaintenancePlan[] = [
-  { id: 'mp-ex04', tenantId: 't-emirates', assetId: 'a-ex04', name: '500 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 500, dueSoonAt: 8500, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 8000 },
-  { id: 'mp-bd02', tenantId: 't-emirates', assetId: 'a-bd02', name: '250 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 15250, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 14700 },
-  { id: 'mp-gn01', tenantId: 't-emirates', assetId: 'a-gn01', name: 'Oil change 250 h', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 2500, lastDoneAt: new Date(daysAgo(180)).toISOString(), lastDoneValue: 2000 },
-  { id: 'mp-fb14', tenantId: 't-alnoor', assetId: 'a-fb14', name: '10,000 km service', basis: 'km', kmSource: 'gps', interval: 10000, dueSoonAt: 10000, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 7000 },
-  { id: 'mp-tp22', tenantId: 't-alnoor', assetId: 'a-tp22', name: '400 h service', basis: 'engine_hours', hoursSource: 'estimated', interval: 400, dueSoonAt: 2000, lastDoneAt: new Date(daysAgo(365)).toISOString(), lastDoneValue: 1200 },
+  { id: 'mp-ex04', tenantId: 't-emirates', assetId: 'a-ex04', name: '500 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 500, dueSoonAt: 8400, lastDoneAt: new Date(daysAgo(45)).toISOString(), lastDoneValue: 8000 },
+  { id: 'mp-bd02', tenantId: 't-emirates', assetId: 'a-bd02', name: '250 h service', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 14900, lastDoneAt: new Date(daysAgo(40)).toISOString(), lastDoneValue: 14700 },
+  { id: 'mp-gn01', tenantId: 't-emirates', assetId: 'a-gn01', name: 'Oil change 250 h', basis: 'engine_hours', hoursSource: 'ecu', interval: 250, dueSoonAt: 2200, lastDoneAt: new Date(daysAgo(5)).toISOString(), lastDoneValue: 2000 },
+  { id: 'mp-fb14', tenantId: 't-alnoor', assetId: 'a-fb14', name: '10,000 km service', basis: 'km', kmSource: 'gps', interval: 10000, dueSoonAt: 15000, lastDoneAt: new Date(daysAgo(30)).toISOString(), lastDoneValue: 7000 },
+  { id: 'mp-tp22', tenantId: 't-alnoor', assetId: 'a-tp22', name: '400 h service', basis: 'engine_hours', hoursSource: 'estimated', interval: 400, dueSoonAt: 1520, lastDoneAt: new Date(daysAgo(25)).toISOString(), lastDoneValue: 1200 },
   { id: 'mp-cr02', tenantId: 't-gulflift', assetId: 'a-cr02', name: 'Annual crane inspection', basis: 'days', interval: 365, dueSoonAt: 365, lastDoneAt: new Date(daysAgo(350)).toISOString(), lastDoneValue: 0 },
   { id: 'mp-cr08', tenantId: 't-gulflift', assetId: 'a-cr08', name: 'Annual crane inspection', basis: 'days', interval: 365, dueSoonAt: 365, lastDoneAt: new Date(daysAgo(370)).toISOString(), lastDoneValue: 0 },
-  { id: 'mp-pu51', tenantId: 't-marina', assetId: 'a-pu51', name: '10,000 km service', basis: 'km', kmSource: 'can', interval: 10000, dueSoonAt: 10000, lastDoneAt: new Date(daysAgo(200)).toISOString(), lastDoneValue: 3000 },
+  { id: 'mp-pu51', tenantId: 't-marina', assetId: 'a-pu51', name: '10,000 km service', basis: 'km', kmSource: 'can', interval: 10000, dueSoonAt: 11000, lastDoneAt: new Date(daysAgo(90)).toISOString(), lastDoneValue: 3000 },
 ];
 
 // ── Service records ────────────────────────────────────────────────────────────
 
 export const serviceRecords: ServiceRecord[] = [
-  { id: 'sr-001', planId: 'mp-ex04', assetId: 'a-ex04', tenantId: 't-emirates', doneAt: new Date(daysAgo(365)).toISOString(), value: 8000, notes: 'Scheduled 500 h service at Al Quoz Yard', costAed: 6800, createdBy: 'u-khalid' },
-  { id: 'sr-002', planId: 'mp-bd02', assetId: 'a-bd02', tenantId: 't-emirates', doneAt: new Date(daysAgo(365)).toISOString(), value: 14700, notes: '250 h service', costAed: 4500, createdBy: 'u-khalid' },
-  { id: 'sr-003', planId: 'mp-fb14', assetId: 'a-fb14', tenantId: 't-alnoor', doneAt: new Date(daysAgo(365)).toISOString(), value: 7000, notes: 'Scheduled service', costAed: 2200, createdBy: 'u-omar' },
+  { id: 'sr-001', planId: 'mp-ex04', assetId: 'a-ex04', tenantId: 't-emirates', doneAt: new Date(daysAgo(45)).toISOString(), value: 8000, notes: 'Scheduled 500 h service at Al Quoz Yard', costAed: 6800, createdBy: 'u-khalid' },
+  { id: 'sr-002', planId: 'mp-bd02', assetId: 'a-bd02', tenantId: 't-emirates', doneAt: new Date(daysAgo(40)).toISOString(), value: 14700, notes: '250 h service — oil, filters, coolant top-up', costAed: 4500, createdBy: 'u-khalid' },
+  { id: 'sr-003', planId: 'mp-gn01', assetId: 'a-gn01', tenantId: 't-emirates', doneAt: new Date(daysAgo(5)).toISOString(), value: 2000, notes: 'Oil and filter change on site', costAed: 950, createdBy: 'u-khalid' },
+  { id: 'sr-004', planId: 'mp-fb14', assetId: 'a-fb14', tenantId: 't-alnoor', doneAt: new Date(daysAgo(30)).toISOString(), value: 7000, notes: 'Scheduled 10,000 km service', costAed: 2200, createdBy: 'u-omar' },
+  { id: 'sr-005', planId: 'mp-tp22', assetId: 'a-tp22', tenantId: 't-alnoor', doneAt: new Date(daysAgo(25)).toISOString(), value: 1200, notes: '400 h service — hour meter read at the workshop', costAed: 1800, createdBy: 'u-omar' },
+  { id: 'sr-006', planId: 'mp-pu51', assetId: 'a-pu51', tenantId: 't-marina', doneAt: new Date(daysAgo(90)).toISOString(), value: 3000, notes: '10,000 km service at Marina yard', costAed: 1400, createdBy: 'u-lina' },
+  { id: 'sr-007', planId: 'mp-cr02', assetId: 'a-cr02', tenantId: 't-gulflift', doneAt: new Date(daysAgo(350)).toISOString(), value: 0, notes: 'Annual crane inspection — third party certificate issued', costAed: 3000, createdBy: 'u-priya' },
+  { id: 'sr-008', planId: 'mp-cr08', assetId: 'a-cr08', tenantId: 't-gulflift', doneAt: new Date(daysAgo(370)).toISOString(), value: 0, notes: 'Annual crane inspection — third party certificate issued', costAed: 3000, createdBy: 'u-priya' },
 ];
 
 // ── MUCs ──────────────────────────────────────────────────────────────────────
