@@ -13,6 +13,10 @@ import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
+import {
+  addLabelToAssets, CUSTOMER_LABELS_STORAGE_KEY, labelsForAsset, parseCustomerLabelState, removeLabelFromAssets,
+  type CustomerLabelState,
+} from '@/domain/customer-labels';
 import { getReadingForAsset, computeStatus } from '@/server/telemetry/simulator';
 import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
 import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
@@ -248,6 +252,23 @@ export default function AssetDetailPage() {
   const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [labelState, setLabelState] = useState<CustomerLabelState>(() => ({
+    labels: [...seed.labels],
+    assignments: [...seed.assetLabels],
+  }));
+  const [labelPickerOpen, setLabelPickerOpen] = useState(false);
+  const [labelInput, setLabelInput] = useState('');
+  const [labelMessage, setLabelMessage] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const fallback = { labels: [...seed.labels], assignments: [...seed.assetLabels] };
+    try {
+      setLabelState(parseCustomerLabelState(window.localStorage.getItem(CUSTOMER_LABELS_STORAGE_KEY), fallback));
+    } catch {
+      setLabelState(fallback);
+    }
+  }, []);
 
   const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
@@ -353,6 +374,43 @@ export default function AssetDetailPage() {
   const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
   const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
 
+  // Labels belong to the asset's tenant. A renter never receives the owner's label names.
+  const canViewAssetLabels = hasCapability(session, 'label.view')
+    && (session.isKasper || asset.ownerTenantId === session.tenantId);
+  const canManageAssetLabels = hasCapability(session, 'label.manage')
+    && (session.isKasper || asset.ownerTenantId === session.tenantId);
+  const assetLabels = canViewAssetLabels ? labelsForAsset(labelState, asset.id, asset.ownerTenantId) : [];
+  const persistLabels = (next: CustomerLabelState) => {
+    setLabelState(next);
+    try {
+      window.localStorage.setItem(CUSTOMER_LABELS_STORAGE_KEY, JSON.stringify(next));
+      setLabelMessage(null);
+    } catch {
+      setLabelMessage('Label changes are visible for this visit, but browser storage is unavailable.');
+    }
+  };
+  const addAssetLabel = () => {
+    if (!canManageAssetLabels) return;
+    const result = addLabelToAssets(labelState, {
+      tenantId: asset.ownerTenantId,
+      assetIds: [asset.id],
+      name: labelInput,
+      createdBy: session.userId,
+      createdAt: clock.now(),
+      newLabelId: `l-${clock.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    });
+    if (!result.ok) { setLabelMessage(result.error); return; }
+    persistLabels(result.state);
+    setLabelInput('');
+    setLabelPickerOpen(false);
+  };
+  const removeAssetLabel = (labelId: string) => {
+    if (!canManageAssetLabels) return;
+    const result = removeLabelFromAssets(labelState, { tenantId: asset.ownerTenantId, assetIds: [asset.id], labelId });
+    if (!result.ok) { setLabelMessage(result.error); return; }
+    persistLabels(result.state);
+  };
+
   const tabs: { id: TabId; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
     { id: 'overview', label: 'Overview', phase: 'day_one', enabled: true },
     { id: 'history', label: 'History', phase: 'day_one', enabled: true },
@@ -381,6 +439,47 @@ export default function AssetDetailPage() {
           <div className="text-sm text-grey-500">
             {site?.name} · {ownerTenant?.name}
           </div>
+          {canViewAssetLabels && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Asset labels">
+              {assetLabels.map(label => (
+                <span key={label.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-paper-2 px-2 py-1 text-xs text-grey-700">
+                  {label.name}
+                  {canManageAssetLabels && (
+                    <button type="button" aria-label={`Remove ${label.name} label`} onClick={() => removeAssetLabel(label.id)} className="ml-0.5 text-grey-500 hover:text-red">×</button>
+                  )}
+                </span>
+              ))}
+              {assetLabels.length === 0 && !canManageAssetLabels && <span className="text-xs text-grey-500">No labels</span>}
+              {canManageAssetLabels && (
+                <Button variant="secondary" size="sm" onClick={() => { setLabelPickerOpen(open => !open); setLabelMessage(null); }}>
+                  {labelPickerOpen ? 'Close labels' : '+ Label'}
+                </Button>
+              )}
+              {labelPickerOpen && canManageAssetLabels && (
+                <div className="flex basis-full flex-wrap items-center gap-2 pt-1">
+                  <input
+                    role="combobox"
+                    aria-label="Choose an existing label or enter a new label"
+                    aria-autocomplete="list"
+                    aria-expanded="true"
+                    list={`asset-label-options-${asset.id}`}
+                    value={labelInput}
+                    onChange={event => setLabelInput(event.target.value)}
+                    onKeyDown={event => { if (event.key === 'Enter') addAssetLabel(); }}
+                    maxLength={40}
+                    placeholder="Choose or create a label"
+                    className="min-w-[14rem] rounded-lg border border-line bg-paper px-3 py-2 text-xs text-grey-700 focus:border-ink focus:outline-none"
+                  />
+                  <datalist id={`asset-label-options-${asset.id}`}>
+                    {labelState.labels.filter(label => label.tenantId === asset.ownerTenantId).map(label => <option key={label.id} value={label.name} />)}
+                  </datalist>
+                  <Button size="sm" onClick={addAssetLabel} disabled={assetLabels.length >= 20}>Add label</Button>
+                  <span className="text-[11px] text-grey-500">{assetLabels.length}/20 labels</span>
+                  {labelMessage && <span role="alert" className="basis-full text-xs text-red">{labelMessage}</span>}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
@@ -393,7 +492,7 @@ export default function AssetDetailPage() {
         Last updated {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}{' '}
         {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago` : ''}
         {reading && (
-          <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
+          <span className="hover:text-ink cursor-help" title={`Reading time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
             (hover for details)
           </span>
         )}

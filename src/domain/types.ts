@@ -286,6 +286,8 @@ export interface GeofenceEvent {
   assetId: string;
   type: 'enter' | 'exit';
   at: string | number;
+  /** Reading-derived events are history only and never dispatch alerts. */
+  source?: 'reading_history';
 }
 
 export interface ReportRun {
