@@ -24,6 +24,7 @@ import { endEarly } from '@/server/bookings';
 import type { Asset, TrackingLink } from '@/domain/types';
 import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
+import { canManageMaintenance, planSnapshot, plansForAsset, serviceHistory } from '@/server/maintenance';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -229,7 +230,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
 }
 
 
-type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'alerts';
+type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'maintenance' | 'alerts';
 
 export default function AssetDetailPage() {
   const params = useParams();
@@ -346,6 +347,12 @@ export default function AssetDetailPage() {
   const canRequestTracker = hasCapability(session, 'tracker.request')
     && (session.isKasper || asset.ownerTenantId === session.tenantId);
 
+  // Maintenance plans belong to the owner: renters never see them (spec 11.18).
+  const isOwnerOrKasper = session.isKasper || asset.ownerTenantId === session.tenantId;
+  const canManageMaintenancePlans = canManageMaintenance(session);
+  const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
+  const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
+
   const tabs: { id: TabId; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
     { id: 'overview', label: 'Overview', phase: 'day_one', enabled: true },
     { id: 'history', label: 'History', phase: 'day_one', enabled: true },
@@ -354,6 +361,7 @@ export default function AssetDetailPage() {
     { id: 'driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
     { id: 'utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
     { id: 'certificates', label: 'Certificates', phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
+    { id: 'maintenance', label: 'Maintenance', phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
     { id: 'alerts', label: 'Alerts', phase: 'day_one', enabled: true },
   ];
 
@@ -882,6 +890,92 @@ export default function AssetDetailPage() {
                         >
                           Verify
                         </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'maintenance' && (
+        <div className="space-y-3">
+          <div className="bg-surface border border-line rounded-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-line flex items-center justify-between">
+              <span className="text-sm font-medium text-ink">Service plans</span>
+              <a className="text-xs text-yellow-600 hover:text-yellow font-medium" href="/app/maintenance">
+                Open the maintenance board
+              </a>
+            </div>
+            {maintenancePlans.length === 0 ? (
+              <div className="p-6 text-center text-sm text-grey-500">
+                No service plans for {asset.code} yet.
+                {canManageMaintenancePlans ? ' Add one from the maintenance board.' : ''}
+              </div>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-paper-2 text-grey-500">
+                    <th className="px-3 py-2 text-left font-medium">Plan</th>
+                    <th className="px-3 py-2 text-left font-medium">Due</th>
+                    <th className="px-3 py-2 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintenancePlans.map(p => {
+                    const snapshot = planSnapshot(p, asset);
+                    return (
+                      <tr key={p.id} className="bg-paper hover:bg-paper-2">
+                        <td className="px-3 py-2 border-b border-line text-grey-700">{p.name}</td>
+                        <td className="px-3 py-2 border-b border-line text-grey-700">
+                          {snapshot.headline}
+                          {snapshot.onHire && <span className="text-grey-500"> · {snapshot.onHire}</span>}
+                        </td>
+                        <td className="px-3 py-2 border-b border-line text-center">
+                          {snapshot.state === 'overdue' ? (
+                            <Badge variant="red">Overdue</Badge>
+                          ) : snapshot.state === 'due_soon' ? (
+                            <Badge variant="amber">Due soon</Badge>
+                          ) : (
+                            <Badge variant="green">Ok</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="bg-surface border border-line rounded-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">Service history</div>
+            {maintenanceRecords.length === 0 ? (
+              <div className="p-6 text-center text-sm text-grey-500">No services logged for {asset.code} yet.</div>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-paper-2 text-grey-500">
+                    <th className="px-3 py-2 text-left font-medium">Date</th>
+                    <th className="px-3 py-2 text-right font-medium">Reading</th>
+                    <th className="px-3 py-2 text-left font-medium">Notes</th>
+                    <th className="px-3 py-2 text-right font-medium">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintenanceRecords.map(r => (
+                    <tr key={r.id} className="bg-paper hover:bg-paper-2">
+                      <td className="px-3 py-2 border-b border-line text-grey-700">
+                        {clock.formatDubaiDate(new Date(r.doneAt).getTime())}
+                      </td>
+                      <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">
+                        {r.value.toLocaleString('en-US')}
+                      </td>
+                      <td className="px-3 py-2 border-b border-line text-grey-700">{r.notes}</td>
+                      <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">
+                        AED {r.costAed.toLocaleString('en-US')}
                       </td>
                     </tr>
                   ))}

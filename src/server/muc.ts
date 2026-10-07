@@ -68,7 +68,8 @@ function ecuBaseHours(asset: Asset): number {
   return 500 + (parseInt(digits, 10) % 8000);
 }
 
-const BEHAVIOUR_HOURS_PER_DAY: Record<Asset['behaviour'], number> = {
+/** Engine hours per day the simulator puts on each kind of asset. */
+export const BEHAVIOUR_HOURS_PER_DAY: Record<Asset['behaviour'], number> = {
   parked: 1,
   works_at_site: 9,
   drives_between_sites: 6,
