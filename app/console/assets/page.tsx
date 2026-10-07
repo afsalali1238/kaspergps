@@ -275,6 +275,9 @@ export default function AssetsPage() {
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  <Link href={`/console/assets/${asset.id}`} className="text-xs px-2 py-1 rounded bg-yellow/10 border border-yellow/30 text-yellow-dark hover:bg-yellow/20">
+                    Details
+                  </Link>
                   <Link href={`/app/assets/${asset.id}`} className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
                     View
                   </Link>
