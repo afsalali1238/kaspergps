@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import './globals.css';
-import { DemoBar } from '@/components/demo/DemoBar';
+import { DemoBarGate } from '@/components/demo/DemoBarGate';
 import { LanguageProvider } from '@/lib/useT';
 import { LANGUAGE_COOKIE, dirOf, languageFromCookie } from '@/lib/language';
 
@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen bg-bg antialiased">
         <LanguageProvider initial={language}>
-          <DemoBar />
+          <DemoBarGate />
           {children}
         </LanguageProvider>
       </body>
