@@ -133,7 +133,7 @@ export function hasRoleCapability(role: Role, cap: Capability): boolean {
 const COMPANY_CAPABILITIES: Record<Role, Capability[]> = {
   kasper_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'console.billing.view', 'console.billing.manage', 'asset.create', 'asset.retire', 'console.assets.transfer', 'console.adapters.manage', 'console.bookings.view', 'console.bookings.manage', 'console.staff.manage', 'console.import'],
   kasper_ops: ['geofence.view', 'geofence.manage', 'asset.create', 'asset.retire', 'console.adapters.manage', 'console.bookings.view', 'console.bookings.manage', 'console.import'],
-  tenant_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'asset.create', 'asset.retire', 'tracker.request'],
+  tenant_admin: ['geofence.view', 'geofence.manage', 'billing.view', 'asset.create', 'asset.retire', 'tracker.request', 'users.manage', 'sites.manage'],
   site_user: ['geofence.view'],
 };
 
