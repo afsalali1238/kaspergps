@@ -2,10 +2,17 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Button, Badge, EmptyState, Tabs,
+  Button, Badge, EmptyState,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import {
+  getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
+} from '@/server/muc';
+import type { MucVerifyStatus } from '@/server/muc';
+import type { Muc } from '@/domain/types';
+import { hasFeature } from '@/domain/features';
+import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
@@ -15,31 +22,51 @@ function formatTs(ts: string | number): string {
   });
 }
 
-function fmtAed(amount: number): string {
-  return `AED ${amount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}`;
+function formatDateOnly(ts: string | number): string {
+  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
+  return new Date(t).toLocaleDateString('en-AE', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    timeZone: 'Asia/Dubai',
+  });
 }
 
-function MucRow({ muc, canView, onView }: {
-  muc: typeof seed.mucs[0];
+/** The previous calendar month in Dubai, e.g. 1–30 Sep 2026 at the anchor. */
+function lastMonthPeriod(nowMs: number): { label: string; from: number; to: number } {
+  const d = new Date(new Date(nowMs).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' }));
+  const from = new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
+  const to = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0).getTime() - 60000;
+  const label = new Date(from).toLocaleDateString('en-AE', { month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
+  return { label, from, to };
+}
+
+function MucRow({ muc, canView, verifyState, onView }: {
+  muc: Muc;
   canView: boolean;
+  verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
 }) {
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
 
   return (
-    <tr key={muc.id} className="bg-paper hover:bg-paper-2">
+    <tr className="bg-paper hover:bg-paper-2">
       <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{muc.number}</td>
       <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{asset?.code ?? '—'}</td>
       <td className="px-3 py-2 border-b border-line text-grey-700">{owner?.name ?? '—'}</td>
       <td className="px-3 py-2 border-b border-line text-grey-500 text-xs">
-        {formatTs(muc.periodFrom).split(',')[0]} – {formatTs(muc.periodTo).split(',')[0]}
+        {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
       </td>
       <td className="px-3 py-2 border-b border-line text-right font-mono text-ink font-medium">
         {muc.payload.billableHours.toFixed(1)} h
       </td>
       <td className="px-3 py-2 border-b border-line text-center">
-        <Badge variant={muc.status === 'sealed' ? 'green' : 'yellow'}>{muc.status}</Badge>
+        {verifyState === 'tampered' ? (
+          <Badge variant="red">Seal broken</Badge>
+        ) : muc.status === 'sealed' ? (
+          <Badge variant="green">Sealed</Badge>
+        ) : (
+          <Badge variant="yellow">Voided</Badge>
+        )}
       </td>
       <td className="px-3 py-2 text-right border-b border-line">
         {muc.status === 'sealed' && canView ? (
@@ -56,12 +83,24 @@ function MucRow({ muc, canView, onView }: {
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
   const muc = seed.mucs.find(m => m.number === number);
+  const [status, setStatus] = useState<MucVerifyStatus | 'checking'>('checking');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!muc) return;
+    getMucVerifyStatus(muc).then(s => {
+      if (!cancelled) setStatus(s);
+    });
+    return () => { cancelled = true; };
+  }, [muc]);
+
   if (!muc) return null;
 
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
-  const isValid = true;
+  const isValid = status === 'valid';
   const isReplaced = !!muc.replacesMucId;
+  const replacement = muc.replacesMucId ? seed.mucs.find(m => m.id === muc.replacesMucId) : null;
 
   return (
     <div className="space-y-3">
@@ -73,8 +112,8 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
           </svg>
           <span className="text-sm font-semibold text-ink">Kasper GPS</span>
         </div>
-        <Badge variant={isValid ? 'green' : 'red'}>
-          {isValid ? 'Seal intact' : 'Seal broken'}
+        <Badge variant={isValid ? 'green' : status === 'checking' ? 'grey' : 'red'}>
+          {status === 'checking' ? 'Checking…' : isValid ? 'Seal intact' : 'Seal broken'}
         </Badge>
       </div>
 
@@ -99,7 +138,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         <div className="flex justify-between">
           <span className="text-grey-500">Period</span>
           <span className="text-ink text-xs font-mono">
-            {formatTs(muc.periodFrom).split(',')[0]} – {formatTs(muc.periodTo).split(',')[0]}
+            {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -120,6 +159,17 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         </div>
       </div>
 
+      {muc.payload.gaps.length > 0 && (
+        <div className="bg-paper-2 rounded-lg p-3 border border-line text-xs text-grey-700">
+          <div className="text-grey-500 mb-1">Data gaps ({muc.payload.gaps.length})</div>
+          <ul className="space-y-0.5 font-mono">
+            {muc.payload.gaps.map((g, i) => (
+              <li key={i}>{formatTs(g.from)} → {formatTs(g.to)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="text-xs space-y-1 pt-2 border-t border-line">
         <div className="flex justify-between">
           <span className="text-grey-500">Status</span>
@@ -129,7 +179,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         </div>
         <div className="flex justify-between">
           <span className="text-grey-500">Issued</span>
-          <span className="text-ink">{formatTs(muc.issuedAt).split(',')[0]}</span>
+          <span className="text-ink">{formatTs(muc.issuedAt)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-grey-500">Issued by</span>
@@ -139,18 +189,18 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
           <>
             <div className="flex justify-between">
               <span className="text-grey-500">Voided</span>
-              <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt).split(',')[0] : '—'}</span>
+              <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt) : '—'}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <span className="text-grey-500">Void reason</span>
-              <span className="text-ink text-xs">{muc.voidReason}</span>
+              <span className="text-ink text-xs text-right">{muc.voidReason}</span>
             </div>
           </>
         )}
         {isReplaced && (
           <div className="flex justify-between">
-            <span className="text-grey-500">Replaced by</span>
-            <span className="text-ink font-mono text-xs">{muc.number}</span>
+            <span className="text-grey-500">{muc.status === 'voided' ? 'Replaced by' : 'Replaces'}</span>
+            <span className="text-ink font-mono text-xs">{replacement?.number ?? '—'}</span>
           </div>
         )}
       </div>
@@ -162,17 +212,32 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         </div>
       </div>
 
-      {!isValid && (
+      {status === 'tampered' && (
         <div className="bg-red/10 border border-red/30 text-red text-sm px-3 py-2 rounded-lg">
-          This certificate has been tampered with. The seal does not match the stored payload.
+          Does not match its seal — contact Kasper.
         </div>
       )}
 
-      {isReplaced && (
+      {muc.status === 'voided' && (
         <div className="bg-yellow/5 border border-yellow/20 text-yellow-dark text-sm px-3 py-2 rounded-lg">
-          This certificate was voided and replaced. See <strong>{muc.replacesMucId}</strong>.
+          {replacement
+            ? <>This certificate was voided and replaced. See <strong>{replacement.number}</strong>.</>
+            : <>This certificate was voided. No replacement has been issued.</>}
         </div>
       )}
+
+      <a
+        className="text-xs text-yellow-600 hover:text-yellow font-medium"
+        href={`/verify/${encodeURIComponent(muc.number)}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open the public verify page
+      </a>
+
+      <div className="flex justify-end">
+        <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
+      </div>
     </div>
   );
 }
@@ -183,27 +248,64 @@ export default function CertificatesPage() {
   const phase = store.getState().demoSwitches.phase;
   const [selectedMuc, setSelectedMuc] = useState<string | null>(null);
   const [showIssue, setShowIssue] = useState(false);
-
-  if (!session) return null;
-
-  const myTenantId = session.tenantId;
-  const isTenantAdmin = session.role === 'tenant_admin';
-  const isKasper = session.isKasper;
+  const [version, setVersion] = useState(0);
+  const [issueAssetId, setIssueAssetId] = useState('');
+  const [issuePeriod, setIssuePeriod] = useState<'last-month' | 'booking'>('last-month');
+  const [gapOverride, setGapOverride] = useState('');
+  const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [actionNumber, setActionNumber] = useState<string | null>(null);
+  const [actionKind, setActionKind] = useState<'void' | 'reissue' | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [verifyStates, setVerifyStates] = useState<Record<string, MucVerifyStatus | 'checking'>>({});
 
   const myMucs = useMemo(() => {
-    if (isKasper) return seed.mucs;
+    if (!session) return [];
+    if (session.isKasper) return seed.mucs;
+    const myTenantId = session.tenantId;
     return seed.mucs.filter(muc => {
       if (muc.ownerTenantId === myTenantId) return true;
       const booking = muc.bookingId ? seed.bookings.find(b => b.id === muc.bookingId) : null;
       if (booking && booking.renterTenantId === myTenantId) return true;
       return false;
     });
-  }, [myTenantId, isKasper]);
+    // version busts the memo after issue/void/reissue
+  }, [session, version]);
 
-  const tier3Assets = useMemo(() =>
-    seed.assets.filter(a => a.canProfile.adapter === 'ALL-CAN300'),
-    []
+  const tier3Assets = useMemo(
+    () => seed.assets.filter(a => hasFeature(a, 'muc')),
+    // Recompute after issue/void/reissue (adapter edits can change eligibility).
+    [version]
   );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, MucVerifyStatus | 'checking'> = {};
+      for (const muc of seed.mucs) {
+        next[muc.id] = await getMucVerifyStatus(muc);
+      }
+      if (!cancelled) setVerifyStates(next);
+    })();
+    return () => { cancelled = true; };
+  }, [version]);
+
+  if (!session) return null;
+
+  const isKasperAdmin = session.isKasper && session.role === 'kasper_admin';
+  const isTenantAdmin = session.role === 'tenant_admin';
+  const canIssue = isKasperAdmin || isTenantAdmin;
+
+  const myTier3 = tier3Assets.filter(a =>
+    isKasperAdmin || a.ownerTenantId === session.tenantId
+  );
+
+  const selectedAsset = myTier3.find(a => a.id === issueAssetId) ?? myTier3[0] ?? null;
+  const selectedAssetBookings = selectedAsset
+    ? seed.bookings.filter(b => b.assetId === selectedAsset.id)
+    : [];
+
+  const nowMs = clock.now();
+  const lastMonth = lastMonthPeriod(nowMs);
 
   if (phase === 'day_one') {
     return (
@@ -214,37 +316,163 @@ export default function CertificatesPage() {
     );
   }
 
+  const refresh = () => setVersion(v => v + 1);
+
+  const handleIssue = async () => {
+    if (!selectedAsset) return;
+    const bookingId = issuePeriod === 'booking' ? selectedAssetBookings[0]?.id : undefined;
+    const period = issuePeriod === 'booking' && selectedAssetBookings[0]
+      ? {
+          from: new Date(selectedAssetBookings[0].start).getTime(),
+          to: new Date(selectedAssetBookings[0].end).getTime(),
+        }
+      : { from: lastMonth.from, to: lastMonth.to };
+
+    const result = await issueMuc(session, {
+      assetId: selectedAsset.id,
+      periodFrom: period.from,
+      periodTo: period.to,
+      bookingId,
+      gapOverrideReason: gapOverride.trim() || undefined,
+    });
+    if (result.ok) {
+      setBanner({ kind: 'ok', text: result.message ?? 'Certificate issued.' });
+      setShowIssue(false);
+      setGapOverride('');
+      refresh();
+    } else {
+      setBanner({ kind: 'error', text: result.error ?? 'Could not issue the certificate.' });
+    }
+  };
+
+  const handleVoid = async () => {
+    if (!actionNumber) return;
+    const result = await voidMuc(session, actionNumber, actionReason);
+    if (result.ok) {
+      setBanner({ kind: 'ok', text: result.message ?? 'Certificate voided.' });
+      setActionNumber(null);
+      setActionKind(null);
+      setActionReason('');
+      refresh();
+    } else {
+      setBanner({ kind: 'error', text: result.error ?? 'Could not void the certificate.' });
+    }
+  };
+
+  const handleReissue = async () => {
+    if (!actionNumber) return;
+    const result = await reissueMuc(session, actionNumber, actionReason);
+    if (result.ok) {
+      setBanner({ kind: 'ok', text: result.message ?? 'Certificate reissued.' });
+      setActionNumber(null);
+      setActionKind(null);
+      setActionReason('');
+      refresh();
+    } else {
+      setBanner({ kind: 'error', text: result.error ?? 'Could not reissue the certificate.' });
+    }
+  };
+
   return (
     <div className="space-y-4 p-4">
       <div>
         <h1 className="text-lg font-semibold text-ink">Monthly Utilisation Certificates</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Sealed certificates of engine hours for Tier 3 assets.
+          Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.
         </p>
       </div>
 
-      {showIssue && isTenantAdmin && tier3Assets.length > 0 && (
+      {banner && (
+        <div
+          className={
+            banner.kind === 'ok'
+              ? 'bg-green/10 border border-green/30 text-green text-sm px-4 py-2 rounded-lg'
+              : 'bg-red/10 border border-red/30 text-red text-sm px-4 py-2 rounded-lg'
+          }
+        >
+          {banner.text}
+        </div>
+      )}
+
+      {showIssue && canIssue && myTier3.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <h2 className="text-sm font-medium text-ink mb-3">Issue a certificate</h2>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-grey-500 font-medium">Asset (Tier 3 with ECU)</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                {tier3Assets.map(a => (
+              <select
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                value={selectedAsset?.id ?? ''}
+                onChange={e => setIssueAssetId(e.target.value)}
+              >
+                {myTier3.map(a => (
                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">Period</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                <option value="last-month">Last month (Sep 2026)</option>
+              <select
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                value={issuePeriod}
+                onChange={e => setIssuePeriod(e.target.value as 'last-month' | 'booking')}
+              >
+                <option value="last-month">Last month ({lastMonth.label})</option>
+                {selectedAssetBookings.map(b => (
+                  <option key={b.id} value="booking">
+                    Booking {b.reference} ({formatDateOnly(b.start)} – {formatDateOnly(b.end)})
+                  </option>
+                ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs text-grey-500 font-medium">
+                Data-gap override reason {isKasperAdmin ? '(Kasper Admin only)' : ''}
+              </label>
+              <input
+                type="text"
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                placeholder="Only needed when the period has a gap longer than 24 hours"
+                value={gapOverride}
+                onChange={e => setGapOverride(e.target.value)}
+              />
+            </div>
             <div className="flex gap-2">
-              <Button size="sm">Issue and seal</Button>
+              <Button size="sm" onClick={handleIssue}>Issue and seal</Button>
               <Button variant="secondary" size="sm" onClick={() => setShowIssue(false)}>Cancel</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {actionNumber && actionKind && (
+        <div className="bg-surface border border-line rounded-lg p-4">
+          <h2 className="text-sm font-medium text-ink mb-2">
+            {actionKind === 'void' ? `Void ${actionNumber}` : `Reissue ${actionNumber}`}
+          </h2>
+          <p className="text-xs text-grey-500 mb-2">
+            {actionKind === 'void'
+              ? 'A void needs a reason of at least 10 characters. The certificate stays listed as Voided.'
+              : 'Reissue copies the period into a new -02 certificate with a fresh seal and audit entry.'}
+          </p>
+          <input
+            type="text"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+            placeholder="Reason (at least 10 characters)"
+            value={actionReason}
+            onChange={e => setActionReason(e.target.value)}
+          />
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              variant={actionKind === 'void' ? 'danger' : 'primary'}
+              onClick={actionKind === 'void' ? handleVoid : handleReissue}
+            >
+              {actionKind === 'void' ? 'Void certificate' : 'Reissue certificate'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => { setActionNumber(null); setActionKind(null); setActionReason(''); }}>
+              Cancel
+            </Button>
           </div>
         </div>
       )}
@@ -252,7 +480,7 @@ export default function CertificatesPage() {
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <div className="flex items-center justify-between p-3 border-b border-line">
           <h2 className="text-sm font-medium text-ink">Certificates</h2>
-          {isTenantAdmin && tier3Assets.length > 0 && (
+          {canIssue && myTier3.length > 0 && (
             <Button variant="secondary" size="sm" onClick={() => setShowIssue(!showIssue)}>
               {showIssue ? 'Cancel' : 'Issue certificate'}
             </Button>
@@ -275,7 +503,46 @@ export default function CertificatesPage() {
             </thead>
             <tbody>
               {myMucs.map(muc => (
-                <MucRow key={muc.id} muc={muc} canView={isTenantAdmin || isKasper} onView={setSelectedMuc} />
+                <React.Fragment key={muc.id}>
+                  <MucRow
+                    muc={muc}
+                    canView={isTenantAdmin || session.isKasper}
+                    verifyState={verifyStates[muc.id] ?? 'checking'}
+                    onView={setSelectedMuc}
+                  />
+                  {canIssue && muc.ownerTenantId === session.tenantId && (
+                    <tr className="bg-paper">
+                      <td colSpan={7} className="px-3 pb-2 border-b border-line">
+                        <div className="flex gap-2 justify-end">
+                          {muc.status === 'sealed' && (
+                            <button
+                              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+                              onClick={() => { setActionNumber(muc.number); setActionKind('void'); setActionReason(''); }}
+                            >
+                              Void
+                            </button>
+                          )}
+                          {muc.status === 'voided' && (
+                            <button
+                              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+                              onClick={() => { setActionNumber(muc.number); setActionKind('reissue'); setActionReason(''); }}
+                            >
+                              Reissue
+                            </button>
+                          )}
+                          <a
+                            className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+                            href={`/verify/${encodeURIComponent(muc.number)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Verify
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -284,11 +551,7 @@ export default function CertificatesPage() {
 
       {selectedMuc && (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/50 z-50 p-4">
-          <div className="bg-surface border border-line rounded-lg p-5 max-w-md w-full shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-ink">Certificate details</h2>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedMuc(null)}>Close</Button>
-            </div>
+          <div className="bg-surface border border-line rounded-lg p-5 max-w-md w-full shadow-lg max-h-[90vh] overflow-y-auto">
             <CertificateVerify number={selectedMuc} onClose={() => setSelectedMuc(null)} />
           </div>
         </div>

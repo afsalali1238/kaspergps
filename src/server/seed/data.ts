@@ -7,7 +7,8 @@ import type {
   Tenant, Site, User, Asset, Tracker, Pairing, Booking, TrackingLink,
   Alert, AuditEntry, Label, AssetLabel, Geofence, GeofenceEvent,
   MaintenancePlan, ServiceRecord, Muc, Invoice, Payment, ReportSchedule,
-  ReportRun, Role, AssetClass, CanProfile, SimBehaviour
+  ReportRun, Role, AssetClass, CanProfile, SimBehaviour, Notification,
+  TrackerRequest
 } from '@/domain/types';
 import { makeImei as makeImeiFromBody } from '@/domain/tracker-id';
 
@@ -236,10 +237,10 @@ export const trackers: Tracker[] = trackerRows.map(row => {
 // ── Pairings ──────────────────────────────────────────────────────────────────
 
 export const pairings: Pairing[] = [
-  // LD-09 tracker was moved to PU-41 10 days ago
-  { id: 'p-ld09-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: 'a-ld09', to: null },
-  // CR-08 tracker swapped 20 days ago
-  { id: 'p-cr08-old', trackerId: 'tr-spare-3', assetId: 'a-cr08', from: 'a-cr08', to: 'a-cr08' },
+  // LD-09's tracker was moved onto PU-41 10 days ago (dated, not asset ids)
+  { id: 'p-ld09-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: new Date(daysAgo(10)).toISOString(), to: null },
+  // CR-08's old tracker ran until the swap 20 days ago, flagged for support
+  { id: 'p-cr08-old', trackerId: 'tr-spare-3', assetId: 'a-cr08', from: new Date(daysAgo(400)).toISOString(), to: new Date(daysAgo(20)).toISOString() },
   // FL-09 paired this morning
   { id: 'p-fl09', trackerId: 'tr-fl09', assetId: 'a-fl09', from: new Date(daysAgo(0.5)).toISOString(), to: null },
 ];
@@ -459,7 +460,7 @@ export const alerts: Alert[] = [
 
 // ── Tracker request ────────────────────────────────────────────────────────────
 
-export const trackerRequests: { id: string; tenantId: string; assetId: string; requestedBy: string; at: string; note: string; status: 'open' | 'done' | 'declined'; handledBy?: string; handledAt?: string }[] = [
+export const trackerRequests: TrackerRequest[] = [
   { id: 'trreq-001', tenantId: 't-gulflift', assetId: 'a-mw01', requestedBy: 'u-priya', at: new Date(daysAgo(2)).toISOString(), note: 'New welder trailer added — needs a tracker for site safety monitoring', status: 'open' },
 ];
 
@@ -505,7 +506,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
+    sealSha256: '70bd11f5cdb357ab0f8363332df2beb6a50b5a84efb2dfcc22f97cff072833c0',
     issuedAt: new Date(daysAgo(10)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -528,7 +529,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3',
+    sealSha256: '21712085ae37892f5ae06df99f74baf288a641ae31fbb6e87419aa63940afe85',
     issuedAt: new Date(daysAgo(12)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'voided',
@@ -555,7 +556,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4',
+    sealSha256: '3127b834f8cefd718accae381b9f8eb2091c717a814becac77d8a41bdeea4b81',
     issuedAt: new Date(daysAgo(8)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -578,7 +579,7 @@ export const mucs: Muc[] = [
       gapRule: 'delta_disclosed',
       source: 'ECU',
     },
-    sealSha256: 'd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5',
+    sealSha256: '2e247220fa273d5dd562b98bc2986dbaf273be77db8d72e62b4994d14d424b5a',
     issuedAt: new Date(daysAgo(8)).toISOString(),
     issuedBy: 'u-khalid',
     status: 'sealed',
@@ -693,6 +694,10 @@ export const reportRuns: ReportRun[] = [
   { id: 'rr-002', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(14)).toISOString(), to: new Date(daysAgo(7)).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(14)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-22_to_2026-09-29.pdf' },
 ];
 
+// ── Notifications (bell) ───────────────────────────────────────────────────────
+
+export const notifications: Notification[] = [];
+
 // ── Audit entries ──────────────────────────────────────────────────────────────
 
 export const auditEntries: AuditEntry[] = [
@@ -765,6 +770,7 @@ export const seed = {
   reportSchedules,
   reportRuns,
   auditEntries,
+  notifications,
   onboardingDrafts,
   adapters,
 };

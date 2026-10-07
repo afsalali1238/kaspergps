@@ -230,6 +230,15 @@ export interface TrackingLink {
   showEta: boolean;
 }
 
+export interface Notification {
+  id: string;
+  userId: string;
+  at: string | number;
+  text: string;
+  read: boolean;
+  href?: string;
+}
+
 export interface AuditEntry {
   id: string;
   at: string | number;

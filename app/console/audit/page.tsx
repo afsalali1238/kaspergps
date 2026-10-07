@@ -2,33 +2,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-
-const auditActions = [
-  'create',
-  'edit',
-  'retire',
-  'pair',
-  'fit',
-  'transfer',
-  'import',
-  'suspend',
-  'close',
-  'deactivate',
-  'reactivate',
-  'acknowledge',
-  'invite',
-  'resend',
-];
+import {
+  actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName,
+} from '@/server/audit';
+import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {
-  const d = new Date(typeof ts === 'number' ? ts : ts);
-  return d.toLocaleString('en-AE', {
-    year: 'numeric', month: 'short', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Dubai',
-  });
+  return clock.formatDubaiDateTime(typeof ts === 'number' ? ts : new Date(ts).getTime());
 }
 
 export default function AuditLogPage() {
@@ -40,6 +21,28 @@ export default function AuditLogPage() {
   const [action, setAction] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [exportedAt, setExportedAt] = useState<string | null>(null);
+
+  // Actions come from the entries themselves, so anything written during the
+  // demo (MUC issue/void, grants, imports) shows up in the filter.
+  const actions = auditActions();
+
+  const filtered = useMemo(
+    () => queryAuditEntries({ person, tenant, action, from: dateFrom, to: dateTo }),
+    [person, tenant, action, dateFrom, dateTo]
+  );
+
+  const exportCsv = () => {
+    const rows = queryAuditEntries({ person, tenant, action, from: dateFrom, to: dateTo });
+    const blob = new Blob([auditEntriesToCsv(rows)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kasper-audit-${clock.dubaiToIso(clock.now()).slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportedAt(`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} exported`);
+  };
 
   if (!session || !session.isKasper) {
     return (
@@ -48,62 +51,6 @@ export default function AuditLogPage() {
       </div>
     );
   }
-
-  const entries = useMemo(() => {
-    // In production this comes from the audit store. In the prototype we show
-    // a representative set derived from seed data.
-    const items: { id: string; person: string; tenant: string; action: string; at: string | number; detail: string }[] = [];
-
-    // Tenant creates
-    for (const t of seed.tenants) {
-      items.push({
-        id: `audit-tenant-create-${t.id}`,
-        person: 'Kasper Admin',
-        tenant: t.name,
-        action: 'create',
-        at: t.createdAt,
-        detail: `Tenant created: ${t.name}`,
-      });
-    }
-
-    // Asset creates
-    for (const a of seed.assets) {
-      items.push({
-        id: `audit-asset-create-${a.id}`,
-        person: 'Kasper Admin',
-        tenant: seed.tenants.find(t => t.id === a.ownerTenantId)?.name ?? '—',
-        action: 'create',
-        at: a.createdAt,
-        detail: `Asset created: ${a.code} — ${a.name}`,
-      });
-    }
-
-    // Sort newest first
-    return items.sort((a, b) => {
-      const ta = typeof a.at === 'number' ? a.at : new Date(a.at).getTime();
-      const tb = typeof b.at === 'number' ? b.at : new Date(b.at).getTime();
-      return tb - ta;
-    });
-  }, []);
-
-  const filtered = useMemo(() => {
-    return entries.filter(e => {
-      if (person && !e.person.toLowerCase().includes(person.toLowerCase())) return false;
-      if (tenant && !e.tenant.toLowerCase().includes(tenant.toLowerCase())) return false;
-      if (action && e.action !== action) return false;
-      if (dateFrom) {
-        const from = new Date(dateFrom).getTime();
-        const at = typeof e.at === 'number' ? e.at : new Date(e.at).getTime();
-        if (at < from) return false;
-      }
-      if (dateTo) {
-        const to = new Date(dateTo).getTime() + 86400000;
-        const at = typeof e.at === 'number' ? e.at : new Date(e.at).getTime();
-        if (at >= to) return false;
-      }
-      return true;
-    });
-  }, [entries, person, tenant, action, dateFrom, dateTo]);
 
   return (
     <div className="space-y-4 p-4">
@@ -145,7 +92,7 @@ export default function AuditLogPage() {
               onChange={e => setAction(e.target.value)}
             >
               <option value="">All actions</option>
-              {auditActions.map(a => <option key={a} value={a}>{a}</option>)}
+              {actions.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
           <div>
@@ -171,12 +118,17 @@ export default function AuditLogPage() {
           <Button variant="secondary" size="sm" onClick={() => { setPerson(''); setTenant(''); setAction(''); setDateFrom(''); setDateTo(''); }}>
             Clear filters
           </Button>
-          <Button variant="secondary" size="sm">Export CSV</Button>
+          <Button variant="secondary" size="sm" onClick={exportCsv}>Export CSV</Button>
+          {exportedAt && <span className="text-xs text-grey-500 self-center">{exportedAt}</span>}
         </div>
       </div>
 
       {/* Results */}
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
+        <div className="px-3 py-2 border-b border-line text-xs text-grey-500">
+          {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
+          {action || person || tenant || dateFrom || dateTo ? ' (filtered)' : ''}
+        </div>
         {filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-grey-500">No audit entries match the current filters.</div>
         ) : (
@@ -187,6 +139,7 @@ export default function AuditLogPage() {
                 <th className="px-3 py-2 text-left font-medium">Person</th>
                 <th className="px-3 py-2 text-left font-medium">Tenant</th>
                 <th className="px-3 py-2 text-left font-medium">Action</th>
+                <th className="px-3 py-2 text-left font-medium">Asset</th>
                 <th className="px-3 py-2 text-left font-medium">Detail</th>
               </tr>
             </thead>
@@ -194,10 +147,14 @@ export default function AuditLogPage() {
               {filtered.map(e => (
                 <tr key={e.id} className="bg-paper hover:bg-paper-2">
                   <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">{formatTs(e.at)}</td>
-                  <td className="px-3 py-2 border-b border-line text-grey-700 whitespace-nowrap">{e.person}</td>
-                  <td className="px-3 py-2 border-b border-line text-grey-700">{e.tenant}</td>
+                  <td className="px-3 py-2 border-b border-line text-grey-700 whitespace-nowrap">{actorName(e.actorUserId)}</td>
+                  <td className="px-3 py-2 border-b border-line text-grey-700">{tenantName(e.tenantId)}</td>
                   <td className="px-3 py-2 border-b border-line"><Badge>{e.action}</Badge></td>
-                  <td className="px-3 py-2 border-b border-line text-grey-700">{e.detail}</td>
+                  <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{assetCode(e.assetId)}</td>
+                  <td className="px-3 py-2 border-b border-line text-grey-700">
+                    {e.detail}
+                    {e.reason && <span className="text-grey-500"> — {e.reason}</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>

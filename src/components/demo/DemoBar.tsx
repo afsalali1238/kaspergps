@@ -8,6 +8,10 @@ import { seed } from '@/server/seed/data';
 import * as clocklib from '@/lib/clock';
 
 import { ANCHOR_MS } from '@/server/seed/data';
+import { tamperWithMuc } from '@/server/muc';
+import { getReadingsForAsset } from '@/server/telemetry/simulator';
+import { resolveEtaForLink } from '@/server/links';
+import { OFFLINE_AFTER_SEC } from '@/config/thresholds';
 import type { Session } from '@/domain/types';
 import { FeaturesPanel } from './FeaturesPanel';
 
@@ -69,28 +73,92 @@ function startScenario(id: number, router: ReturnType<typeof useRouter>, session
   }
 }
 
-// ── Jump to presets ────────────────────────────────────────────────────────────
+// ── Jump to presets (spec 10.3) — computed from the seed ──────────────────────
 
-function makePreset(label: string, targetMs: number) {
-  return {
-    label,
-    jump: () => clocklib.setAnchor(targetMs),
-  };
+interface ClockPreset {
+  label: string;
+  hint: string;
+  at: number;
 }
 
-function jumpToPresets(): { label: string; jump: () => void }[] {
+function bookingFor(code: string, status: string) {
+  const asset = seed.assets.find(a => a.code === code);
+  if (!asset) return null;
+  return seed.bookings.find(b => b.assetId === asset.id && b.status === status) ?? null;
+}
+
+function jumpToPresets(): ClockPreset[] {
+  const out: ClockPreset[] = [];
   const now = clocklib.now();
-  return [
-    makePreset('Now', now),
-    makePreset('−1 hour', now - 3600000),
-    makePreset('−1 day', now - 86400000),
-    makePreset('+1 hour', now + 3600000),
-    makePreset('+1 day', now + 86400000),
-    makePreset('Start of last month', ANCHOR_MS - 30 * 86400000),
-    makePreset('End of last month', ANCHOR_MS - 1 * 86400000),
-    makePreset('FB-12 link expires (today 20:00)', ANCHOR_MS + 14 * 3600000),
-    makePreset('EX-07 rental starts (tomorrow 08:00)', ANCHOR_MS + 1 * 86400000 + 8 * 3600000),
-  ];
+
+  const add = (label: string, at: number | null | undefined) => {
+    if (at === null || at === undefined || !Number.isFinite(at)) return;
+    out.push({ label, hint: clocklib.formatDubaiTime(at), at });
+  };
+
+  const ex07Start = bookingFor('EX-07', 'scheduled')?.start;
+  const ex07Ms = ex07Start ? new Date(ex07Start).getTime() : null;
+  add('EX-07 rental starts', ex07Ms);
+  add('1 min before EX-07 rental starts', ex07Ms === null ? null : ex07Ms - 60000);
+
+  const ex04 = bookingFor('EX-04', 'active');
+  add('EX-04 rental ends', ex04 ? new Date(ex04.end).getTime() : null);
+
+  const fb12Asset = seed.assets.find(a => a.code === 'FB-12');
+  const fb12Link = seed.trackingLinks.find(l => l.assetId === fb12Asset?.id && l.revokedAt === undefined);
+  if (fb12Link) add('FB-12 link expires', toMs(fb12Link.expiresAt));
+
+  const tp22Asset = seed.assets.find(a => a.code === 'TP-22');
+  const tp22Link = seed.trackingLinks.find(l => l.assetId === tp22Asset?.id);
+  if (tp22Link) add('TP-22 24-hour link expires', toMs(tp22Link.expiresAt));
+
+  const wt08 = seed.assets.find(a => a.code === 'WT-08');
+  if (wt08) {
+    const readings = getReadingsForAsset(wt08, now - 3600000, now);
+    const last = readings.length > 0 ? new Date(readings[readings.length - 1].deviceTime).getTime() : null;
+    add('WT-08 goes offline', last === null ? null : last + OFFLINE_AFTER_SEC * 1000);
+  }
+
+  if (fb12Asset && fb12Link) {
+    const booking = seed.bookings.find(b => b.id === fb12Link.bookingId);
+    const readings = getReadingsForAsset(fb12Asset, now - 3600000, now);
+    const last = readings.length > 0 ? readings[readings.length - 1] : null;
+    if (booking?.destination && last) {
+      const eta = resolveEtaForLink(
+        fb12Link, fb12Asset,
+        { lat: last.lat, lng: last.lng, deviceTime: last.deviceTime },
+        booking.destination.name, booking.destination, now
+      );
+      add('FB-12 arrives at Al Habtoor site', eta.state === 'arrived' ? now : eta.etaAt);
+    }
+  }
+
+  add('Start of last month', startOfLastMonthDubai());
+  add('End of last month', startOfThisMonthDubai() - 60000);
+
+  const overdueInvoice = seed.invoices.find(i => i.status === 'unpaid' || i.status === 'part_paid' || i.status === 'overdue');
+  if (overdueInvoice) add(`${overdueInvoice.number} becomes overdue`, toMs(overdueInvoice.dueAt));
+
+  return out;
+}
+
+function startOfThisMonthDubai(): number {
+  const d = clocklib.dubaiMsToDate(clocklib.now());
+  return clocklib.isoFromDubai(
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+  );
+}
+
+function startOfLastMonthDubai(): number {
+  const d = clocklib.dubaiMsToDate(clocklib.now());
+  const m = d.getMonth() === 0 ? 12 : d.getMonth();
+  const y = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+  return clocklib.isoFromDubai(`${y}-${String(m).padStart(2, '0')}-01T00:00:00`);
+}
+
+function toMs(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  return typeof v === 'number' ? v : new Date(v).getTime();
 }
 
 // ── Tools ──────────────────────────────────────────────────────────────────────
@@ -164,8 +232,17 @@ export function DemoBar() {
     }))
     .filter(g => g.users.length > 0);
 
+  const clockOffset = gs().clockOffsetMs;
   const currentTimeStr = clocklib.formatDubaiTime(clocklib.now());
   const currentDateStr = clocklib.formatDubaiDate(clocklib.now());
+
+  const jumpTo = (targetMs: number) => {
+    useStore.getState().setClockOffsetMs(targetMs - ANCHOR_MS);
+    clocklib.setOffsetMs(targetMs - ANCHOR_MS);
+    window.dispatchEvent(new CustomEvent('kasper:clock-changed'));
+    router.refresh();
+  };
+  const shiftBy = (deltaMs: number) => jumpTo(clocklib.now() + deltaMs);
 
   const selectUser = useCallback((userId: string) => {
     const user = seed.users.find(u => u.id === userId);
@@ -254,6 +331,52 @@ export function DemoBar() {
           </div>
         )}
       </div>
+      {/* Clock */}
+      <div className="flex-shrink-0 relative">
+        <button
+          onClick={() => setClockOpen(!clockOpen)}
+          className="flex-shrink-0 bg-[#1a1b20] text-paper text-[10px] font-mono px-2 py-1 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+        >
+          {currentTimeStr} · {currentDateStr}
+        </button>
+        {clockOpen && (
+          <div className="absolute top-full right-0 mt-1 w-72 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <div className="p-2 border-b border-[#2a2c30]">
+              <div className="text-[10px] text-paper/50 font-mono">Simulated clock · Dubai</div>
+              <div className="text-sm text-paper mt-0.5">{currentDateStr} · {currentTimeStr}</div>
+              {clockOffset !== 0 && (
+                <div className="text-[10px] text-yellow/80 font-mono">
+                  {clockOffset > 0 ? '+' : '−'}{Math.abs(Math.round(clockOffset / 3600000))} h from real time
+                </div>
+              )}
+            </div>
+            <div className="p-2 flex flex-wrap gap-1 border-b border-[#2a2c30]">
+              <ClockButton label="−1 d" onClick={() => shiftBy(-86400000)} />
+              <ClockButton label="−1 h" onClick={() => shiftBy(-3600000)} />
+              <ClockButton label="+1 h" onClick={() => shiftBy(3600000)} />
+              <ClockButton label="+1 d" onClick={() => shiftBy(86400000)} />
+              <ClockButton label="+1 w" onClick={() => shiftBy(7 * 86400000)} />
+              <ClockButton label="Reset to now" onClick={() => jumpTo(ANCHOR_MS)} isReset />
+            </div>
+            <div className="p-2">
+              <div className="text-[10px] text-paper/50 font-mono mb-1">Jump to</div>
+              <div className="max-h-56 overflow-y-auto space-y-0.5">
+                {jumpToPresets().map(preset => (
+                  <button
+                    key={preset.label}
+                    onClick={() => jumpTo(preset.at)}
+                    className="w-full text-left px-2 py-1 text-[11px] text-paper/80 hover:bg-white/5 rounded transition-colors flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">{preset.label}</span>
+                    <span className="text-paper/40 font-mono flex-shrink-0">{preset.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Phase switch */}
       <div className="flex-shrink-0 flex items-center bg-[#1a1b20] border border-[#2a2c30] rounded-lg overflow-hidden">
         {(['day_one', 'phase2', 'later'] as const).map(p => (
@@ -392,6 +515,20 @@ export function DemoBar() {
                 </button>
                 <button
                   onClick={() => {
+                    const target = seed.mucs.find(m => m.number === 'MUC-2026-09-EX-04-01') ?? seed.mucs[0];
+                    if (!target) return;
+                    const result = tamperWithMuc(target.number);
+                    if (result.ok) {
+                      window.alert(`${result.message}\n\nOpen /verify/${target.number} to see it.`);
+                    }
+                    setToolsOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-amber/80 hover:bg-amber/10 transition-colors"
+                >
+                  Tamper with a stored certificate
+                </button>
+                <button
+                  onClick={() => {
                     const state = useStore.getState();
                     const blob = new Blob([JSON.stringify({
                       demoSwitches: state.demoSwitches,
@@ -401,7 +538,7 @@ export function DemoBar() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'kasper-demo-state-' + new Date().toISOString().slice(0,10) + '.json';
+                    a.download = 'kasper-demo-state-' + clocklib.dubaiToIso(clocklib.now()).slice(0,10) + '.json';
                     a.click();
                     URL.revokeObjectURL(url);
                     setToolsOpen(false);
