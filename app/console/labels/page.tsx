@@ -6,22 +6,13 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
+import type { Label } from '@/domain/types';
 
-interface Label {
-  id: string;
-  name: string;
-  tenantId: string;
-  createdAt: string;
-  assetIds: string[];
+function assetsForLabel(labelId: string): string[] {
+  return seed.assetLabels
+    .filter(al => al.labelId === labelId)
+    .map(al => al.assetId);
 }
-
-const LABELS: Label[] = [
-  { id: 'l-1', name: 'Project Alpha', tenantId: 't-alnoor', createdAt: '2026-09-01', assetIds: ['a-fb12', 'a-fb14'] },
-  { id: 'l-2', name: 'Urgent delivery', tenantId: 't-emirates', createdAt: '2026-09-05', assetIds: ['a-ex04', 'a-ex07'] },
-  { id: 'l-3', name: 'Maintenance due', tenantId: 't-marina', createdAt: '2026-09-10', assetIds: ['a-cr02'] },
-];
 
 export default function LabelsPage() {
   const store = useStore;
@@ -37,27 +28,72 @@ export default function LabelsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Kasper sees all labels; tenant users see only their own tenant's labels.
   const visibleLabels = useMemo(() => {
     if (!session) return [];
-    return LABELS.filter(l => {
-      if (l.tenantId !== session.tenantId && !session.isKasper) return false;
+    return seed.labels.filter(l => {
+      if (!session.isKasper && l.tenantId !== session.tenantId) return false;
       if (searchQuery && !l.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
   }, [session, searchQuery]);
 
+  const createLabel = (name: string) => {
+    if (!session) return;
+    if (!name.trim() || name.length > 40) return;
+    // Check for duplicate name (case-insensitive) within the same tenant
+    const duplicate = seed.labels.find(l =>
+      l.name.toLowerCase() === name.toLowerCase() &&
+      (!session.isKasper ? l.tenantId === session.tenantId : true)
+    );
+    if (duplicate) {
+      showToast("A label with this name already exists.");
+      return;
+    }
+    showToast(`Label "${name}" created.`);
+    setShowCreateForm(false);
+    setNewLabelName('');
+  };
+
+  const deleteLabel = (label: Label) => {
+    const assetCodes = assetsForLabel(label.id)
+      .map(id => seed.assets.find(a => a.id === id)?.code)
+      .filter(Boolean)
+      .join(', ');
+    if (assetCodes) {
+      if (!window.confirm(`Remove "${label.name}" from ${assetCodes}?`)) return;
+    }
+    showToast(`"${label.name}" deleted.`);
+  };
+
+  const renameLabel = (label: Label) => {
+    const newName = prompt(`Rename "${label.name}" to:`);
+    if (newName && newName.trim().length >= 1 && newName.trim().length <= 40) {
+      showToast(`Label renamed to "${newName.trim()}".`);
+    }
+  };
+
   if (!session) return null;
 
   return (
     <div className="space-y-4 p-4">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+          placeholder="Search labels…"
+        />
+        <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create label</Button>
+      </div>
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-ink">Labels</h1>
           <p className="text-sm text-grey-500 mt-1">
-            Organize assets with custom labels.
+            Organise assets with custom labels. Labels belong to a tenant and can be applied to any of its assets.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create label</Button>
       </div>
 
       {toast && (
@@ -86,40 +122,47 @@ export default function LabelsPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => { setShowCreateForm(false); setNewLabelName(''); }}>Cancel</Button>
-              <Button onClick={() => { setShowCreateForm(false); setNewLabelName(''); showToast('Label created'); }}>Create</Button>
+              <Button onClick={() => createLabel(newLabelName)}>Create</Button>
             </div>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
-        {visibleLabels.map(label => (
-          <div key={label.id} className="bg-surface border border-line rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="yellow">{label.name}</Badge>
-                  <span className="text-xs text-grey-500">{label.assetIds.length} assets</span>
+        {visibleLabels.map(label => {
+          const assetIds = assetsForLabel(label.id);
+          const assetCodes = assetIds.map(id => seed.assets.find(a => a.id === id)?.code).filter(Boolean);
+          return (
+            <div key={label.id} className="bg-surface border border-line rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="yellow">{label.name}</Badge>
+                    <span className="text-xs text-grey-500">{assetCodes.length} asset{assetCodes.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="text-xs text-grey-500 mt-1">
+                    Assets: {assetCodes.join(', ') || 'No assets'}
+                  </div>
+                  <div className="text-xs text-grey-500 mt-1">
+                    Tenant: {seed.tenants.find(t => t.id === label.tenantId)?.name ?? 'Unknown'}
+                  </div>
                 </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  Assets: {label.assetIds.map(id => seed.assets.find(a => a.id === id)?.code).join(', ')}
+                <div className="flex gap-1">
+                  <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink" onClick={() => renameLabel(label)}>
+                    Rename
+                  </button>
+                  <button className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20" onClick={() => deleteLabel(label)}>
+                    Delete
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-1">
-                <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
-                  Rename
-                </button>
-                <button className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20">
-                  Delete
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {visibleLabels.length === 0 && (
           <EmptyState
             title="No labels"
-            description="Create a label to organize your assets."
+            description="Create a label to organise your assets."
           />
         )}
       </div>
