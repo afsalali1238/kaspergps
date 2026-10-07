@@ -3,7 +3,7 @@
 // phase switches that take both screens away again.
 
 import { expect, test } from '@playwright/test';
-import { demo, expectNoText, goTo, setPhase, startScenario, USERS } from './helpers';
+import { demo, expectNoText, goTo, setPhase, USERS } from './helpers';
 
 test.describe('S37 — Khalid’s maintenance board', () => {
   test('overdue, due soon and ok, with a service task per fault code', async ({ page }) => {

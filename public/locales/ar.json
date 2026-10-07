@@ -188,7 +188,8 @@
       "rented_from_line": "مستأجرة من {company} حتى {until}",
       "history_starts": "يبدأ السجل من {from}",
       "kasper_view": "عرض كاسبر · المالك: {owner}",
-      "current_rental": "الإيجار الحالي:"
+      "current_rental": "الإيجار الحالي:",
+      "no_destination": "بلا وجهة"
     },
     "actions": {
       "run_report": "تشغيل تقرير",
@@ -371,7 +372,20 @@
       "log_service": "تسجيل صيانة",
       "view_only": "عرض فقط"
     },
-    "hover_details": "(مرّر المؤشر للتفاصيل)"
+    "hover_details": "(مرّر المؤشر للتفاصيل)",
+    "trips_empty": "لم تُسجَّل أي رحلات بعد. تبدأ الرحلة عند تشغيل الإشعال وتجاوز السرعة 3 كم/س.",
+    "no_can_tier1": "المعدّات من الفئة 1 لا تتوفر لديها بيانات CAN.",
+    "engine_fuel_stub": "بيانات المحرك والوقود لهذه المعدّة.",
+    "driving_events": "أحداث القيادة",
+    "ecu_engine_hours": "ساعات المحرك من ECU",
+    "muc_note": "قراءة العدّاد من الـ ECU. تُختم شهادات الاستخدام الشهرية من هذا العدّاد.",
+    "reading_ecu": "جارٍ قراءة الـ ECU…",
+    "no_engine_data": "لا توجد بيانات محرك في هذه الفترة.",
+    "muc_title": "شهادات الاستخدام الشهرية (MUC)",
+    "open_certificates": "فتح الشهادات",
+    "certificates_none": "لا توجد شهادات لـ {code} بعد.",
+    "service_plans": "خطط الصيانة",
+    "service_history": "سجل الصيانة"
   },
   "alerts": {
     "title": "التنبيهات",

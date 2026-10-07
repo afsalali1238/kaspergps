@@ -334,12 +334,12 @@ export default function AssetDetailPage() {
   if (!session) return null;
   if (!asset) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset_detail.not_found', 'Asset not found')}</div>
     </div>
   );
   if (!visible) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset_detail.not_found', 'Asset not found')}</div>
     </div>
   );
 
@@ -411,8 +411,8 @@ export default function AssetDetailPage() {
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? 'No destination'} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name} ·
+                  {currentBooking.destination?.name ?? t('asset_detail.rental_strip.no_destination', 'No destination')} ·
                   until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
                 </div>
               </div>
@@ -420,7 +420,7 @@ export default function AssetDetailPage() {
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name} ·
                   from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
                 </div>
               </div>
@@ -743,7 +743,7 @@ export default function AssetDetailPage() {
                     </tr>
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">No data</td>
+                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">{t('common.no_data', 'No data')}</td>
                     </tr>
                   )}
                 </tbody>
@@ -755,23 +755,23 @@ export default function AssetDetailPage() {
 
       {activeTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Trips</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.trips', 'Trips')}</div>
           <div className="text-sm text-grey-500">
-            No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.
+            {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
           </div>
         </div>
       )}
 
       {activeTab === 'engine' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Engine & fuel</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.engine_fuel', 'Engine & fuel')}</div>
           {isTier1 ? (
             <div className="text-sm text-grey-500">
-              Tier 1 assets don't have CAN data available.
+              {t('asset_detail.no_can_tier1', "Tier 1 assets don't have CAN data available.")}
             </div>
           ) : (
             <div className="text-sm text-grey-500">
-              Engine & fuel data for this asset.
+              {t('asset_detail.engine_fuel_stub', 'Engine & fuel data for this asset.')}
             </div>
           )}
         </div>
@@ -779,7 +779,7 @@ export default function AssetDetailPage() {
 
       {activeTab === 'driving' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Driving events</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.driving_events', 'Driving events')}</div>
           <div className="text-sm text-grey-500">
             No driving events recorded yet.
           </div>
@@ -792,11 +792,11 @@ export default function AssetDetailPage() {
             <>
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-ink">ECU engine hours</div>
+                  <div className="text-sm font-medium text-ink">{t('asset_detail.ecu_engine_hours', 'ECU engine hours')}</div>
                   <div className="font-mono text-lg text-ink">{ecuHoursAt(asset, clock.now()).toFixed(1)} h</div>
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  Meter reading from the ECU. Monthly Utilisation Certificates are sealed from this meter.
+                  {t('asset_detail.muc_note', 'Meter reading from the ECU. Monthly Utilisation Certificates are sealed from this meter.')}
                 </div>
               </div>
               <div className="bg-surface border border-line rounded-lg overflow-hidden">
@@ -804,9 +804,9 @@ export default function AssetDetailPage() {
                   Last 7 days
                 </div>
                 {!breakdown ? (
-                  <div className="p-4 text-sm text-grey-500">Reading the ECU…</div>
+                  <div className="p-4 text-sm text-grey-500">{t('asset_detail.reading_ecu', 'Reading the ECU…')}</div>
                 ) : breakdown.days.length === 0 ? (
-                  <div className="p-4 text-sm text-grey-500">No engine data in this window.</div>
+                  <div className="p-4 text-sm text-grey-500">{t('asset_detail.no_engine_data', 'No engine data in this window.')}</div>
                 ) : (
                   <table className="w-full text-xs border-collapse">
                     <thead>
@@ -835,7 +835,7 @@ export default function AssetDetailPage() {
             </>
           ) : (
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-sm font-medium text-ink mb-3">Utilisation</div>
+              <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.utilisation', 'Utilisation')}</div>
               <div className="text-sm text-grey-500">
                 Last 7 days utilisation for this asset.
               </div>
@@ -848,14 +848,14 @@ export default function AssetDetailPage() {
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">Monthly Utilisation Certificates</span>
+              <span className="text-sm font-medium text-ink">{t('asset_detail.muc_title', 'Monthly Utilisation Certificates')}</span>
               <a className="text-xs text-yellow-600 hover:text-yellow font-medium" href="/app/certificates">
-                Open certificates
+                {t('asset_detail.open_certificates', 'Open certificates')}
               </a>
             </div>
             {mucs.length === 0 ? (
               <div className="p-6 text-center text-sm text-grey-500">
-                No certificates for {asset.code} yet.
+                {t('asset_detail.certificates_none', 'No certificates for {code} yet.', { code: asset.code })}
               </div>
             ) : (
               <table className="w-full text-xs border-collapse">
@@ -882,11 +882,11 @@ export default function AssetDetailPage() {
                       </td>
                       <td className="px-3 py-2 border-b border-line text-center">
                         {verifyStates[m.id] === 'tampered' ? (
-                          <Badge variant="red">Seal broken</Badge>
+                          <Badge variant="red">{t('certificates.status.seal_broken', 'Seal broken')}</Badge>
                         ) : m.status === 'sealed' ? (
-                          <Badge variant="green">Sealed</Badge>
+                          <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
                         ) : (
-                          <Badge variant="yellow">Voided</Badge>
+                          <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>
                         )}
                       </td>
                       <td className="px-3 py-2 border-b border-line text-right">
@@ -912,7 +912,7 @@ export default function AssetDetailPage() {
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">Service plans</span>
+              <span className="text-sm font-medium text-ink">{t('asset_detail.service_plans', 'Service plans')}</span>
               <a className="text-xs text-yellow-600 hover:text-yellow font-medium" href="/app/maintenance">
                 Open the maintenance board
               </a>
@@ -943,11 +943,11 @@ export default function AssetDetailPage() {
                         </td>
                         <td className="px-3 py-2 border-b border-line text-center">
                           {snapshot.state === 'overdue' ? (
-                            <Badge variant="red">Overdue</Badge>
+                            <Badge variant="red">{t('maintenance.overdue', 'Overdue')}</Badge>
                           ) : snapshot.state === 'due_soon' ? (
-                            <Badge variant="amber">Due soon</Badge>
+                            <Badge variant="amber">{t('maintenance.due_soon', 'Due soon')}</Badge>
                           ) : (
-                            <Badge variant="green">Ok</Badge>
+                            <Badge variant="green">{t('maintenance.ok', 'Ok')}</Badge>
                           )}
                         </td>
                       </tr>
@@ -959,7 +959,7 @@ export default function AssetDetailPage() {
           </div>
 
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
-            <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">Service history</div>
+            <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.service_history', 'Service history')}</div>
             {maintenanceRecords.length === 0 ? (
               <div className="p-6 text-center text-sm text-grey-500">No services logged for {asset.code} yet.</div>
             ) : (
@@ -996,7 +996,7 @@ export default function AssetDetailPage() {
 
       {activeTab === 'alerts' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Alerts</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.alerts', 'Alerts')}</div>
           <div className="text-sm text-grey-500">
             No alerts for this asset.
           </div>

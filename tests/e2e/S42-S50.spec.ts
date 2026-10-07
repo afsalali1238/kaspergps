@@ -3,7 +3,7 @@
 // administration — plus the refusals that keep the rules honest.
 
 import { expect, test } from '@playwright/test';
-import { demo, expectNoText, goTo, startScenario, USERS } from './helpers';
+import { demo, expectNoText, startScenario, USERS } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');

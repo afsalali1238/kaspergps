@@ -3,7 +3,7 @@
 // owner records a part-payment, Kasper issues statements).
 
 import { expect, test } from '@playwright/test';
-import { demo, goTo, startScenario, tamperWithCertificate, USERS } from './helpers';
+import { demo, goTo, tamperWithCertificate, USERS } from './helpers';
 
 test.describe('S31 — Khalid issues and reissues a MUC', () => {
   test('the certificates screen lists the seeded September certificate', async ({ page }) => {
