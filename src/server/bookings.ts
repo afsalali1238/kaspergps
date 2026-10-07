@@ -9,6 +9,7 @@ import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
 import { canEndAccess, hasCapability } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
+import { revokeLinksForBooking } from '@/server/tracking-links';
 
 // Seed ids run b-1001..b-1012, so runtime ids start well clear of them.
 let bookingSeq = 2000;
@@ -197,6 +198,7 @@ export function cancelBooking(session: Session, bookingId: string, reason = ''):
 
   booking.status = 'cancelled';
   booking.cancelledAt = new Date(clock.now()).toISOString();
+  const revokedOnCancel = revokeLinksForBooking(booking.id, 'booking_cancelled', session.userId);
 
   recordAuditForSession(session, {
     action: 'booking.cancel',
@@ -206,7 +208,10 @@ export function cancelBooking(session: Session, bookingId: string, reason = ''):
     detail: `${booking.reference} cancelled`,
     reason: reason.trim() || undefined,
   });
-  return ok(booking, `${booking.reference} cancelled — the renter's access ends now.`);
+  return ok(
+    booking,
+    `${booking.reference} cancelled — the renter's access ends now${revokedOnCancel ? ` · ${revokedOnCancel} tracking ${revokedOnCancel === 1 ? 'link' : 'links'} revoked` : ''}.`
+  );
 }
 
 export function closeBooking(session: Session, bookingId: string, reason = ''): OpResult<Booking> {
@@ -220,6 +225,7 @@ export function closeBooking(session: Session, bookingId: string, reason = ''): 
 
   booking.status = 'closed';
   booking.closedAt = new Date(clock.now()).toISOString();
+  const revokedOnClose = revokeLinksForBooking(booking.id, 'job_closed', session.userId);
 
   recordAuditForSession(session, {
     action: 'booking.close',
@@ -229,7 +235,10 @@ export function closeBooking(session: Session, bookingId: string, reason = ''): 
     detail: `${booking.reference} job closed`,
     reason: reason.trim() || undefined,
   });
-  return ok(booking, `${booking.reference} closed — the renter's access ends now.`);
+  return ok(
+    booking,
+    `${booking.reference} closed — the renter's access ends now${revokedOnClose ? ` · ${revokedOnClose} tracking ${revokedOnClose === 1 ? 'link' : 'links'} revoked` : ''}.`
+  );
 }
 
 /**
@@ -251,6 +260,8 @@ export function endEarly(session: Session, bookingId: string, reason: string): O
   booking.status = 'closed';
   booking.closedAt = new Date(nowMs).toISOString();
 
+  const revokedOnCut = revokeLinksForBooking(booking.id, 'access_ended', session.userId);
+
   // The renter keeps the window they had up to now; the override is audited.
   seed.grantOverrides.push({
     bookingId: booking.id,
@@ -267,5 +278,9 @@ export function endEarly(session: Session, bookingId: string, reason: string): O
     detail: `${asset.code} rental ended early by ${session.user.name}`,
     reason: reason.trim(),
   });
-  return ok(booking, `${booking.reference} ended early — access cut off now.`);
+  const renterName = seed.tenants.find(t => t.id === booking.renterTenantId)?.name ?? 'the hirer';
+  return ok(
+    booking,
+    `${renterName} no longer has access to ${asset.code}${revokedOnCut ? ` · ${revokedOnCut} tracking ${revokedOnCut === 1 ? 'link' : 'links'} revoked` : ''}.`
+  );
 }

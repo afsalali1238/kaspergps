@@ -16,6 +16,12 @@ import { isAssetVisible, getRelationship, hasCapability } from '@/server/access'
 import { getReadingForAsset, computeStatus } from '@/server/telemetry/simulator';
 import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
 import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
+import {
+  activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset,
+  revokeTrackingLink,
+} from '@/server/tracking-links';
+import { endEarly } from '@/server/bookings';
+import type { Asset, TrackingLink } from '@/domain/types';
 import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
 
@@ -56,6 +62,173 @@ function createMarkerIcon(status: string) {
   });
 }
 
+function SharePanel({ asset, onClose, onDone, onError }: {
+  asset: Asset;
+  onClose: () => void;
+  onDone: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const session = useStore.getState().session!;
+  const options = expiryOptions(asset.id);
+  const [optionKey, setOptionKey] = useState(String(options[0]?.bookingId ?? 'none'));
+  const [showEta, setShowEta] = useState(true);
+  const [created, setCreated] = useState<TrackingLink | null>(null);
+  const [version, setVersion] = useState(0);
+
+  const option = options.find(o => String(o.bookingId ?? 'none') === optionKey) ?? options[0];
+  const booking = option?.bookingId ? seed.bookings.find(b => b.id === option.bookingId) : null;
+  const hasDestination = Boolean(booking?.destination);
+  const active = activeLinksForAsset(asset.id);
+  const past = pastLinksForAsset(asset.id);
+  const linkUrl = created ? `${typeof window !== 'undefined' ? window.location.origin : ''}/t/${created.token}` : '';
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      onDone('Link copied to the clipboard.');
+    } catch {
+      onError('Copy blocked by the browser — select the link and copy it manually.');
+    }
+  };
+
+  return (
+    <div className="bg-surface border border-line rounded-lg p-4 space-y-3" key={version}>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-sm font-medium text-ink">Share tracking link</h2>
+          <p className="text-xs text-grey-500 mt-0.5">
+            Anyone with the link sees {asset.code}&apos;s live position until it expires. No login, nothing else.
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-grey-500 font-medium">Job</label>
+          <select
+            value={optionKey}
+            onChange={e => { setOptionKey(e.target.value); setCreated(null); }}
+            className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+          >
+            {options.map(o => (
+              <option key={String(o.bookingId ?? 'none')} value={String(o.bookingId ?? 'none')}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-grey-500 font-medium">Expires</label>
+          <div className="mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper-2 text-grey-700">
+            {option ? `${clock.formatDubaiDate(option.expiresAt)} ${clock.formatDubaiTime(option.expiresAt)}` : '—'}
+            {!booking && <span className="text-grey-500"> · 24 h</span>}
+          </div>
+        </div>
+      </div>
+
+      {hasDestination && (
+        <label className="flex items-center gap-2 text-sm text-grey-700">
+          <input
+            type="checkbox"
+            checked={showEta}
+            onChange={e => setShowEta(e.target.checked)}
+            className="accent-yellow"
+          />
+          Show arrival time (ETA) to the hirer
+          <span className="text-xs text-grey-500">· to {booking?.destination?.name}</span>
+        </label>
+      )}
+
+      {!created ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            const result = createTrackingLink(session, {
+              assetId: asset.id,
+              bookingId: option?.bookingId ?? null,
+              expiresAt: option?.expiresAt,
+              showEta: hasDestination ? showEta : false,
+            });
+            if (result.ok) {
+              setCreated(result.data!);
+              setVersion(v => v + 1);
+              onDone(result.message ?? 'Link created.');
+            } else {
+              onError(result.error ?? 'Could not create the link.');
+            }
+          }}
+        >
+          Create
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="flex-1 min-w-[16rem] px-3 py-2 text-xs rounded-lg border border-line bg-paper-2 text-grey-700 break-all">{linkUrl}</code>
+            <Button size="sm" onClick={copy}>Copy</Button>
+            <a
+              className="text-xs text-yellow-600 hover:text-yellow font-medium px-2"
+              href={`/t/${created.token}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open
+            </a>
+          </div>
+          <div className="text-xs text-grey-500">
+            Suggested message: <span className="text-grey-700">Track {asset.code} live: {linkUrl}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="pt-2 border-t border-line">
+        <div className="text-xs font-medium text-grey-500 mb-1">Active links ({active.length})</div>
+        {active.length === 0 ? (
+          <div className="text-xs text-grey-500">No active links for {asset.code}.</div>
+        ) : (
+          <div className="space-y-1">
+            {active.map(link => (
+              <div key={link.id} className="flex items-center justify-between gap-2 text-xs text-grey-700">
+                <span>
+                  {link.bookingId ? seed.bookings.find(b => b.id === link.bookingId)?.reference ?? 'Job' : 'No job'}
+                  {' · '}
+                  {seed.users.find(u => u.id === link.createdBy)?.name ?? 'Kasper'}
+                  {' · '}created {clock.formatDubaiDate(Number(new Date(link.createdAt)))}
+                  {' · '}expires {clock.formatDubaiDate(Number(new Date(link.expiresAt)))}
+                </span>
+                <button
+                  className="px-2 py-0.5 rounded bg-paper border border-line hover:border-ink"
+                  onClick={() => {
+                    const result = revokeTrackingLink(session, link.id, 'manual');
+                    if (result.ok) { onDone(result.message ?? 'Link revoked.'); setVersion(v => v + 1); }
+                    else onError(result.error ?? 'Could not revoke the link.');
+                  }}
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {past.length > 0 && (
+        <div className="pt-2 border-t border-line">
+          <div className="text-xs font-medium text-grey-500 mb-1">Past links ({past.length})</div>
+          <div className="space-y-1">
+            {past.map(link => (
+              <div key={link.id} className="text-xs text-grey-500">
+                {clock.formatDubaiDate(Number(new Date(link.createdAt)))}
+                {' · '}{link.bookingId ? seed.bookings.find(b => b.id === link.bookingId)?.reference ?? 'Job' : 'No job'}
+                {' · '}{linkEndWords(link)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'alerts';
 
 export default function AssetDetailPage() {
@@ -69,6 +242,9 @@ export default function AssetDetailPage() {
   const [breakdown, setBreakdown] = useState<EcuBreakdown | null>(null);
   const [verifyStates, setVerifyStates] = useState<Record<string, MucVerifyStatus>>({});
   const [requestNote, setRequestNote] = useState('');
+  const [panel, setPanel] = useState<'share' | 'end' | 'edit' | null>(null);
+  const [endReason, setEndReason] = useState('');
+  const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -84,7 +260,8 @@ export default function AssetDetailPage() {
   const currentBooking = useMemo(() => {
     if (!asset || !session) return null;
     return seed.bookings.find(b => b.assetId === asset.id && b.status === 'active');
-  }, [asset, session]);
+    // assetVersion busts the memo after a link or rental change
+  }, [asset, session, assetVersion]);
 
   const upcomingBooking = useMemo(() => {
     if (!asset || !session) return null;
@@ -110,6 +287,9 @@ export default function AssetDetailPage() {
     () => (asset && hasOpenTrackerRequest(asset.id) ? trackerRequestForAsset(asset.id) : null),
     [asset, requestVersion]
   );
+
+  const showAssetToast = (kind: 'ok' | 'error', text: string) => setTrackerToast({ kind, text });
+  const refreshAsset = () => setAssetVersion(v => v + 1);
 
   const submitTrackerRequest = () => {
     if (!asset) return;
@@ -269,17 +449,72 @@ export default function AssetDetailPage() {
 
       {/* Actions */}
       {(canEdit || canShare || canEndAccess) && (
-        <div className="flex flex-wrap gap-2">
-          {canEdit && (
-            <Button variant="secondary" size="sm">Edit asset</Button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {canEdit && (
+              <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'edit' ? null : 'edit')}>
+                Edit asset
+              </Button>
+            )}
+            {canShare && (
+              <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'share' ? null : 'share')}>
+                Share tracking link
+              </Button>
+            )}
+            {canEndAccess && rel === 'owner' && currentBooking && (
+              <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
+                End access now
+              </Button>
+            )}
+            <a
+              className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
+              href="/app/reports"
+            >
+              Run report
+            </a>
+          </div>
+
+          {panel === 'share' && (
+            <SharePanel asset={asset} onClose={() => setPanel(null)} onDone={message => { showAssetToast('ok', message); setPanel(null); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
           )}
-          {canShare && (
-            <Button variant="secondary" size="sm">Share tracking link</Button>
+
+          {panel === 'end' && currentBooking && (
+            <div className="bg-surface border border-red/30 rounded-lg p-4">
+              <h2 className="text-sm font-medium text-ink mb-1">
+                End {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? 'the hirer'}&apos;s access now
+              </h2>
+              <p className="text-xs text-grey-500 mb-2">
+                The rental is cut short now: the override is saved, the job&apos;s tracking links are revoked and the cut-off is audited.
+                It is not undone by the nightly check.
+              </p>
+              <input
+                type="text"
+                value={endReason}
+                onChange={e => setEndReason(e.target.value)}
+                placeholder="Reason (at least 10 characters)"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              />
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    const result = endEarly(session, currentBooking.id, endReason);
+                    if (result.ok) {
+                      showAssetToast('ok', result.message ?? 'Access ended.');
+                      setPanel(null);
+                      refreshAsset();
+                    } else {
+                      showAssetToast('error', result.error ?? 'Could not end access.');
+                    }
+                  }}
+                >
+                  End {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? 'the hirer'}&apos;s access now
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setPanel(null)}>Cancel</Button>
+              </div>
+            </div>
           )}
-          {canEndAccess && rel === 'owner' && (
-            <Button variant="danger" size="sm">End access now</Button>
-          )}
-          <Button variant="secondary" size="sm">Run report</Button>
         </div>
       )}
 
