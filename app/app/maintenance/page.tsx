@@ -12,7 +12,7 @@ import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { visibleAssetIds } from '@/server/access';
 import {
-  boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts,
+  boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService,
   openTasks, planSnapshot, plansVisibleTo, savePlan, serviceHistory, type PlanSnapshot,
 } from '@/server/maintenance';
 import { tierForAsset } from '@/domain/features';
@@ -28,11 +28,41 @@ function stateBadge(state: PlanSnapshot['state']): React.ReactNode {
 
 /** Basis chips use the same vocabulary as Cost & ROI. */
 function basisChip(snapshot: PlanSnapshot): React.ReactNode {
-  if (snapshot.plan.basis === 'days') return <SourceLabel source="Days on hire" />;
+  if (snapshot.plan.basis === 'days') return <Badge variant="grey">Calendar days</Badge>;
   if (snapshot.plan.basis === 'km') return <SourceLabel source={snapshot.plan.kmSource === 'can' ? 'ECU (ALL-CAN300)' : 'GPS distance'} />;
   if (snapshot.plan.hoursSource === 'estimated') return <SourceLabel source="Estimated" />;
   if (snapshot.asset.canProfile.adapter === 'ALL-CAN300') return <SourceLabel source="ECU" />;
   return <SourceLabel source="ECU · partial" />;
+}
+
+function applyCalendarThreshold(snapshot: PlanSnapshot): PlanSnapshot {
+  if (snapshot.plan.basis !== 'days') return snapshot;
+  const threshold = snapshot.plan.dueSoonAt > 0 && snapshot.plan.dueSoonAt < snapshot.plan.interval
+    ? snapshot.plan.dueSoonAt
+    : Math.round(snapshot.plan.interval * 0.85);
+  const state = snapshot.remaining <= 0 ? 'overdue' : snapshot.current >= threshold ? 'due_soon' : 'ok';
+  return { ...snapshot, dueSoonAt: threshold, state };
+}
+
+function boardFromSnapshots(snapshots: PlanSnapshot[]): { overdue: PlanSnapshot[]; dueSoon: PlanSnapshot[]; ok: PlanSnapshot[] } {
+  const ordered = [...snapshots].sort((a, b) => a.remaining - b.remaining);
+  return {
+    overdue: ordered.filter(snapshot => snapshot.state === 'overdue'),
+    dueSoon: ordered.filter(snapshot => snapshot.state === 'due_soon'),
+    ok: ordered.filter(snapshot => snapshot.state === 'ok'),
+  };
+}
+
+function alertsForBoard(board: { overdue: PlanSnapshot[]; dueSoon: PlanSnapshot[]; ok: PlanSnapshot[] }) {
+  const dueSoonLine = (snapshot: PlanSnapshot) => snapshot.unit === 'km'
+    ? `${snapshot.asset.code} ${snapshot.plan.name} (${Math.max(0, Math.round(snapshot.remaining)).toLocaleString('en-US')} km left)`
+    : snapshot.unit === 'days'
+      ? `${snapshot.asset.code} ${snapshot.plan.name} (${clock.formatDubaiDate(snapshot.dueAt ?? clock.now())})`
+      : `${snapshot.asset.code} ${snapshot.plan.name} (${Math.max(0, Math.round(snapshot.remaining))} h left)`;
+  return [
+    ...board.overdue.map(snapshot => ({ state: 'overdue' as const, text: `Maintenance overdue: ${snapshot.asset.code} — ${snapshot.plan.name}` })),
+    ...board.dueSoon.map(snapshot => ({ state: 'due_soon' as const, text: `Maintenance due soon: ${dueSoonLine(snapshot)}` })),
+  ];
 }
 
 export default function MaintenancePage() {
@@ -42,20 +72,26 @@ export default function MaintenancePage() {
 
   const [view, setView] = useState<View>('board');
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [, setVersion] = useState(0);
+  const [dataRevision, setDataRevision] = useState(0);
   const [logFor, setLogFor] = useState<PlanSnapshot | null>(null);
   const [planForm, setPlanForm] = useState<{ snapshot?: PlanSnapshot } | null>(null);
 
   const show = (tone: 'ok' | 'error', text: string) => {
     setToast({ tone, text });
-    setVersion(v => v + 1);
+    setDataRevision(v => v + 1);
   };
 
-  const board = useMemo(() => (session ? boardFor(session) : { overdue: [], dueSoon: [], ok: [] }), [session, setVersion]);
-  const alerts = useMemo(() => (session ? maintenanceAlerts(session) : []), [session]);
-  const history = useMemo(() => (session ? serviceHistory(session) : []), [session]);
-  const tasks = useMemo(() => (session ? openTasks(session) : []), [session]);
-  const plans = useMemo(() => (session ? plansVisibleTo(session) : []), [session]);
+  const ownedAssetIds = useMemo(() => new Set(seed.assets
+    .filter(asset => session && (session.isKasper || asset.ownerTenantId === session.tenantId))
+    .map(asset => asset.id)), [session]);
+  const rawBoard = useMemo(() => session ? boardFor(session) : { overdue: [], dueSoon: [], ok: [] }, [session, dataRevision]);
+  const board = useMemo(() => boardFromSnapshots(
+    [...rawBoard.overdue, ...rawBoard.dueSoon, ...rawBoard.ok].map(applyCalendarThreshold),
+  ), [rawBoard]);
+  const alerts = useMemo(() => alertsForBoard(board), [board]);
+  const history = useMemo(() => (session ? serviceHistory(session) : []), [session, dataRevision]);
+  const tasks = useMemo(() => (session ? openTasks(session).filter(task => ownedAssetIds.has(task.assetId)) : []), [session, ownedAssetIds, dataRevision]);
+  const plans = useMemo(() => (session ? plansVisibleTo(session) : []), [session, dataRevision]);
 
   const canManage = Boolean(session && canManageMaintenance(session));
 
@@ -74,7 +110,8 @@ export default function MaintenancePage() {
   }
 
   const faultCodes = seed.alerts.filter(a =>
-    a.type === 'fault_code' && !a.closedAt && a.assetId && visibleAssetIds(session).includes(a.assetId)
+    a.type === 'fault_code' && !a.closedAt && a.assetId
+    && ownedAssetIds.has(a.assetId) && visibleAssetIds(session).includes(a.assetId)
   );
 
   const planTable: ExportTable = {
@@ -179,7 +216,7 @@ export default function MaintenancePage() {
           {tasks.map(t => {
             const asset = seed.assets.find(a => a.id === t.assetId);
             const plan = plans.find(p => p.assetId === t.assetId);
-            const snapshot = plan ? planSnapshot(plan, asset!) : null;
+            const snapshot = plan && asset ? planSnapshot(plan, asset) : null;
             return (
               <div key={t.id} className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-grey-700">
@@ -369,7 +406,7 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
   const plan = snapshot.plan;
   const asset = snapshot.asset;
   const meter = currentMeter(plan, asset);
-  const [doneAt, setDoneAt] = useState(new Date(clock.now()).toISOString().slice(0, 10));
+  const [doneAt, setDoneAt] = useState(clock.dubaiToIso(clock.now()).slice(0, 10));
   const [value, setValue] = useState(String(meter.value));
   const [notes, setNotes] = useState('');
   const [cost, setCost] = useState('');
@@ -379,9 +416,11 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
     <Sheet open onClose={onClose} title={`Log service — ${asset.code}`} width="md">
       <div className="space-y-4">
         <div className="text-sm text-grey-700">
-          {plan.name} · <SourceLabel source={plan.basis === 'km'
-            ? (plan.kmSource === 'can' ? 'ECU (ALL-CAN300)' : 'GPS distance')
-            : plan.hoursSource === 'estimated' ? 'Estimated' : 'ECU'} inline />
+          {plan.name} · {plan.basis === 'days'
+            ? <Badge variant="grey">Calendar days</Badge>
+            : <SourceLabel source={plan.basis === 'km'
+              ? (plan.kmSource === 'can' ? 'ECU (ALL-CAN300)' : 'GPS distance')
+              : plan.hoursSource === 'estimated' ? 'Estimated' : 'ECU'} inline />}
         </div>
         <p className="text-xs text-grey-500">
           Logging a service resets the plan: the reading you enter here becomes the new starting point.
@@ -396,14 +435,14 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
           />
         </label>
         <label className="text-xs text-grey-500 block">
-          Meter reading ({plan.basis === 'km' ? 'km' : plan.hoursSource ? 'hours' : 'km'}) — {meter.source}
+          {plan.basis === 'days' ? 'Calendar value (days since last service)' : `Meter reading (${plan.basis === 'km' ? 'km' : 'hours'})`} — {meter.source}
           <input
             value={value}
             onChange={e => setValue(e.target.value)}
             inputMode="decimal"
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           />
-          <span className="text-[11px] text-grey-500">Prefilled from the current reading — edit it if the hour meter reads differently.</span>
+          <span className="text-[11px] text-grey-500">{plan.basis === 'days' ? 'Prefilled from the current calendar value.' : 'Prefilled from the current meter — edit it if the reading differs.'}</span>
         </label>
         <label className="text-xs text-grey-500 block">
           Notes
@@ -433,12 +472,26 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
         <div className="flex gap-2">
           <Button
             onClick={() => {
+              const meterValue = Number(value);
+              const costValue = Number(cost);
+              if (!doneAt) {
+                onResult('error', 'Choose the service date.');
+                return;
+              }
+              if (value.trim() === '' || !Number.isFinite(meterValue) || meterValue < 0) {
+                onResult('error', 'Enter a non-negative meter reading.');
+                return;
+              }
+              if (cost.trim() === '' || !Number.isFinite(costValue) || costValue < 0) {
+                onResult('error', 'Enter the service cost. Use 0 only when the service had no cost.');
+                return;
+              }
               const result = logService(session, {
                 planId: plan.id,
                 doneAt: new Date(`${doneAt}T12:00:00+04:00`).getTime(),
-                value: Number(value),
+                value: meterValue,
                 notes,
-                costAed: Number(cost || 0),
+                costAed: costValue,
                 taskId: task?.id,
               });
               onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
@@ -462,15 +515,24 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
   const owned = seed.assets.filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
-  const [assetId, setAssetId] = useState(snapshot?.asset.id ?? owned[0]?.id ?? '');
+  const initialAssetId = snapshot?.asset.id ?? owned[0]?.id ?? '';
+  const initialAsset = seed.assets.find(asset => asset.id === initialAssetId);
+  const defaultBasis: MaintenancePlan['basis'] = initialAsset && tierForAsset(initialAsset) === 1 ? 'days' : 'engine_hours';
+  const [assetId, setAssetId] = useState(initialAssetId);
   const [name, setName] = useState(snapshot?.plan.name ?? '');
-  const [basis, setBasis] = useState<MaintenancePlan['basis']>(snapshot?.plan.basis ?? 'engine_hours');
+  const [basis, setBasis] = useState<MaintenancePlan['basis']>(snapshot?.plan.basis ?? defaultBasis);
   const [interval, setInterval] = useState(String(snapshot?.plan.interval ?? ''));
   const [lastDoneValue, setLastDoneValue] = useState(String(snapshot?.plan.lastDoneValue ?? ''));
   const lastDoneMs = snapshot
     ? (typeof snapshot.plan.lastDoneAt === 'number' ? snapshot.plan.lastDoneAt : new Date(snapshot.plan.lastDoneAt).getTime())
     : clock.now();
-  const [lastDoneAt, setLastDoneAt] = useState(new Date(lastDoneMs).toISOString().slice(0, 10));
+  const [lastDoneAt, setLastDoneAt] = useState(clock.dubaiToIso(lastDoneMs).slice(0, 10));
+  const initialDueSoonPercent = snapshot && snapshot.plan.interval > 0
+    ? snapshot.plan.basis === 'days'
+      ? (snapshot.dueSoonAt / snapshot.plan.interval) * 100
+      : ((snapshot.dueSoonAt - snapshot.plan.lastDoneValue) / snapshot.plan.interval) * 100
+    : 80;
+  const [dueSoonPercent, setDueSoonPercent] = useState(String(Math.min(95, Math.max(51, Math.round(initialDueSoonPercent)))));
 
   const asset = seed.assets.find(a => a.id === assetId);
   const tier = asset ? tierForAsset(asset) : 1;
@@ -486,7 +548,12 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
           Asset
           <select
             value={assetId}
-            onChange={e => setAssetId(e.target.value)}
+            onChange={e => {
+              const nextAssetId = e.target.value;
+              const nextAsset = seed.assets.find(item => item.id === nextAssetId);
+              setAssetId(nextAssetId);
+              if (nextAsset && tierForAsset(nextAsset) === 1 && basis === 'engine_hours') setBasis('days');
+            }}
             disabled={Boolean(snapshot)}
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           >
@@ -509,7 +576,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
             onChange={e => setBasis(e.target.value as typeof basis)}
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           >
-            <option value="engine_hours">Engine hours</option>
+            <option value="engine_hours" disabled={tier === 1}>Engine hours{tier === 1 ? ' (not available)' : ''}</option>
             <option value="km">Distance</option>
             <option value="days">Days (calendar)</option>
           </select>
@@ -535,6 +602,18 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           />
         </label>
+        <label className="text-xs text-grey-500 block">
+          Due soon threshold (% of interval)
+          <input
+            type="number"
+            min={51}
+            max={95}
+            value={dueSoonPercent}
+            onChange={event => setDueSoonPercent(event.target.value)}
+            className="block mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-grey-700 focus:border-ink focus:outline-none"
+          />
+          <span className="mt-1 block text-[11px] text-grey-500">The warning starts after this share of the interval has been used.</span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-grey-500 block">
             Last done at (reading)
@@ -556,11 +635,37 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
           </label>
         </div>
         <p className="text-[11px] text-grey-500">
-          Due soon starts at 80 % of the interval unless you set your own threshold. {tier === 1 ? 'A tracker-only asset can only be planned by distance or days.' : ''}
+          Choose a due-soon threshold from 51% to 95% of the interval. {tier === 1 ? 'A tracker-only asset can only be planned by distance or days.' : ''}
         </p>
         <div className="flex gap-2">
           <Button
             onClick={() => {
+              if (tier === 1 && basis === 'engine_hours') {
+                onResult('error', 'Tier 1 assets use distance or calendar days for service plans.');
+                return;
+              }
+              const thresholdPercent = Number(dueSoonPercent);
+              if (!Number.isFinite(thresholdPercent) || thresholdPercent < 51 || thresholdPercent > 95) {
+                onResult('error', 'Choose a due-soon threshold from 51% to 95%.');
+                return;
+              }
+              const intervalValue = Number(interval);
+              const lastReadingValue = Number(lastDoneValue);
+              if (interval.trim() === '' || !Number.isFinite(intervalValue) || intervalValue <= 0) {
+                onResult('error', 'Enter an interval greater than zero.');
+                return;
+              }
+              if (lastDoneValue.trim() === '' || !Number.isFinite(lastReadingValue) || lastReadingValue < 0) {
+                onResult('error', 'Enter a non-negative last service reading.');
+                return;
+              }
+              if (!lastDoneAt) {
+                onResult('error', 'Choose the date of the last service.');
+                return;
+              }
+              const dueSoonAt = basis === 'days'
+                ? intervalValue * thresholdPercent / 100
+                : lastReadingValue + intervalValue * thresholdPercent / 100;
               const result = savePlan(session, {
                 id: snapshot?.plan.id,
                 assetId,
@@ -568,9 +673,10 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
                 basis,
                 hoursSource: hoursSource as 'ecu' | 'estimated' | undefined,
                 kmSource: kmSource as 'can' | 'gps' | undefined,
-                interval: Number(interval),
+                interval: intervalValue,
+                dueSoonAt,
                 lastDoneAt: new Date(`${lastDoneAt}T12:00:00+04:00`).getTime(),
-                lastDoneValue: Number(lastDoneValue || 0),
+                lastDoneValue: lastReadingValue,
               });
               onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
             }}

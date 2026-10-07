@@ -7,6 +7,9 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasCapability } from '@/server/access';
+import { setDieselPrice } from '@/server/cost';
+import { companyDieselPriceStorageKey, DEFAULT_DIESEL_PRICE_AED_PER_L, parseDieselPrice } from '@/domain/cost';
 
 function roleBadge(userRole: string): React.ReactNode {
   return <Badge variant={userRole === 'tenant_admin' ? 'default' : 'grey'}>
@@ -31,6 +34,18 @@ export default function SettingsPage() {
   const [showInvite, setShowInvite] = useState(false);
   const [showAddSite, setShowAddSite] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [dieselPriceDraft, setDieselPriceDraft] = useState(String(DEFAULT_DIESEL_PRICE_AED_PER_L));
+  const [costMessage, setCostMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  React.useEffect(() => {
+    if (!session || typeof window === 'undefined') return;
+    try {
+      const saved = parseDieselPrice(window.localStorage.getItem(companyDieselPriceStorageKey(session.tenantId)));
+      setDieselPriceDraft((saved ?? DEFAULT_DIESEL_PRICE_AED_PER_L).toFixed(2));
+    } catch {
+      // The default price remains available if browser storage is blocked.
+    }
+  }, [session]);
 
   if (!session) return null;
 
@@ -46,6 +61,7 @@ export default function SettingsPage() {
     );
   }
 
+  const canEditCostInputs = hasCapability(session, 'cost.view');
   const myTenantId = session.tenantId;
   const myUsers = seed.users.filter(u => u.tenantId === myTenantId);
   const mySites = seed.sites.filter(s => s.tenantId === myTenantId);
@@ -79,6 +95,7 @@ export default function SettingsPage() {
           { id: 'users', label: 'Users' },
           { id: 'sites', label: 'Sites' },
           { id: 'assets', label: 'Assets' },
+          ...(canEditCostInputs ? [{ id: 'costs', label: 'Cost inputs' }] : []),
         ]}
         activeId={activeTab}
         onChange={setActiveTab}
@@ -453,6 +470,50 @@ export default function SettingsPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'costs' && canEditCostInputs && (
+        <div className="max-w-2xl rounded-lg border border-line bg-surface p-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-medium text-ink">Cost inputs</h2>
+            <p className="text-xs text-grey-500">Set the diesel price used by the cost calculator. The prototype rate is a dummy value.</p>
+          </div>
+          <label className="mt-4 block text-xs font-medium text-grey-500">
+            Diesel price (AED/L)
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min="0.01"
+                max="20"
+                step="0.01"
+                value={dieselPriceDraft}
+                onChange={event => setDieselPriceDraft(event.target.value)}
+                className="w-36 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-grey-700 focus:border-ink focus:outline-none"
+              />
+              <Button size="sm" onClick={() => {
+                const result = setDieselPrice(session, Number(dieselPriceDraft));
+                setCostMessage({ tone: result.ok ? 'ok' : 'error', text: result.ok ? result.message! : result.error! });
+                if (result.ok && result.data !== undefined) {
+                  setDieselPriceDraft(result.data.toFixed(2));
+                  try {
+                    window.localStorage.setItem(companyDieselPriceStorageKey(session.tenantId), String(result.data));
+                  } catch {
+                    setCostMessage({ tone: 'error', text: 'Price set for this visit, but browser storage is unavailable.' });
+                  }
+                }
+              }}>
+                Save price
+              </Button>
+              <span className="text-xs text-grey-500">Default AED 3.05/L</span>
+            </span>
+          </label>
+          {costMessage && (
+            <div className={costMessage.tone === 'ok' ? 'mt-3 rounded-lg border border-green/30 bg-green/10 px-3 py-2 text-sm text-green' : 'mt-3 rounded-lg border border-red/30 bg-red/10 px-3 py-2 text-sm text-red'} role="status">
+              {costMessage.text}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-grey-500">Rates are for planning only and aren&apos;t billing-grade.</p>
         </div>
       )}
     </div>

@@ -8,10 +8,11 @@ import {
 } from '@/components/ui';
 import { useStore } from '@/store';
 import {
-  canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile,
-  setDieselPrice, type AssetCostRow, type CostPeriod,
+  canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice,
+  type AssetCostRow, type CostPeriod,
 } from '@/server/cost';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
+import { companyDieselPriceStorageKey, DEFAULT_DIESEL_PRICE_AED_PER_L, parseDieselPrice } from '@/domain/cost';
 
 const PERIODS: { id: CostPeriod; label: string }[] = [
   { id: 'this_month', label: 'This month' },
@@ -23,6 +24,9 @@ const PERIODS: { id: CostPeriod; label: string }[] = [
 type SortKey = 'code' | 'revenueAed' | 'fuelAed' | 'idleAed' | 'maintenanceAed' | 'fixedAed' | 'operatorAed' | 'costAed' | 'marginAed' | 'marginPct' | 'utilisationPct';
 
 const money = (value: number | null) => (value === null ? null : Math.round(value).toLocaleString('en-US'));
+const hasUnmeasuredOptionalCost = (row: AssetCostRow) => row.lines.some(line =>
+  ['idle', 'fixed', 'operator'].includes(line.key) && line.amountAed === null,
+);
 
 function Amount({ value }: { value: number | null }) {
   if (value === null) return <span className="text-grey-500 italic text-xs">Not measured</span>;
@@ -39,17 +43,38 @@ export default function CostPage() {
   const [sortAsc, setSortAsc] = useState(false);
   const [openAssetId, setOpenAssetId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [, setVersion] = useState(0);
+  const [dataRevision, setDataRevision] = useState(0);
+  const [priceReady, setPriceReady] = useState(false);
 
   const show = (tone: 'ok' | 'error', text: string) => {
     setToast({ tone, text });
-    setVersion(v => v + 1);
+    setDataRevision(v => v + 1);
   };
+
+  React.useEffect(() => {
+    if (!session || !canViewCost(session) || typeof window === 'undefined') return;
+    try {
+      const storedPrice = parseDieselPrice(window.localStorage.getItem(companyDieselPriceStorageKey(session.tenantId)));
+      const companyPrice = storedPrice ?? DEFAULT_DIESEL_PRICE_AED_PER_L;
+      if (getDieselPrice() !== companyPrice) {
+        const result = setDieselPrice(session, companyPrice);
+        if (result.ok) setDataRevision(v => v + 1);
+      }
+    } catch {
+      // Fall back to the published dummy rate if browser storage is blocked.
+      if (getDieselPrice() !== DEFAULT_DIESEL_PRICE_AED_PER_L) {
+        const result = setDieselPrice(session, DEFAULT_DIESEL_PRICE_AED_PER_L);
+        if (result.ok) setDataRevision(v => v + 1);
+      }
+    } finally {
+      setPriceReady(true);
+    }
+  }, [session]);
 
   const range = useMemo(() => periodRange(period), [period]);
   const rows = useMemo(
     () => (session && canViewCost(session) ? costRows(session, range.fromMs, range.toMs) : []),
-    [session, range.fromMs, range.toMs],
+    [session, range.fromMs, range.toMs, dataRevision],
   );
 
   const sorted = useMemo(() => {
@@ -67,15 +92,24 @@ export default function CostPage() {
     return list;
   }, [rows, sortKey, sortAsc]);
 
-  const totals = useMemo(() => rows.reduce((acc, r) => ({
-    revenue: acc.revenue + r.revenueAed,
-    cost: acc.cost + r.costAed,
-    fuel: acc.fuel + (r.fuelAed ?? 0),
-    idle: acc.idle + (r.idleAed ?? 0),
-    maintenance: acc.maintenance + r.maintenanceAed,
-    fixed: acc.fixed + (r.fixedAed ?? 0),
-    operator: acc.operator + (r.operatorAed ?? 0),
-  }), { revenue: 0, cost: 0, fuel: 0, idle: 0, maintenance: 0, fixed: 0, operator: 0 }), [rows]);
+  const totals = useMemo(() => {
+    const sumOptional = (values: (number | null)[]) => values.some(value => value === null)
+      ? null
+      : values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    const revenue = rows.reduce((sum, row) => sum + row.revenueAed, 0);
+    const cost = rows.reduce((sum, row) => sum + row.costAed, 0);
+    return {
+      revenue,
+      cost,
+      fuel: sumOptional(rows.map(row => row.fuelAed)),
+      idle: sumOptional(rows.map(row => row.idleAed)),
+      maintenance: rows.reduce((sum, row) => sum + row.maintenanceAed, 0),
+      fixed: sumOptional(rows.map(row => row.fixedAed)),
+      operator: sumOptional(rows.map(row => row.operatorAed)),
+      margin: revenue - cost,
+      hasUnmeasuredCosts: rows.some(hasUnmeasuredOptionalCost),
+    };
+  }, [rows]);
 
   if (!session) return null;
 
@@ -103,19 +137,24 @@ export default function CostPage() {
     );
   }
 
+  if (!priceReady) {
+    return <div className="p-4 text-sm text-grey-500">Loading cost inputs…</div>;
+  }
+
   const openRow = sorted.find(r => r.asset.id === openAssetId) ?? null;
 
   const fleetTable: ExportTable = {
     title: `Cost & ROI — ${range.label}`,
-    columns: ['Asset', 'Revenue', 'Fuel', 'Idle', 'Maintenance', 'Fixed', 'Operator', 'Total cost', 'Margin', 'Margin %', 'Utilisation %'],
+    columns: ['Asset', 'Revenue', 'Fuel', 'Idle', 'Maintenance', 'Fixed', 'Operator', 'Known cost total*', 'Known margin*', 'Margin %*', 'Utilisation %'],
     rows: sorted.map(r => [
       r.asset.code, money(r.revenueAed) ?? 'Not measured', money(r.fuelAed) ?? 'Not measured',
       money(r.idleAed) ?? 'Not measured', money(r.maintenanceAed) ?? '0', money(r.fixedAed) ?? 'Not measured',
-      money(r.operatorAed) ?? 'Not measured', money(r.costAed) ?? '0', money(r.marginAed) ?? '0',
-      r.marginPct === null ? '—' : r.marginPct, r.utilisationPct,
+      money(r.operatorAed) ?? 'Not measured', `${money(r.costAed) ?? '0'}${hasUnmeasuredOptionalCost(r) ? '*' : ''}`,
+      `${money(r.marginAed) ?? '0'}${hasUnmeasuredOptionalCost(r) ? '*' : ''}`,
+      r.marginPct === null ? '—' : `${r.marginPct}${hasUnmeasuredOptionalCost(r) ? '*' : ''}`, r.utilisationPct,
     ]),
   };
-  const fleetMeta = { fileName: 'kasper-cost-roi', subtitle: `Fleet view · ${range.label} · dummy rates` };
+  const fleetMeta = { fileName: 'kasper-cost-roi', subtitle: `Fleet view · ${range.label} · dummy rates · * Known totals exclude Not measured lines` };
 
   const header = (label: string, key: SortKey, align: 'left' | 'right' = 'right') => (
     <th className={clsx('px-3 py-2 font-medium', align === 'left' ? 'text-left' : 'text-right')}>
@@ -139,9 +178,9 @@ export default function CostPage() {
             <h1 className="text-lg font-semibold text-ink">Cost &amp; ROI</h1>
             <Badge variant="grey">Draft</Badge>
           </div>
-          <p className="text-sm text-grey-500 mt-1">
-            What each asset earned and what it cost to run. Rates are dummy; every line says where its number came from.
-          </p>
+            <p className="mt-1 text-sm text-grey-500">
+              Planning estimates only — not billing-grade. Every cost line shows its basis.
+            </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => downloadXlsx(fleetMeta, [fleetTable])}>Excel</Button>
@@ -161,7 +200,7 @@ export default function CostPage() {
             {p.label}
           </Button>
         ))}
-        <span className="text-xs text-grey-500 ml-auto">{range.label} · diesel AED {getDieselPrice().toFixed(2)}/L (dummy)</span>
+        <span className="ml-auto flex items-center gap-2 text-xs text-grey-500">{range.label} · diesel AED {getDieselPrice().toFixed(2)}/L (dummy) <Link href="/app/settings" className="underline underline-offset-2 hover:text-ink">Change in Settings</Link></span>
       </div>
 
       {toast && (
@@ -186,9 +225,9 @@ export default function CostPage() {
               {header('Maintenance', 'maintenanceAed')}
               {header('Fixed', 'fixedAed')}
               {header('Operator', 'operatorAed')}
-              {header('Total cost', 'costAed')}
-              {header('Margin', 'marginAed')}
-              {header('Margin %', 'marginPct')}
+              {header('Known cost', 'costAed')}
+              {header('Known margin*', 'marginAed')}
+              {header('Margin %*', 'marginPct')}
               {header('Utilisation', 'utilisationPct')}
             </tr>
           </thead>
@@ -209,11 +248,11 @@ export default function CostPage() {
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right">
                   <div><Amount value={r.fuelAed} /></div>
-                  <SourceLabel source={r.lines.find(l => l.key === 'fuel')!.basis === 'ECU (ALL-CAN300)' ? 'ECU (ALL-CAN300)' : 'Estimated'} className="mt-0.5" />
+                  <SourceLabel source={r.lines.find(l => l.key === 'fuel')?.basis ?? 'Not measured'} className="mt-0.5" />
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right">
                   <div><Amount value={r.idleAed} /></div>
-                  <SourceLabel source={r.idleAed === null ? 'Not measured' : 'ECU (ALL-CAN300)'} className="mt-0.5" />
+                  <SourceLabel source={r.lines.find(l => l.key === 'idle')?.basis ?? 'Not measured'} className="mt-0.5" />
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right">
                   <div><Amount value={r.maintenanceAed} /></div>
@@ -227,14 +266,15 @@ export default function CostPage() {
                   <div><Amount value={r.operatorAed} /></div>
                   <SourceLabel source={r.operatorAed === null ? 'Not measured' : 'Dummy rate'} className="mt-0.5" />
                 </td>
-                <td className="px-3 py-2 border-b border-line text-right font-mono text-ink">
-                  {money(r.costAed)}
+                <td className="px-3 py-2 border-b border-line text-right font-mono text-ink" title="Measured and estimated amounts only; Not measured lines are excluded.">
+                  {money(r.costAed)}{hasUnmeasuredOptionalCost(r) ? '*' : ''}
+                  {hasUnmeasuredOptionalCost(r) && <div className="text-[10px] font-sans text-grey-500">Known costs</div>}
                 </td>
-                <td className={clsx('px-3 py-2 border-b border-line text-right font-mono', r.marginAed < 0 ? 'text-red' : 'text-green')}>
-                  {money(r.marginAed)}
+                <td className={clsx('px-3 py-2 border-b border-line text-right font-mono', r.marginAed < 0 ? 'text-red' : 'text-green')} title="Known margin before any Not measured costs.">
+                  {money(r.marginAed)}{hasUnmeasuredOptionalCost(r) ? '*' : ''}
                 </td>
-                <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">
-                  {r.marginPct === null ? '—' : `${r.marginPct}%`}
+                <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700" title={hasUnmeasuredOptionalCost(r) ? 'Known margin percentage before Not measured costs.' : undefined}>
+                  {r.marginPct === null ? '—' : `${r.marginPct}%${hasUnmeasuredOptionalCost(r) ? '*' : ''}`}
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{r.utilisationPct}%</td>
               </tr>
@@ -257,9 +297,9 @@ export default function CostPage() {
                 <td className="px-3 py-2 text-right font-mono">{money(totals.maintenance)}</td>
                 <td className="px-3 py-2 text-right font-mono">{money(totals.fixed)}</td>
                 <td className="px-3 py-2 text-right font-mono">{money(totals.operator)}</td>
-                <td className="px-3 py-2 text-right font-mono">{money(totals.cost)}</td>
-                <td className={clsx('px-3 py-2 text-right font-mono', totals.revenue - totals.cost < 0 ? 'text-red' : 'text-green')}>
-                  {money(totals.revenue - totals.cost)}
+                <td className="px-3 py-2 text-right font-mono" title="Known costs only; Not measured lines are excluded.">{money(totals.cost)}{totals.hasUnmeasuredCosts ? '*' : ''}</td>
+                <td className={clsx('px-3 py-2 text-right font-mono', totals.margin < 0 ? 'text-red' : 'text-green')} title="Known margin before any Not measured costs.">
+                  {money(totals.margin)}{totals.hasUnmeasuredCosts ? '*' : ''}
                 </td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2" />
@@ -270,7 +310,7 @@ export default function CostPage() {
       </div>
 
       <p className="text-xs text-grey-500">
-        Click an asset for its six-month chart, ROI and cost inputs. Lines with no basis read “Not measured”, never 0.
+        Click an asset for its six-month chart, ROI and cost inputs. Lines with no basis read “Not measured”, never 0. An asterisk marks known costs and margin before unmeasured lines are included.
       </p>
 
       {openRow && (
@@ -300,18 +340,22 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
   const series = monthlySeries(asset, 6);
   const max = Math.max(1, ...series.map(p => Math.max(p.revenueAed, p.costAed)));
   const profile = row.profile;
+  const hasUnmeasuredCosts = hasUnmeasuredOptionalCost(row);
+  const roiHasPurchaseValue = Boolean(profile && profile.purchaseValueAed > 0);
+  const roiNote = profile && profile.purchaseValueAed <= 0
+    ? 'Add a purchase value greater than AED 0 to calculate ROI.'
+    : roi.note;
   const [purchaseValue, setPurchaseValue] = useState(String(profile?.purchaseValueAed ?? ''));
   const [finance, setFinance] = useState(String(profile?.monthlyFinanceAed ?? ''));
   const [operatorRate, setOperatorRate] = useState(String(profile?.operatorCostPerHourAed ?? ''));
   const [insurance, setInsurance] = useState(String(profile?.insurancePerMonthAed ?? ''));
-  const [diesel, setDiesel] = useState(String(getDieselPrice()));
 
   return (
     <Sheet open onClose={onClose} title={`${asset.code} · ${asset.name}`} width="lg">
       <div className="space-y-5">
         {/* Six-month chart */}
         <div>
-          <h2 className="text-sm font-medium text-ink mb-2">Revenue vs cost — last 6 months</h2>
+          <h2 className="text-sm font-medium text-ink mb-2">Revenue vs known cost* — last 6 months</h2>
           <div className="flex items-end gap-3 h-32">
             {series.map(p => (
               <div key={p.label} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
@@ -333,25 +377,26 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
           </div>
           <div className="flex gap-3 text-[11px] text-grey-500 mt-2">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-green/60 rounded-sm" /> Revenue</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red/50 rounded-sm" /> Cost</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red/50 rounded-sm" /> Known cost*</span>
           </div>
+          <p className="mt-1 text-[11px] text-grey-500">* Known costs omit lines marked Not measured.</p>
         </div>
 
         {/* ROI */}
         <div className="bg-surface border border-line rounded-lg p-3 grid grid-cols-2 gap-3">
           <div>
-            <div className="text-xs text-grey-500">ROI to date</div>
+            <div className="text-xs text-grey-500">ROI to date{hasUnmeasuredCosts ? '*' : ''}</div>
             <div className="text-lg font-semibold text-ink">
-              {roi.roiPct === null ? 'Not enough data' : `${roi.roiPct}%`}
+              {roi.roiPct === null || !roiHasPurchaseValue ? 'Not enough data' : `${roi.roiPct}%${hasUnmeasuredCosts ? '*' : ''}`}
             </div>
           </div>
           <div>
-            <div className="text-xs text-grey-500">Payback estimate</div>
+            <div className="text-xs text-grey-500">Payback estimate{hasUnmeasuredCosts ? '*' : ''}</div>
             <div className="text-lg font-semibold text-ink">
-              {roi.paybackMonths === null ? 'Not enough data' : `${roi.paybackMonths} months`}
+              {roi.paybackMonths === null || !roiHasPurchaseValue ? 'Not enough data' : `${roi.paybackMonths} months${hasUnmeasuredCosts ? '*' : ''}`}
             </div>
           </div>
-          <p className="col-span-2 text-[11px] text-grey-500">{roi.note}</p>
+          <p className="col-span-2 text-[11px] text-grey-500">{roiNote}{hasUnmeasuredCosts ? ' * Known ROI and payback exclude lines marked Not measured.' : ''}</p>
         </div>
 
         {/* Cost lines */}
@@ -372,13 +417,13 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
                 </tr>
               ))}
               <tr className="bg-paper-2">
-                <td className="px-3 py-2 font-medium text-ink">Margin</td>
+                <td className="px-3 py-2 font-medium text-ink">{hasUnmeasuredCosts ? 'Known margin*' : 'Margin'}</td>
                 <td className={clsx('px-3 py-2 text-right font-mono', row.marginAed < 0 ? 'text-red' : 'text-green')}>
-                  {money(row.marginAed)}
+                  {money(row.marginAed)}{hasUnmeasuredCosts ? '*' : ''}
                 </td>
                 <td className="px-3 py-2 text-grey-500" colSpan={2}>
-                  {row.marginPct === null ? 'No revenue in this period' : `${row.marginPct}% of revenue`}
-                  {' · '}utilisation {row.utilisationPct}%
+                  {row.marginPct === null ? 'No revenue in this period' : `${row.marginPct}%${hasUnmeasuredCosts ? '*' : ''} of revenue`}
+                  {' · '}utilisation {row.utilisationPct}%{hasUnmeasuredCosts ? ' · excludes Not measured costs' : ''}
                 </td>
               </tr>
             </tbody>
@@ -414,38 +459,27 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
             <Button
               size="sm"
               onClick={() => {
+                const rawValues = [purchaseValue, finance, operatorRate, insurance];
+                if (rawValues.some(value => value.trim() === '' || !Number.isFinite(Number(value)) || Number(value) < 0)) {
+                  onResult('error', 'Enter a non-negative value for each cost input. Use 0 when there is no cost.');
+                  return;
+                }
                 const result = saveCostProfile(session, {
                   assetId: asset.id,
-                  purchaseValueAed: Number(purchaseValue || 0),
-                  monthlyFinanceAed: Number(finance || 0),
-                  operatorCostPerHourAed: Number(operatorRate || 0),
-                  insurancePerMonthAed: Number(insurance || 0),
+                  purchaseValueAed: Number(purchaseValue),
+                  monthlyFinanceAed: Number(finance),
+                  operatorCostPerHourAed: Number(operatorRate),
+                  insurancePerMonthAed: Number(insurance),
                 });
                 onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
               }}
             >
               Save cost profile
             </Button>
-            <label className="text-xs text-grey-500">
-              Diesel price (AED/L, company setting)
-              <span className="flex items-center gap-2 mt-1">
-                <input value={diesel} onChange={e => setDiesel(e.target.value)} inputMode="decimal"
-                  className="w-24 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const result = setDieselPrice(session, Number(diesel));
-                    onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
-                  }}
-                >
-                  Set price
-                </Button>
-              </span>
-            </label>
+            <Link href="/app/settings" className="text-xs text-grey-700 underline underline-offset-2 hover:text-ink">Diesel price in Settings</Link>
           </div>
           <p className="text-[11px] text-grey-500">
-            Purchase value drives ROI and payback; finance and insurance are pro-rated to the period. All rates are dummy.
+            Purchase value drives ROI and payback; finance and insurance are pro-rated to the period. All rates are dummy. The chart excludes lines marked Not measured.
           </p>
         </div>
 
