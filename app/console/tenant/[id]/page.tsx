@@ -8,6 +8,11 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasCapability } from '@/server/access';
+import { canManageBookings, extendBooking, shortenBooking } from '@/server/bookings';
+import { deactivateUser, reactivateUser, updateUserName, updateUserRole } from '@/server/team';
+import { suspendTenant, unsuspendTenant, updateTenant } from '@/server/tenants';
+import * as clock from '@/lib/clock';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -182,11 +187,33 @@ function TenantSites({ tenantId }: { tenantId: string }) {
 }
 
 function TenantUsers({ tenantId }: { tenantId: string }) {
+  const store = useStore;
+  const session = store.getState().session;
   const users = seed.users.filter(u => u.tenantId === tenantId);
   const activeAdmins = users.filter(u => u.role === 'tenant_admin' && u.status === 'active');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'tenant_admin' | 'site_user'>('site_user');
+  const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [, setVersion] = useState(0);
+
+  const canManage = Boolean(session && hasCapability(session, 'users.manage'));
+  const show = (tone: 'ok' | 'error', text: string) => {
+    setToast({ tone, text });
+    setVersion(v => v + 1);
+  };
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <div className={
+          toast.tone === 'ok'
+            ? 'text-sm text-ink bg-green/10 border border-green/30 rounded-lg px-3 py-2'
+            : 'text-sm text-red bg-red/10 border border-red/30 rounded-lg px-3 py-2'
+        }>
+          {toast.text}
+        </div>
+      )}
       {activeAdmins.length < 1 && users.length > 0 && (
         <div className="bg-yellow/10 border border-yellow/30 text-yellow-dark text-sm px-4 py-3 rounded-lg">
           Every company needs at least one Tenant Admin.
@@ -207,7 +234,8 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
           </thead>
           <tbody>
             {users.map(u => (
-              <tr key={u.id} className="bg-paper hover:bg-paper-2">
+              <React.Fragment key={u.id}>
+              <tr className="bg-paper hover:bg-paper-2">
                 <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
                 <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
                 <td className="px-3 py-2 border-b border-line">
@@ -227,16 +255,97 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
                   </Badge>
                 </td>
                 <td className="px-3 py-2 text-right border-b border-line">
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="secondary" size="sm">Edit</Button>
-                    {u.status === 'active' ? (
-                      <Button variant="danger" size="sm">Deactivate</Button>
-                    ) : (
-                      <Button variant="secondary" size="sm">Reactivate</Button>
-                    )}
-                  </div>
+                  {canManage ? (
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setEditing(editing === u.id ? null : u.id);
+                          setName(u.name);
+                          setRole(u.role === 'tenant_admin' ? 'tenant_admin' : 'site_user');
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      {u.status === 'active' ? (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            if (!session) return;
+                            const result = deactivateUser(session, u.id);
+                            show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                          }}
+                        >
+                          Deactivate
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            if (!session) return;
+                            const result = reactivateUser(session, u.id);
+                            show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                          }}
+                        >
+                          Reactivate
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-grey-400">{u.status === 'active' ? 'Active' : 'Inactive'}</span>
+                  )}
                 </td>
               </tr>
+              {editing === u.id && (
+                <tr className="bg-paper-2">
+                  <td colSpan={6} className="px-3 py-3 border-b border-line">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="text-xs text-grey-500">
+                        Name
+                        <input
+                          value={name}
+                          onChange={e => setName(e.target.value)}
+                          className="block mt-1 px-3 py-1.5 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                        />
+                      </label>
+                      <label className="text-xs text-grey-500">
+                        Role
+                        <select
+                          value={role}
+                          onChange={e => setRole(e.target.value as 'tenant_admin' | 'site_user')}
+                          className="block mt-1 px-3 py-1.5 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                        >
+                          <option value="tenant_admin">Tenant Admin</option>
+                          <option value="site_user">Site User</option>
+                        </select>
+                      </label>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (!session) return;
+                          if (name.trim() !== u.name) {
+                            const renamed = updateUserName(session, u.id, name);
+                            if (!renamed.ok) return show('error', renamed.error!);
+                          }
+                          if (role !== u.role) {
+                            const rerolled = updateUserRole(session, u.id, role);
+                            if (!rerolled.ok) return show('error', rerolled.error!);
+                          }
+                          show('ok', `${name.trim()} updated.`);
+                          setEditing(null);
+                        }}
+                      >
+                        Save
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
             {users.length === 0 && (
               <tr className="bg-paper">
@@ -259,7 +368,9 @@ function TenantAssets({ tenantId }: { tenantId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-medium text-grey-500">Assets ({assets.length})</h3>
-        <Button size="sm">Add asset</Button>
+        <Link href="/console/assets">
+          <Button size="sm">Add asset</Button>
+        </Link>
       </div>
 
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
@@ -325,11 +436,31 @@ function TenantAssets({ tenantId }: { tenantId: string }) {
 }
 
 function TenantBookings({ tenantId }: { tenantId: string }) {
+  const store = useStore;
+  const session = store.getState().session;
   const bookings = seed.bookings.filter(b => b.ownerTenantId === tenantId);
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
+  const [changing, setChanging] = useState<{ id: string; mode: 'extend' | 'shorten' } | null>(null);
+  const [newEnd, setNewEnd] = useState('');
+  const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [, setVersion] = useState(0);
+
+  const show = (tone: 'ok' | 'error', text: string) => {
+    setToast({ tone, text });
+    setVersion(v => v + 1);
+  };
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <div className={
+          toast.tone === 'ok'
+            ? 'text-sm text-ink bg-green/10 border border-green/30 rounded-lg px-3 py-2'
+            : 'text-sm text-red bg-red/10 border border-red/30 rounded-lg px-3 py-2'
+        }>
+          {toast.text}
+        </div>
+      )}
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <table className="w-full text-xs border-collapse">
           <thead>
@@ -346,14 +477,15 @@ function TenantBookings({ tenantId }: { tenantId: string }) {
           <tbody>
             {bookings.map(b => {
               const asset = assets.find(a => a.id === b.assetId);
-              const renter = seed.users.find(u => u.id === b.renterName);
+              const canChange = session ? canManageBookings(session, asset ?? assets[0]) : false;
+              const isOpen = b.status === 'active' || b.status === 'scheduled';
               return (
                 <tr key={b.id} className="bg-paper hover:bg-paper-2">
                   <td className="px-3 py-2 border-b border-line font-mono text-grey-700">
                     {asset?.code ?? '—'}
                   </td>
                   <td className="px-3 py-2 border-b border-line text-grey-700">
-                    {renter?.name ?? '—'}
+                    {b.renterName ?? (b.renterTenantId ? seed.tenants.find(t => t.id === b.renterTenantId)?.name : null) ?? '—'}
                   </td>
                   <td className="px-3 py-2 border-b border-line text-grey-700">
                     {b.renterSiteId ? seed.sites.find(s => s.id === b.renterSiteId)?.name ?? b.renterSiteId : '—'}
@@ -373,10 +505,32 @@ function TenantBookings({ tenantId }: { tenantId: string }) {
                     }>{b.status}</Badge>
                   </td>
                   <td className="px-3 py-2 text-right border-b border-line">
-                    <div className="flex gap-1 justify-end">
-                      <Button variant="secondary" size="sm">Extend</Button>
-                      <Button variant="secondary" size="sm">Shorten</Button>
-                    </div>
+                    {canChange && isOpen ? (
+                      <div className="flex gap-1 justify-end">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setChanging({ id: b.id, mode: 'extend' });
+                            setNewEnd(clock.dubaiToIso(Number(b.end)).slice(0, 10));
+                          }}
+                        >
+                          Extend
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setChanging({ id: b.id, mode: 'shorten' });
+                            setNewEnd(clock.dubaiToIso(Number(b.end)).slice(0, 10));
+                          }}
+                        >
+                          Shorten
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-grey-400 text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -391,6 +545,41 @@ function TenantBookings({ tenantId }: { tenantId: string }) {
           </tbody>
         </table>
       </div>
+
+      {changing && (
+        <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
+          <h2 className="text-sm font-medium text-ink">
+            {changing.mode === 'extend' ? 'Extend' : 'Shorten'} {bookings.find(b => b.id === changing.id)?.reference}
+          </h2>
+          <label className="text-xs text-grey-500">
+            New end date (Dubai)
+            <input
+              type="date"
+              value={newEnd}
+              onChange={e => setNewEnd(e.target.value)}
+              className="block mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+            />
+          </label>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!session) return;
+                const endMs = new Date(`${newEnd}T18:00:00+04:00`).getTime();
+                const result = changing.mode === 'extend'
+                  ? extendBooking(session, changing.id, endMs)
+                  : shortenBooking(session, changing.id, endMs);
+                show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                if (result.ok) setChanging(null);
+              }}
+            >
+              {changing.mode === 'extend' ? 'Extend booking' : 'Shorten booking'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setChanging(null)}>Cancel</Button>
+          </div>
+          <p className="text-xs text-grey-500">Extending pushes the access window out; shortening ends it at 18:00 Dubai on the date you pick.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -539,9 +728,20 @@ export default function TenantPage() {
   const session = store.getState().session;
 
   const [activeTab, setActiveTab] = useState('overview');
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'vendor' | 'client' | 'both'>('vendor');
+  const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [, setVersion] = useState(0);
 
   const tenantId = params.id as string;
   const tenant = seed.tenants.find(t => t.id === tenantId);
+  const canManage = Boolean(session && hasCapability(session, 'console.tenants.manage'));
+
+  const show = (tone: 'ok' | 'error', text: string) => {
+    setToast({ tone, text });
+    setVersion(v => v + 1);
+  };
 
   if (!session || !session.isKasper) {
     return (
@@ -572,15 +772,98 @@ export default function TenantPage() {
             Tenant details and management. Changes here are audited.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm">Edit tenant</Button>
-          {tenant.status === 'active' ? (
-            <Button variant="danger" size="sm">Suspend</Button>
-          ) : (
-            <Button variant="secondary" size="sm">Unsuspend</Button>
-          )}
-        </div>
+        {canManage && (
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setEditing(!editing);
+                setName(tenant.name);
+                setType(tenant.type);
+              }}
+            >
+              Edit tenant
+            </Button>
+            {tenant.status === 'active' ? (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  if (!session) return;
+                  const result = suspendTenant(session, tenant.id);
+                  show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                }}
+              >
+                Suspend
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (!session) return;
+                  const result = unsuspendTenant(session, tenant.id);
+                  show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                }}
+              >
+                Unsuspend
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
+      {toast && (
+        <div className={
+          toast.tone === 'ok'
+            ? 'text-sm text-ink bg-green/10 border border-green/30 rounded-lg px-3 py-2'
+            : 'text-sm text-red bg-red/10 border border-red/30 rounded-lg px-3 py-2'
+        }>
+          {toast.text}
+        </div>
+      )}
+
+      {editing && canManage && (
+        <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
+          <h2 className="text-sm font-medium text-ink">Edit company</h2>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-xs text-grey-500">
+              Name
+              <input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="block mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              />
+            </label>
+            <label className="text-xs text-grey-500">
+              Type
+              <select
+                value={type}
+                onChange={e => setType(e.target.value as 'vendor' | 'client' | 'both')}
+                className="block mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              >
+                <option value="vendor">Vendor</option>
+                <option value="client">Client</option>
+                <option value="both">Vendor + Client</option>
+              </select>
+            </label>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!session) return;
+                const result = updateTenant(session, tenant.id, { name, type });
+                show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                if (result.ok) setEditing(false);
+              }}
+            >
+              Save changes
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+          <p className="text-xs text-grey-500">Every change here writes an audit entry.</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs tabs={tenantTabs} activeId={activeTab} onChange={setActiveTab} />
