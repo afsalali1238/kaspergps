@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
@@ -11,7 +11,7 @@ import { ANCHOR_MS } from '@/server/seed/data';
 import type { Session } from '@/domain/types';
 import { FeaturesPanel } from './FeaturesPanel';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function roleShort(role: string): string {
   const map: Record<string, string> = {
@@ -115,6 +115,26 @@ export function DemoBar() {
   const [clockOpen, setClockOpen] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string);
+        if (data.demoSwitches) useStore.getState().setDemoSwitches(data.demoSwitches);
+        if (data.clockOffsetMs != null) useStore.getState().setClockOffsetMs(data.clockOffsetMs);
+        if (data.session) useStore.getState().setSession(data.session);
+      } catch (err) {
+        console.error('Invalid demo state file:', err);
+      }
+    };
+    reader.readAsText(file);
+    setToolsOpen(false);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
 
   const gs = useStore.getState;
@@ -221,90 +241,19 @@ export function DemoBar() {
                       )}
                     >
                       <span className="truncate">
-                        <span className="text-paper font-medium">{user.name}</span>
-                        <span className="text-paper/60 ml-1">— {roleShort(user.role)}</span>
-                        {user.siteIds.length > 0 && (
-                          <span className="text-paper/40 ml-1 text-[10px]">· {seed.sites.find(s => s.id === user.siteIds[0])?.name}</span>
-                        )}
+                        <span className="text-paper/90">{user.name}</span>
                       </span>
-                      {user.status === 'deactivated' && (
-                        <span className="text-red/60 text-[9px] font-mono flex-shrink-0">off</span>
-                      )}
-                      {user.status === 'invited' && (
-                        <span className="text-blue-400/80 text-[9px] font-mono flex-shrink-0">invited</span>
-                      )}
+                      <span className="text-paper/50 flex-shrink-0">
+                        {roleShort(user.role)}
+                      </span>
                     </button>
                   ))}
                 </div>
               ))}
-              {/* Outside hirer + Signed out */}
-              <div className="border-t border-[#2a2c30] pt-1">
-                <div className="px-3 py-1.5 text-[10px] text-paper/50 font-mono uppercase">Quick links</div>
-                <button
-                  onClick={() => { router.push('/t/k7Qm2Xc9TpLw4ZaN8rVb3Ye5'); setViewAsOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-paper/70 hover:bg-white/5 transition-colors"
-                >
-                  Outside hirer (FB-12 link)
-                </button>
-                <button
-                  onClick={() => { router.push('/sign-in'); useStore.getState().setSession(null); setViewAsOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-paper/70 hover:bg-white/5 transition-colors"
-                >
-                  Signed out
-                </button>
-              </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Clock */}
-      <div className="flex-shrink-0 relative">
-        <button
-          onClick={() => setClockOpen(!clockOpen)}
-          className="bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors font-mono whitespace-nowrap border border-[#2a2c30]"
-        >
-          {currentDateStr} {currentTimeStr}
-          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="ml-1 text-paper/60">
-            <path d="M2 3l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-        </button>
-
-        {clockOpen && (
-          <div className="absolute top-full left-0 mt-1 w-64 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-[#2a2c30]">
-              <div className="text-center text-xs text-paper font-mono py-1">
-                {clocklib.formatDubaiDate(clocklib.now())} {clocklib.formatDubaiTime(clocklib.now())}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-1 p-2">
-              <ClockButton label="−1h" onClick={() => { clocklib.jumpBackHours(1); useStore.getState().setClockOffsetMs(clocklib.getOffsetMs()); }} />
-              <ClockButton label="−1d" onClick={() => { clocklib.jumpBackDays(1); useStore.getState().setClockOffsetMs(clocklib.getOffsetMs()); }} />
-              <ClockButton label="+1h" onClick={() => { clocklib.jumpForwardHours(1); useStore.getState().setClockOffsetMs(clocklib.getOffsetMs()); }} />
-              <ClockButton label="+1d" onClick={() => { clocklib.jumpForwardDays(1); useStore.getState().setClockOffsetMs(clocklib.getOffsetMs()); }} />
-              <ClockButton label="+1w" onClick={() => { clocklib.jumpForwardDays(7); useStore.getState().setClockOffsetMs(clocklib.getOffsetMs()); }} />
-              <ClockButton label="Reset" onClick={() => { clocklib.resetOffset(); useStore.getState().resetClock(); setClockOpen(false); }} isReset />
-            </div>
-            <div className="border-t border-[#2a2c30] p-2 max-h-48 overflow-y-auto">
-              <div className="text-[10px] text-paper/50 font-mono mb-1 px-1">Jump to</div>
-              {jumpToPresets().map(preset => (
-                <button
-                  key={preset.label}
-                  onClick={() => {
-                    preset.jump();
-                    useStore.getState().setClockOffsetMs(clocklib.getOffsetMs());
-                    setClockOpen(false);
-                  }}
-                  className="w-full text-left px-2 py-1 text-xs text-paper/80 hover:bg-white/5 transition-colors"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Phase switch */}
       <div className="flex-shrink-0 flex items-center bg-[#1a1b20] border border-[#2a2c30] rounded-lg overflow-hidden">
         {(['day_one', 'phase2', 'later'] as const).map(p => (
@@ -441,6 +390,39 @@ export function DemoBar() {
                 >
                   Reset demo data
                 </button>
+                <button
+                  onClick={() => {
+                    const state = useStore.getState();
+                    const blob = new Blob([JSON.stringify({
+                      demoSwitches: state.demoSwitches,
+                      clockOffsetMs: state.clockOffsetMs,
+                      session: state.session,
+                    }, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'kasper-demo-state-' + new Date().toISOString().slice(0,10) + '.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setToolsOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-paper/80 hover:bg-white/5 transition-colors"
+                >
+                  Export demo state (JSON)
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleImport}
+                />
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="w-full text-left px-3 py-1.5 text-xs text-paper/80 hover:bg-white/5 transition-colors"
+                >
+                  Import demo state (JSON)
+                </button>
               </div>
             </div>
           </div>
@@ -455,7 +437,7 @@ export function DemoBar() {
   );
 }
 
-// ── Clock button sub-component ─────────────────────────────────────────────────
+// ── Clock button sub-component ──────────────────────────────────────────────────
 
 function ClockButton({ label, onClick, isReset }: { label: string; onClick: () => void; isReset?: boolean }) {
   return (
