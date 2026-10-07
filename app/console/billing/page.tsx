@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import type { Tenant } from '@/domain/types';
 
 function formatInvoicePeriod(issuedAt: string | number): string {
   const d = new Date(typeof issuedAt === 'number' ? issuedAt : issuedAt);

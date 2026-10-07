@@ -6,8 +6,6 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
 
 interface Label {
   id: string;
@@ -27,7 +25,7 @@ export default function LabelsPage() {
   const store = useStore;
   const session = store.getState().session;
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
   const [toast, setToast] = useState<string | null>(null);

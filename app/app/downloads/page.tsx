@@ -1,15 +1,11 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import Link from 'next/link';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
-import * as clock from '@/lib/clock';
 import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
 
 interface Download {
   id: string;

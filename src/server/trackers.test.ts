@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { isValidImei, makeImei } from '@/domain/tracker-id';
 import {
-  assetsWithoutTracker, assetPairingHistory, currentPairingForAsset, currentPairingForTracker,
-  currentTrackerForAsset, markTrackerFaulty, pairingHistory, pairTracker, pairingTargetsFor,
+  assetPairingHistory, currentPairingForAsset, currentPairingForTracker,
+  currentTrackerForAsset, markTrackerFaulty, pairingHistory, pairTracker,
   registerTracker, retireTracker, stockTrackers, trackerById, unpairTracker,
   updateTrackerSettings,
 } from './trackers';

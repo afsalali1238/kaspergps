@@ -7,7 +7,6 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import type { Asset, Tracker, User } from '@/domain/types';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +78,6 @@ function AssetsImporter() {
       setRows([]);
       return;
     }
-    const header = parsed[0];
     const dataRows = parsed.slice(1);
     const results: { cells: string[]; errors: string[] }[] = [];
 
@@ -89,9 +87,6 @@ function AssetsImporter() {
       const tenantName = cells[8]?.trim();
       const siteName = cells[9]?.trim();
 
-      // duplicate in file
-      // duplicate in file
-      const seen = new Set<string>();
       // tenant exists
       const tenant = tenants.find(t => t.name.toLowerCase() === tenantName?.toLowerCase());
       if (!tenant) errors.push('Unknown tenant');
@@ -329,7 +324,6 @@ function UsersImporter() {
   const [done, setDone] = useState<string | null>(null);
 
   const tenants = useMemo(() => seed.tenants, []);
-  const sites = useMemo(() => seed.sites, []);
 
   const process = () => {
     const parsed = parseCsvRows(text);
@@ -339,18 +333,18 @@ function UsersImporter() {
       const errors: string[] = [];
       const name = cells[0]?.trim();
       const email = cells[1]?.trim();
-      const role = cells[2]?.trim();
+      const userRole = cells[2]?.trim();
       const tenantName = cells[3]?.trim();
       const siteNames = cells[4]?.trim();
 
       if (!name) errors.push('Name required');
       if (!email) errors.push('Email required');
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Bad email');
-      if (!role) errors.push('Role required');
-      else if (!['tenant_admin', 'site_user', 'kasper_admin', 'kasper_ops'].includes(role)) errors.push('Unknown role');
+      if (!userRole) errors.push('Role required');
+      else if (!['tenant_admin', 'site_user', 'kasper_admin', 'kasper_ops'].includes(userRole)) errors.push('Unknown role');
       const tenant = tenants.find(t => t.name.toLowerCase() === tenantName?.toLowerCase());
       if (!tenant) errors.push('Unknown tenant');
-      if (!siteNames && role === 'site_user') errors.push('Site names required for Site User');
+      if (!siteNames && userRole === 'site_user') errors.push('Site names required for Site User');
       results.push({ cells, errors });
     }
     setRows(results);

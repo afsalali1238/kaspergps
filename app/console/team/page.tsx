@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import type { User } from '@/domain/types';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
