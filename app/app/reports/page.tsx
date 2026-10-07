@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import clsx from 'clsx';
 import {
   Button, EmptyState,
@@ -10,6 +10,8 @@ import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, hasCapability } from '@/server/access';
 import { FEATURES } from '@/domain/features';
+import { getReadingsForAsset } from '@/server/telemetry/simulator';
+import * as XLSX from 'xlsx';
 
 type ReportType = 'trip_mileage' | 'location_history' | 'operating_hours' | 'fuel' | 'utilisation' | 'driving_events';
 type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
@@ -122,6 +124,61 @@ export default function ReportsPage() {
   }, [dateTo]);
 
   const canRunReport = hasCapability(session!, 'report.run');
+
+  // Generate an Excel report from the current selection.
+  const generateReport = useCallback(() => {
+    if (!selectedReport || !canRunReport) return;
+    const assets = visibleAssets;
+    const rows: { Time: string; 'Asset code': string; Speed: string; Ignition: string; Heading: string }[] = [];
+
+    for (const asset of assets) {
+      const endMs = clock.now();
+      const startMs = presetDays != null ? endMs - presetDays * 86400000 : 0;
+      const readings = getReadingsForAsset(asset, startMs, endMs);
+      for (const r of readings) {
+        const t = typeof r.deviceTime === 'number' ? r.deviceTime : new Date(r.deviceTime).getTime();
+        if (t >= startMs && t <= endMs) {
+          rows.push({
+            Time: clock.formatDubaiDateTime(t),
+            'Asset code': asset.code,
+            Speed: `${r.speedKmh.toFixed(1)} km/h`,
+            Ignition: r.ignition ? 'On' : 'Off',
+            Heading: `${Math.round(r.heading)}°`,
+          });
+        }
+      }
+    }
+
+    if (rows.length === 0) {
+      showToast('No data for this period');
+      return;
+    }
+
+    rows.sort((a, b) => a.Time.localeCompare(b.Time));
+
+    const summarySheet = XLSX.utils.json_to_sheet([{
+      Report: REPORT_TYPES.find(r => r.id === selectedReport)?.label ?? selectedReport,
+      Scope: scope === 'single_asset' ? 'Single asset' : scope === 'site' ? 'Site' : 'Multiple assets',
+      From: effectiveDateFrom,
+      To: effectiveDateTo,
+      Format: format === 'pdf' ? 'PDF' : 'Excel',
+      Generated: clock.formatDubaiDateTime(clock.dubaiNow().getTime()),
+      'Number of readings': rows.length,
+    }], { header: ['Report', 'Scope', 'From', 'To', 'Format', 'Generated', 'Number of readings'] });
+
+    const dataSheet = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Data');
+
+    const filename = `Kasper_${selectedReport}_${scope}_${effectiveDateFrom}_to_${effectiveDateTo}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }, [selectedReport, scope, format, effectiveDateFrom, effectiveDateTo, visibleAssets, canRunReport]);
+
+  function showToast(message: string) {
+    // Simple toast via alert for prototype — the demo bar has a proper toast system.
+    console.log('Report:', message);
+  }
 
   if (!session) return null;
 
@@ -302,7 +359,7 @@ export default function ReportsPage() {
               )}
             </div>
             {canRunReport && (
-              <Button onClick={() => {}}>
+              <Button onClick={generateReport}>
                 Run report
               </Button>
             )}
