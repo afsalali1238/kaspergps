@@ -510,11 +510,12 @@ export function DemoBar() {
                       setResetArmed(true);
                       return;
                     }
-                    // In-app state lives in memory: clearing the saved switches and
-                    // reloading puts the whole prototype back to the seeded day one.
+                    // Prototype data lives in memory, so a reload puts every screen
+                    // back to the seeded day one. Switches and clock go back too —
+                    // the signed-in user stays signed in.
+                    useStore.getState().setDemoSwitches({ phase: 'later', showHidden: false, salesView: false });
                     clocklib.resetOffset();
                     useStore.getState().resetClock();
-                    try { localStorage.removeItem('kasper.store.v2'); } catch { /* private mode */ }
                     setResetArmed(false);
                     setToolsOpen(false);
                     window.location.reload();

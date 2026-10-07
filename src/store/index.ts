@@ -1,5 +1,6 @@
 // Client state store for the Kasper GPS prototype.
-// Uses Zustand with persistence for demo switches and clock offset.
+// Uses Zustand with persistence for the demo switches, clock offset and the
+// signed-in session, so a refresh (or a pasted URL) keeps the demo context.
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -76,6 +77,7 @@ export const useStore = create<Store>()(
       name: 'kasper.store.v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        session: state.session,
         demoSwitches: state.demoSwitches,
         clockOffsetMs: state.clockOffsetMs,
       }),
