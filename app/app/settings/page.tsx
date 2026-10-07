@@ -143,7 +143,7 @@ export default function SettingsPage() {
               )}
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleInvite}>{t('settings.users.send_invite', 'Send invite')}</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowInvite(false)}>Cancel</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowInvite(false)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
             </div>
           )}
@@ -244,7 +244,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm">{t('settings.sites.save', 'Save site')}</Button>
-                  <Button variant="secondary" size="sm" onClick={() => setShowAddSite(false)}>Cancel</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setShowAddSite(false)}>{t('common.cancel', 'Cancel')}</Button>
                 </div>
               </div>
             </div>
