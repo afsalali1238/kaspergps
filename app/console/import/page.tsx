@@ -86,12 +86,10 @@ function AssetsImporter() {
     for (const cells of dataRows) {
       const errors: string[] = [];
       const code = cells[0]?.trim();
-      const tenantName = cells[5]?.trim();
-      const siteName = cells[6]?.trim();
-      const imei = cells[1]?.trim();
+      const tenantName = cells[8]?.trim();
+      const siteName = cells[9]?.trim();
 
-      // IMEI Luhn
-      if (imei && !luhnCheck(imei)) errors.push('Bad IMEI check digit');
+      // duplicate in file
       // duplicate in file
       const seen = new Set<string>();
       // tenant exists
