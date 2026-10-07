@@ -362,16 +362,16 @@ export default function BillingPage() {
               {basis === 'hourly' && (
                 <label className="flex items-start gap-2 text-xs text-grey-700">
                   <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 accent-ink" />
-                  Customer has agreed to estimated hours (Tier 1/2 assets bill ignition hours labelled “Estimated — not billing-grade”).
+                  {t('billing.create_note_estimated', 'Customer has agreed to estimated hours (Tier 1/2 assets bill ignition hours labelled “Estimated — not billing-grade”).')}
                 </label>
               )}
               <div className="flex gap-2">
                 <Button size="sm" onClick={submitCreate} disabled={!bookingId}>{t('billing.actions.create_invoice', 'Create invoice')}</Button>
-                <Button size="sm" variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button size="sm" variant="secondary" onClick={() => setCreateOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
               <p className="text-xs text-grey-500">
-                VAT 5 % is added and the due date is 14 days out. Tier 3 hourly invoices use the booking’s MUC billable hours
-                and add a minimum-hours top-up line.
+                {t('billing.create_note_vat', 'VAT 5 % is added and the due date is 14 days out. Tier 3 hourly invoices use the booking’s MUC billable hours')}
+                {t('billing.create_note_topup', 'and add a minimum-hours top-up line.')}
               </p>
             </div>
           )}
@@ -664,9 +664,9 @@ export default function BillingPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    <th className="px-3 py-2 text-left font-medium">Customer</th>
-                    <th className="px-3 py-2 text-right font-medium">Issued</th>
-                    <th className="px-3 py-2 text-right font-medium">Outstanding</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('billing.summary.customer', 'Customer')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('billing.summary.issued', 'Issued')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('billing.summary.outstanding', 'Outstanding')}</th>
                   </tr>
                 </thead>
                 <tbody>

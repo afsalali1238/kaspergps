@@ -276,9 +276,9 @@ export default function SettingsPage() {
                     </td>
                     <td className="px-3 py-2 text-right border-b border-line">
                       <div className="flex gap-1 justify-end">
-                        <Button variant="secondary" size="sm">Edit</Button>
+                        <Button variant="secondary" size="sm">{t('common.edit', 'Edit')}</Button>
                         {s.assetCount === 0 && s.userCount === 0 ? (
-                          <Button variant="danger" size="sm">Delete</Button>
+                          <Button variant="danger" size="sm">{t('common.delete', 'Delete')}</Button>
                         ) : (
                           <span className="text-xs text-grey-400">—</span>
                         )}
@@ -318,36 +318,36 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="EX-15"
+                    placeholder={t('settings.assets.code_placeholder', 'EX-15')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Name</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.name', 'Name')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="Excavator 15"
+                    placeholder={t('settings.assets.name_placeholder', 'Excavator 15')}
                   />
                 </div>
                 <div>
                   <label className="text-xs text-grey-500 font-medium">{t('settings.assets.type', 'Type')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option>excavator</option>
-                    <option>wheel_loader</option>
-                    <option>dozer</option>
-                    <option>crane</option>
-                    <option>pickup</option>
-                    <option>tipper</option>
+                    <option>{t('settings.assets.types.excavator', 'Excavator')}</option>
+                    <option>{t('settings.assets.types.wheel_loader', 'Wheel loader')}</option>
+                    <option>{t('settings.assets.types.dozer', 'Dozer')}</option>
+                    <option>{t('settings.assets.types.crane', 'Crane')}</option>
+                    <option>{t('settings.assets.types.pickup', 'Pickup')}</option>
+                    <option>{t('settings.assets.types.tipper', 'Tipper')}</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-grey-500 font-medium">{t('settings.assets.class', 'Class')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option>plant</option>
-                    <option>lifting</option>
-                    <option>truck</option>
-                    <option>light_vehicle</option>
-                    <option>power</option>
+                    <option>{t('settings.assets.classes.plant', 'Plant')}</option>
+                    <option>{t('settings.assets.classes.lifting', 'Lifting')}</option>
+                    <option>{t('settings.assets.classes.truck', 'Truck')}</option>
+                    <option>{t('settings.assets.classes.light_vehicle', 'Light vehicle')}</option>
+                    <option>{t('settings.assets.classes.power', 'Power')}</option>
                   </select>
                 </div>
                 <div>
@@ -355,7 +355,7 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="CAT"
+                    placeholder={t('settings.assets.make_placeholder', 'CAT')}
                   />
                 </div>
                 <div>

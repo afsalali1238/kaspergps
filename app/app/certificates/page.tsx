@@ -129,8 +129,8 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 
       <div className="bg-paper-2 rounded-lg p-3 border border-line text-sm space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-grey-500">Asset</span>
-          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? 'Unknown'}</span>
+          <span className="text-grey-500">{t('certificates.detail.asset', 'Asset')}</span>
+          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? t('common.unknown', 'Unknown')}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-grey-500">{t('certificates.detail.owner', 'Owner')}</span>
