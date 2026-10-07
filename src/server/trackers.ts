@@ -39,16 +39,18 @@ export function currentTrackerForAsset(assetId: string): Tracker | null {
   return seed.trackers.find(t => t.assetId === assetId && t.stockStatus === 'paired') ?? null;
 }
 
+/** The open pairing comes first, then the closes newest-first. */
+function byOpenThenNewest(a: Pairing, b: Pairing): number {
+  if ((a.to === null) !== (b.to === null)) return a.to === null ? -1 : 1;
+  return toMs(b.from) - toMs(a.from);
+}
+
 export function pairingHistory(trackerId: string): Pairing[] {
-  return seed.pairings
-    .filter(p => p.trackerId === trackerId)
-    .sort((a, b) => toMs(b.from) - toMs(a.from));
+  return seed.pairings.filter(p => p.trackerId === trackerId).sort(byOpenThenNewest);
 }
 
 export function assetPairingHistory(assetId: string): Pairing[] {
-  return seed.pairings
-    .filter(p => p.assetId === assetId)
-    .sort((a, b) => toMs(b.from) - toMs(a.from));
+  return seed.pairings.filter(p => p.assetId === assetId).sort(byOpenThenNewest);
 }
 
 /** Trackers registered but not fitted to any asset. */
