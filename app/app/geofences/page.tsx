@@ -5,6 +5,8 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
+import type { TFunction } from '@/lib/i18n';
 import { seed } from '@/server/seed/data';
 import { isAssetVisible } from '@/server/access';
 
@@ -49,18 +51,21 @@ const GEOFENCES: Geofence[] = [
   },
 ];
 
-function kindLabel(kind: string): string {
-  const labels: Record<string, string> = {
-    site: 'Site',
-    job: 'Job',
-    yard: 'Yard',
-    restricted: 'Restricted',
-  };
-  return labels[kind] ?? kind;
+const KIND_KEYS: Record<string, { key: string; fallback: string }> = {
+  site: { key: 'geofences.kinds.site', fallback: 'Site' },
+  job: { key: 'geofences.kinds.job', fallback: 'Job' },
+  yard: { key: 'geofences.kinds.yard', fallback: 'Yard' },
+  restricted: { key: 'geofences.kinds.restricted', fallback: 'Restricted' },
+};
+
+function kindLabel(kind: string, t: TFunction): string {
+  const entry = KIND_KEYS[kind];
+  return entry ? t(entry.key, entry.fallback) : kind;
 }
 
 export default function GeofencesPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
@@ -86,21 +91,23 @@ export default function GeofencesPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Geofences</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('geofences.title', 'Geofences')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          {phase === 'day_one' ? 'Geofences are available in Phase 2.' : 'Define areas on the map to track asset entry and exit.'}
+          {phase === 'day_one'
+            ? t('geofences.phase2Short', 'Geofences are available in Phase 2.')
+            : t('geofences.subtitle', 'Define areas on the map to track asset entry and exit.')}
         </p>
       </div>
 
       {phase === 'day_one' ? (
         <EmptyState
-          title="Not available"
-          description="Geofences are available in Phase 2."
+          title={t('geofences.notAvailable', 'Not available')}
+          description={t('geofences.phase2', 'Geofences are available in Phase 2.')}
         />
       ) : (
         <>
           <div className="flex gap-2">
-            <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create geofence</Button>
+            <Button onClick={() => setShowCreateForm(!showCreateForm)}>{t('geofences.create', 'Create geofence')}</Button>
           </div>
 
           {toast && (
@@ -111,43 +118,47 @@ export default function GeofencesPage() {
 
           {showCreateForm && (
             <div className="bg-surface border border-line rounded-lg p-4">
-              <h2 className="text-sm font-medium text-ink mb-3">Create geofence</h2>
+              <h2 className="text-sm font-medium text-ink mb-3">{t('geofences.create', 'Create geofence')}</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Name</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('geofences.name', 'Name')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="Geofence name"
+                    placeholder={t('geofences.namePlaceholder', 'Geofence name')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Kind</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('geofences.kind', 'Kind')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="job">Job</option>
-                    <option value="yard">Yard</option>
-                    <option value="restricted">Restricted</option>
+                    {(['job', 'yard', 'restricted'] as const).map(k => (
+                      <option key={k} value={k}>{t(KIND_KEYS[k].key, KIND_KEYS[k].fallback)}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Shape</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('geofences.shape', 'Shape')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="circle">Circle</option>
-                    <option value="polygon">Polygon</option>
+                    <option value="circle">{t('geofences.shapeCircle', 'Circle')}</option>
+                    <option value="polygon">{t('geofences.shapePolygon', 'Polygon')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Assets</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('geofences.assets', 'Assets')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="all">All assets</option>
+                    <option value="all">{t('geofences.allAssets', 'All assets')}</option>
                     {seed.assets.filter(a => isAssetVisible(session, a.id)).map(a => (
                       <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setShowCreateForm(false)}>Cancel</Button>
-                  <Button onClick={() => { setShowCreateForm(false); showToast('Geofence created'); }}>Create</Button>
+                  <Button variant="secondary" onClick={() => setShowCreateForm(false)}>
+                    {t('common.cancel', 'Cancel')}
+                  </Button>
+                  <Button onClick={() => { setShowCreateForm(false); showToast(t('geofences.created', 'Geofence created')); }}>
+                    {t('geofences.createAction', 'Create')}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -160,32 +171,32 @@ export default function GeofencesPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Badge variant={geofence.kind === 'restricted' ? 'red' : geofence.kind === 'site' ? 'green' : 'yellow'}>
-                        {kindLabel(geofence.kind)}
+                        {kindLabel(geofence.kind, t)}
                       </Badge>
                       <span className="font-medium text-ink">{geofence.name}</span>
                     </div>
                     <div className="text-sm text-grey-700 mt-1">
                       {geofence.shape === 'circle'
-                        ? `Circle · ${geofence.radius}m radius`
-                        : `Polygon · ${geofence.points?.length} points`}
+                        ? t('geofences.circleShape', `Circle · ${geofence.radius}m radius`, { radius: geofence.radius ?? 0 })
+                        : t('geofences.polygonShape', `Polygon · ${geofence.points?.length} points`, { count: geofence.points?.length ?? 0 })}
                     </div>
                     <div className="text-xs text-grey-500 mt-1">
-                      {geofence.assetIds === 'all' ? 'All assets' :
+                      {geofence.assetIds === 'all' ? t('geofences.allAssets', 'All assets') :
                         seed.assets.filter(a => geofence.assetIds.includes(a.id)).map(a => a.code).join(', ')}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-grey-500">
-                      {geofence.alerts.enter && <span>Enter: Yes</span>}
-                      {geofence.alerts.exit && <span>Exit: Yes</span>}
-                      {geofence.alerts.afterHours && <span>After hours: Yes</span>}
-                      <span>Events (7d): {geofence.eventsLast7Days}</span>
+                      {geofence.alerts.enter && <span>{t('geofences.alertEnter', 'Enter: Yes')}</span>}
+                      {geofence.alerts.exit && <span>{t('geofences.alertExit', 'Exit: Yes')}</span>}
+                      {geofence.alerts.afterHours && <span>{t('geofences.alertAfterHours', 'After hours: Yes')}</span>}
+                      <span>{t('geofences.events7d', `Events (7d): ${geofence.eventsLast7Days}`, { count: geofence.eventsLast7Days })}</span>
                     </div>
                   </div>
                   <div className="flex gap-1">
                     <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
-                      Edit
+                      {t('common.edit', 'Edit')}
                     </button>
                     <button className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20">
-                      Delete
+                      {t('common.delete', 'Delete')}
                     </button>
                   </div>
                 </div>
@@ -193,8 +204,8 @@ export default function GeofencesPage() {
             ))}
             {visibleGeofences.length === 0 && (
               <EmptyState
-                title="No geofences"
-                description="Create a geofence to track asset entry and exit."
+                title={t('geofences.emptyTitle', 'No geofences')}
+                description={t('geofences.emptyDescription', 'Create a geofence to track asset entry and exit.')}
               />
             )}
           </div>

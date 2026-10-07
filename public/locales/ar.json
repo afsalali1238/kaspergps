@@ -40,7 +40,8 @@
     "off": "مطفأ",
     "last24h": "آخر 24 ساعة",
     "last7d": "آخر 7 أيام",
-    "none": "لا شيء"
+    "none": "لا شيء",
+    "last30d": "آخر 30 يومًا"
   },
   "nav": {
     "map": "الخريطة",
@@ -320,14 +321,35 @@
       "utilisation": "الاستخدام",
       "drivingEvents": "أحداث القيادة",
       "fuel": "الوقود",
-      "geofence": "الأسوار الجغرافية"
+      "geofence": "الأسوار الجغرافية",
+      "tripMileageDescription": "الرحلات والمسافات والعدد الكيلومترية",
+      "locationHistoryDescription": "سجل المواقع عبر الوقت",
+      "operatingHoursDescription": "ساعات الإشعال (تقديرية) وساعات محرك ECU",
+      "fuelDescription": "الوقود المستهلك والتزويد والانخفاضات ولتر/ساعة",
+      "utilisationDescription": "زمن العمل والتشغيل بدون حركة والإطفاء",
+      "drivingEventsDescription": "الأحداث العنيفة وتجاوز السرعة"
     },
     "run": "تشغيل التقرير",
     "scheduleThis": "جدولة هذا التقرير",
     "runCreated": "تم إنشاء التقرير — وهو مُدرج في التنزيلات.",
     "scheduleCreated": "تم حفظ الجدول — راجع صفحة الجداول لمعرفة التشغيل التالي.",
     "fromTo": "من {from} إلى {to}",
-    "assetCount": "{count} أصل"
+    "assetCount": "{count} أصل",
+    "subtitle": "شغّل التقارير على أصولك. اختر نوع التقرير والنطاق والفترة الزمنية.",
+    "noneInPhase": "لا توجد تقارير متاحة في المرحلة الحالية.",
+    "scopeSingle": "أصل واحد",
+    "scopeMultiple": "عدة أصول",
+    "scopeSite": "موقع",
+    "selectAsset": "اختر أصلًا",
+    "selectAssets": "اختر الأصول (اضغط Ctrl/Cmd للاختيار المتعدد)",
+    "to": "إلى",
+    "formatExcel": "Excel (.xlsx)",
+    "formatPdf": "PDF",
+    "phases": {
+      "dayOne": "اليوم الأول",
+      "phase2": "المرحلة 2",
+      "later": "لاحقًا"
+    }
   },
   "downloads": {
     "title": "التنزيلات",
@@ -349,7 +371,8 @@
     "outbox": "صندوق البريد الصادر",
     "outboxNote": "التقارير المجدولة تُرسل هنا — لا يخرج أي شيء فعليًا من هذا العرض التوضيحي.",
     "clearOutbox": "مسح",
-    "outboxEmpty": "لا توجد رسائل بعد. جدول تقريرًا لعرض التسليم هنا."
+    "outboxEmpty": "لا توجد رسائل بعد. جدول تقريرًا لعرض التسليم هنا.",
+    "custom": "مخصص"
   },
   "billing": {
     "title": "الفواتير",
@@ -622,5 +645,49 @@
       "sat": "السبت",
       "sun": "الأحد"
     }
+  },
+  "geofences": {
+    "title": "الأسوار الجغرافية",
+    "subtitle": "حدّد مناطق على الخريطة لتتبع دخول الأصل وخروجه.",
+    "phase2Short": "الأسوار الجغرافية متاحة في المرحلة 2.",
+    "notAvailable": "غير متاح",
+    "phase2": "الأسوار الجغرافية متاحة في المرحلة 2.",
+    "create": "إنشاء سور جغرافي",
+    "created": "تم إنشاء السور الجغرافي",
+    "createAction": "إنشاء",
+    "name": "الاسم",
+    "namePlaceholder": "اسم السور الجغرافي",
+    "kind": "النوع",
+    "shape": "الشكل",
+    "shapeCircle": "دائرة",
+    "shapePolygon": "مضلع",
+    "assets": "الأصول",
+    "allAssets": "كل الأصول",
+    "kinds": {
+      "site": "موقع",
+      "job": "مهمة",
+      "yard": "ساحة",
+      "restricted": "مقيّد"
+    },
+    "circleShape": "دائرة · نصف قطر {radius} م",
+    "polygonShape": "مضلع · {count} نقطة",
+    "alertEnter": "الدخول: نعم",
+    "alertExit": "الخروج: نعم",
+    "alertAfterHours": "بعد ساعات العمل: نعم",
+    "events7d": "الأحداث (7 أيام): {count}",
+    "emptyTitle": "لا توجد أسوار جغرافية",
+    "emptyDescription": "أنشئ سورًا جغرافيًا لتتبع دخول الأصل وخروجه."
+  },
+  "maintenance": {
+    "title": "الصيانة",
+    "notAvailable": "غير متاح",
+    "later": "الصيانة متاحة في مرحلة لاحقة.",
+    "subtitle": "جدولة الصيانة لأصولك."
+  },
+  "cost": {
+    "title": "التكلفة والعائد",
+    "notAvailable": "غير متاح",
+    "later": "التكلفة والعائد متاحة في مرحلة لاحقة.",
+    "subtitle": "تحليل التكلفة والعائد لأصولك."
   }
 }

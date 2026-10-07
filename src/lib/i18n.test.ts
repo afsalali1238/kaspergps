@@ -25,6 +25,9 @@ const WIRED_SOURCES = [
   'app/app/certificates/page.tsx',
   'app/app/settings/page.tsx',
   'app/app/assets/[id]/page.tsx',
+  'app/app/geofences/page.tsx',
+  'app/app/maintenance/page.tsx',
+  'app/app/cost/page.tsx',
 ];
 
 function walk(node: unknown, pathSoFar: string[] = []): { path: string; value: string }[] {
@@ -140,6 +143,21 @@ describe('keys the wired screens ask for', () => {
       'asset.playback.playPeriod',
       'asset.kasperView',
       'common.last24h',
+      'common.last30d',
+      'reports.title',
+      'reports.subtitle',
+      'reports.scopeMultiple',
+      'reports.selectAssets',
+      'reports.formatExcel',
+      'reports.phases.dayOne',
+      'reports.types.fuelDescription',
+      'geofences.title',
+      'geofences.kinds.restricted',
+      'geofences.circleShape',
+      'geofences.events7d',
+      'geofences.emptyDescription',
+      'maintenance.subtitle',
+      'cost.subtitle',
     ]) {
       expect(hasArabic(key), key).toBe(true);
     }
