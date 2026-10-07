@@ -21,6 +21,10 @@ const WIRED_SOURCES = [
   'app/app/downloads/page.tsx',
   'app/app/schedules/page.tsx',
   'app/app/reports/page.tsx',
+  'app/app/alerts/page.tsx',
+  'app/app/certificates/page.tsx',
+  'app/app/settings/page.tsx',
+  'app/app/assets/[id]/page.tsx',
 ];
 
 function walk(node: unknown, pathSoFar: string[] = []): { path: string; value: string }[] {
@@ -115,6 +119,27 @@ describe('keys the wired screens ask for', () => {
       'reports.scheduleThis',
       'reports.types.locationHistory',
       'reports.types.drivingEvents',
+      'alerts.openCount',
+      'alerts.words.faultCode',
+      'alerts.maintenanceDue',
+      'alerts.filters.all',
+      'certificates.tableTitle',
+      'certificates.sealIntact',
+      'certificates.aboutBody',
+      'common.cancel',
+      'settings.subtitle',
+      'settings.users.sendInvite',
+      'settings.sites.mapHint',
+      'settings.assets.classes.lightVehicle',
+      'settings.assets.newAssetNote',
+      'settings.users.needsAdmin',
+      'asset.notFound',
+      'asset.rented',
+      'asset.trips.count',
+      'asset.table.maxSpeed',
+      'asset.playback.playPeriod',
+      'asset.kasperView',
+      'common.last24h',
     ]) {
       expect(hasArabic(key), key).toBe(true);
     }
@@ -168,5 +193,51 @@ describe('lookup behaviour', () => {
 
   it('leaves unknown placeholders alone', () => {
     expect(translate('ar', 'publicTracking.updated', 'Updated 10:00', {})).toContain('{time}');
+  });
+
+  it('keeps the values the screens inject (a translated sentence without the placeholder loses data)', () => {
+    // Every key here is passed vars by a wired screen. If the Arabic template
+    // forgets one, the customer sees a sentence with the number missing.
+    const cases: { key: string; vars: Record<string, string> }[] = [
+      { key: 'asset.lastUpdated', vars: { time: '14:32' } },
+      { key: 'asset.minutesAgo', vars: { count: '4' } },
+      { key: 'asset.offlineSince', vars: { time: '14:32' } },
+      { key: 'asset.rental.rentedTo', vars: { name: 'Marina Builders' } },
+      { key: 'asset.rental.until', vars: { time: '12 Oct 18:00' } },
+      { key: 'asset.rental.from', vars: { time: '7 Oct 08:00' } },
+      { key: 'asset.rental.historyStarts', vars: { time: '7 Oct 08:00' } },
+      { key: 'asset.rental.historyNotice', vars: { time: '7 Oct 08:00' } },
+      { key: 'asset.trackingLinks.expires', vars: { time: '7 Oct 23:59' } },
+      { key: 'asset.kasperView', vars: { owner: 'Al Noor', renter: 'Marina' } },
+      { key: 'asset.trips.count', vars: { count: '2' } },
+      { key: 'alerts.openCount', vars: { count: '4' } },
+      { key: 'alerts.since', vars: { time: '14:32', site: 'Al Quoz Yard' } },
+      { key: 'alerts.acknowledgedBy', vars: { name: 'Omar', time: '09:00' } },
+      { key: 'downloads.generatedAt', vars: { time: '6 Oct 07:00' } },
+      { key: 'downloads.size', vars: { size: '40' } },
+      { key: 'schedules.atHour', vars: { hour: '07' } },
+      { key: 'schedules.nextRun', vars: { time: '7 Oct 07:00' } },
+      { key: 'schedules.lastRun', vars: { time: '6 Oct 07:00' } },
+      { key: 'schedules.deliverTo', vars: { email: 'lina@marina.ae' } },
+      { key: 'schedules.pausedAfterSkips', vars: { count: '2' } },
+      { key: 'schedules.firstRun', vars: { time: '7 Oct 07:00' } },
+      { key: 'reports.fromTo', vars: { from: '1 Oct', to: '6 Oct' } },
+      { key: 'reports.assetCount', vars: { count: '2' } },
+      { key: 'certificates.lastMonth', vars: { month: 'Sep 2026' } },
+      { key: 'publicTracking.arrivingAbout', vars: { time: '10:19', minutes: '19' } },
+      { key: 'publicTracking.arrived', vars: { time: '14:50' } },
+      { key: 'publicTracking.updated', vars: { time: '14:32' } },
+      { key: 'publicTracking.linkCreated', vars: { date: '6 Oct 2026', time: '08:00' } },
+      { key: 'publicTracking.expires', vars: { date: '7 Oct 2026', time: '00:00' } },
+    ];
+
+    const missing = cases
+      .filter(c => {
+        const text = translate('ar', c.key, 'FALLBACK', c.vars);
+        return Object.values(c.vars).some(value => !text.includes(value));
+      })
+      .map(c => c.key);
+
+    expect(missing).toEqual([]);
   });
 });

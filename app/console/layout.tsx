@@ -70,7 +70,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="flex h-screen bg-bg">
+    // The console is English-only: pin its direction even when the demo
+    // language cookie is set to Arabic for the customer screens.
+    <div className="flex h-screen bg-bg" dir="ltr">
       {/* Left nav */}
       <nav className="w-56 bg-surface border-r border-line flex-shrink-0 overflow-y-auto">
         <div className="p-4 border-b border-line">

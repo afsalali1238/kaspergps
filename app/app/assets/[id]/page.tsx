@@ -11,6 +11,7 @@ import {
 } from '@/components/ui';
 import { Player } from '@/components/playback/Player';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability, rentalWindow } from '@/server/access';
@@ -58,10 +59,21 @@ function createMarkerIcon(status: string) {
 
 type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'alerts';
 
+/** Status names, translated on the customer screens only. */
+const STATUS_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
+  live: { key: 'statuses.live', fallback: 'Live' },
+  idle: { key: 'statuses.idle', fallback: 'Idle' },
+  stale: { key: 'statuses.stale', fallback: 'Stale' },
+  offline: { key: 'statuses.offline', fallback: 'Offline' },
+  unknown: { key: 'statuses.unknown', fallback: 'Unknown' },
+  no_tracker: { key: 'statuses.noTracker', fallback: 'No tracker' },
+};
+
 export default function AssetDetailPage() {
   const params = useParams();
   const assetId = params.id as string;
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
@@ -172,12 +184,12 @@ export default function AssetDetailPage() {
   if (!session) return null;
   if (!asset) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset.notFound', 'Asset not found')}</div>
     </div>
   );
   if (!visible) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset.notFound', 'Asset not found')}</div>
     </div>
   );
 
@@ -188,13 +200,13 @@ export default function AssetDetailPage() {
   const canEndAccess = hasCapability(session, 'grant.endEarly');
 
   const tabs: { id: TabId; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
-    { id: 'overview', label: 'Overview', phase: 'day_one', enabled: true },
-    { id: 'history', label: 'History', phase: 'day_one', enabled: true },
-    { id: 'trips', label: 'Trips', phase: 'day_one', enabled: true },
-    { id: 'engine', label: 'Engine & fuel', phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
-    { id: 'driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'alerts', label: 'Alerts', phase: 'day_one', enabled: true },
+    { id: 'overview', label: t('asset.tabs.overview', 'Overview'), phase: 'day_one', enabled: true },
+    { id: 'history', label: t('asset.tabs.history', 'History'), phase: 'day_one', enabled: true },
+    { id: 'trips', label: t('asset.tabs.trips', 'Trips'), phase: 'day_one', enabled: true },
+    { id: 'engine', label: t('asset.tabs.engineAndFuel', 'Engine & fuel'), phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
+    { id: 'driving', label: t('asset.tabs.driving', 'Driving'), phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'utilisation', label: t('asset.tabs.utilisation', 'Utilisation'), phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'alerts', label: t('asset.tabs.alerts', 'Alerts'), phase: 'day_one', enabled: true },
   ];
 
   return (
@@ -205,7 +217,7 @@ export default function AssetDetailPage() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-semibold text-ink">{asset.code}</span>
             <span className="text-sm text-grey-500">— {asset.name}</span>
-            {rel === 'renter' && <Badge variant="yellow">Rented</Badge>}
+            {rel === 'renter' && <Badge variant="yellow">{t('asset.rented', 'Rented')}</Badge>}
           </div>
           <div className="text-sm text-grey-500 mt-1">
             {asset.make} {asset.model} · {asset.year} · {asset.plateOrSerial}
@@ -215,18 +227,27 @@ export default function AssetDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge status={status} />
+          <StatusBadge
+            status={status}
+            label={t(STATUS_LABEL_KEYS[status]?.key ?? 'statuses.unknown', STATUS_LABEL_KEYS[status]?.fallback ?? status)}
+          />
           <TierChip tier={tier} />
         </div>
       </div>
 
       {/* Last updated */}
       <div className="text-sm text-grey-500">
-        Last updated {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}{' '}
-        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago` : ''}
+        {t('asset.lastUpdated', `Last updated ${reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}`, {
+          time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—',
+        })}{' '}
+        {reading
+          ? `· ${t('asset.minutesAgo', `${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago`, {
+              count: clock.minutesSinceDubai(new Date(reading.deviceTime).getTime()),
+            })}`
+          : ''}
         {reading && (
           <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
-            (hover for details)
+            {' '}{t('asset.hoverForDetails', '(hover for details)')}
           </span>
         )}
       </div>
@@ -237,30 +258,46 @@ export default function AssetDetailPage() {
           <div className="text-sm">
             {currentBooking ? (
               <div>
-                <div className="font-medium text-ink">Current rental</div>
+                <div className="font-medium text-ink">{t('asset.rental.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? 'No destination'} ·
-                  until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
+                  {t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name}`, {
+                    name: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? '',
+                  })}
+                  {' · '}
+                  {currentBooking.destination?.name ?? t('asset.rental.noDestination', 'No destination')}
+                  {' · '}
+                  {t('asset.rental.until', `until ${clock.formatDubaiDate(new Date(currentBooking.end).getTime())} ${clock.formatDubaiTime(new Date(currentBooking.end).getTime())}`, {
+                    time: `${clock.formatDubaiDate(new Date(currentBooking.end).getTime())} ${clock.formatDubaiTime(new Date(currentBooking.end).getTime())}`,
+                  })}
                 </div>
               </div>
             ) : upcomingBooking ? (
               <div>
-                <div className="font-medium text-ink">Upcoming rental</div>
+                <div className="font-medium text-ink">{t('asset.rental.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name} ·
-                  from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
+                  {t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name}`, {
+                    name: seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name ?? '',
+                  })}
+                  {' · '}
+                  {t('asset.rental.from', `from ${clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} ${clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}`, {
+                    time: `${clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} ${clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}`,
+                  })}
                 </div>
               </div>
             ) : (
-              <div className="text-grey-500">No active or upcoming rentals</div>
+              <div className="text-grey-500">{t('asset.rental.none', 'No active or upcoming rentals')}</div>
             )}
             {recentBookings.length > 0 && (
               <div className="mt-3 pt-3 border-t border-line">
-                <div className="font-medium text-ink text-sm">Recent rentals</div>
+                <div className="font-medium text-ink text-sm">{t('asset.rental.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? 'Rented to' : 'Cancelled'} {seed.tenants.find(t => t.id === b.renterTenantId)?.name} ·
+                    {b.status === 'closed'
+                      ? t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(x => x.id === b.renterTenantId)?.name ?? ''}`, {
+                          name: seed.tenants.find(x => x.id === b.renterTenantId)?.name ?? '',
+                        })
+                      : t('asset.rental.cancelled', 'Cancelled')}
+                    {' · '}
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}
@@ -270,19 +307,27 @@ export default function AssetDetailPage() {
         )}
         {rel === 'renter' && renterBooking && (
           <div className="text-sm">
-            <div className="font-medium text-ink">Your rental</div>
+            <div className="font-medium text-ink">{t('asset.rental.yours', 'Your rental')}</div>
             <div className="text-grey-700 mt-1">
-              Rented from {ownerTenant?.name} until {clock.formatDubaiDate(new Date(renterBooking.end).getTime())} {clock.formatDubaiTime(new Date(renterBooking.end).getTime())}
+              {t('asset.rental.rentedFrom', `Rented from ${ownerTenant?.name}`, { name: ownerTenant?.name ?? '' })}
+              {' '}
+              {t('asset.rental.until', `until ${clock.formatDubaiDate(new Date(renterBooking.end).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.end).getTime())}`, {
+                time: `${clock.formatDubaiDate(new Date(renterBooking.end).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.end).getTime())}`,
+              })}
             </div>
             <div className="text-grey-500 mt-1">
-              History starts {clock.formatDubaiDate(new Date(renterBooking.start).getTime())} {clock.formatDubaiTime(new Date(renterBooking.start).getTime())}
+              {t('asset.rental.historyStarts', `History starts ${clock.formatDubaiDate(new Date(renterBooking.start).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.start).getTime())}`, {
+                time: `${clock.formatDubaiDate(new Date(renterBooking.start).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.start).getTime())}`,
+              })}
             </div>
           </div>
         )}
         {rel === 'kasper' && (
           <div className="text-sm text-grey-700">
-            Kasper view · Owner: {ownerTenant?.name} · Current rental:{' '}
-            {currentBooking ? seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name : 'None'}
+            {t('asset.kasperView', `Kasper view · Owner: ${ownerTenant?.name} · Current rental: ${currentBooking ? seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name : 'None'}`, {
+              owner: ownerTenant?.name ?? '',
+              renter: currentBooking ? seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? '' : t('common.none', 'None'),
+            })}
           </div>
         )}
       </div>
@@ -291,43 +336,51 @@ export default function AssetDetailPage() {
       {(canEdit || canShare || canEndAccess) && (
         <div className="flex flex-wrap gap-2">
           {canEdit && (
-            <Button variant="secondary" size="sm">Edit asset</Button>
+            <Button variant="secondary" size="sm">{t('asset.actions.editAsset', 'Edit asset')}</Button>
           )}
           {canShare && (
-            <Button variant="secondary" size="sm">Share tracking link</Button>
+            <Button variant="secondary" size="sm">{t('asset.actions.shareTrackingLink', 'Share tracking link')}</Button>
           )}
           {canEndAccess && rel === 'owner' && (
-            <Button variant="danger" size="sm">End access now</Button>
+            <Button variant="danger" size="sm">{t('asset.actions.endAccessNow', 'End access now')}</Button>
           )}
-          <Button variant="secondary" size="sm">Run report</Button>
+          <Button variant="secondary" size="sm">{t('asset.actions.runReport', 'Run report')}</Button>
         </div>
       )}
 
       {/* Tracking links — the owner sees the same ETA line the hirer sees (11.6/11.14) */}
       {trackingLinkRows.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-2">Tracking links</div>
+          <div className="text-sm font-medium text-ink mb-2">{t('asset.trackingLinks.title', 'Tracking links')}</div>
           <div className="space-y-2">
             {trackingLinkRows.map(row => (
               <div key={row.id} className="text-sm border border-line rounded p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs text-grey-700">/t/{row.token.slice(0, 10)}…</span>
-                  <Badge variant={row.revoked ? 'grey' : 'green'}>{row.revoked ? 'Revoked' : 'Active'}</Badge>
+                  <Badge variant={row.revoked ? 'grey' : 'green'}>
+                    {row.revoked ? t('asset.trackingLinks.revoked', 'Revoked') : t('asset.trackingLinks.active', 'Active')}
+                  </Badge>
                   <span className="text-xs text-grey-500">{row.job}</span>
                   <span className="text-xs text-grey-500 ml-auto font-mono">
-                    expires {clock.formatDubaiDate(row.expiresAt)} {clock.formatDubaiTime(row.expiresAt)}
+                    {t('asset.trackingLinks.expires', `expires ${clock.formatDubaiDate(row.expiresAt)} ${clock.formatDubaiTime(row.expiresAt)}`, {
+                      time: `${clock.formatDubaiDate(row.expiresAt)} ${clock.formatDubaiTime(row.expiresAt)}`,
+                    })}
                   </span>
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {row.showEta && row.destinationName ? (
                     <>
-                      Destination: <span className="text-grey-700">{row.destinationName}</span>
+                      {t('asset.trackingLinks.destination', 'Destination')}: <span className="text-grey-700">{row.destinationName}</span>
                       {row.etaLine && <span className="text-ink"> · {row.etaLine}</span>}
                     </>
                   ) : row.destinationName ? (
-                    <>Destination: <span className="text-grey-700">{row.destinationName}</span> · arrival time hidden from the hirer</>
+                    <>
+                      {t('asset.trackingLinks.destination', 'Destination')}: <span className="text-grey-700">{row.destinationName}</span>
+                      {' · '}
+                      {t('asset.trackingLinks.etaHidden', 'arrival time hidden from the hirer')}
+                    </>
                   ) : (
-                    'No destination on this job — no arrival time'
+                    t('asset.trackingLinks.noDestination', 'No destination on this job — no arrival time')
                   )}
                 </div>
               </div>
@@ -408,7 +461,7 @@ export default function AssetDetailPage() {
               </MapContainer>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <div className="text-sm text-grey-500">No location data yet</div>
+                <div className="text-sm text-grey-500">{t('asset.noLocationYet', 'No location data yet')}</div>
               </div>
             )}
           </div>
@@ -416,28 +469,32 @@ export default function AssetDetailPage() {
           {/* Status info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Status</div>
-              <div className="text-lg font-semibold text-ink mt-1 capitalize">{status}</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.status', 'Status')}</div>
+              <div className="text-lg font-semibold text-ink mt-1 capitalize">
+                {t(STATUS_LABEL_KEYS[status]?.key ?? 'statuses.unknown', STATUS_LABEL_KEYS[status]?.fallback ?? status)}
+              </div>
               {status === 'offline' && (
                 <div className="text-xs text-red mt-1">
-                  Offline since {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}
+                  {t('asset.offlineSince', `Offline since ${reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}`, {
+                    time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—',
+                  })}
                 </div>
               )}
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Speed</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.speed', 'Speed')}</div>
               <div className="text-lg font-semibold text-ink mt-1 font-mono">
                 {reading ? `${reading.speedKmh} km/h` : '—'}
               </div>
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Ignition</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.ignition', 'Ignition')}</div>
               <div className="text-lg font-semibold mt-1">
-                {reading ? (reading.ignition ? 'On' : 'Off') : '—'}
+                {reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : '—'}
               </div>
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Battery</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.battery', 'Battery')}</div>
               <div className="text-lg font-semibold mt-1 font-mono">
                 {reading ? `${reading.intBattery.toFixed(1)} V` : '—'}
               </div>
@@ -448,25 +505,25 @@ export default function AssetDetailPage() {
           {!isTier1 && (
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Engine hours</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.engineHours', 'Engine hours')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {reading ? `${reading.gnssOdometerKm.toFixed(1)} km` : '—'}
                 </div>
-                <div className="text-xs text-grey-500 mt-1">ECU · today</div>
+                <div className="text-xs text-grey-500 mt-1">{t('asset.ecuToday', 'ECU · today')}</div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Fuel level</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.fuelLevel', 'Fuel level')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined
                     ? `${reading.fuelLevelPct.toFixed(0)}%`
-                    : 'Not measured'}
+                    : t('asset.notMeasured', 'Not measured')}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('fuelLevel') ? 'Fuel gauge' : 'Not available'}
                 </div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Engine RPM</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset.tiles.engineRpm', 'Engine RPM')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {asset.canProfile.supported.includes('rpm') && reading?.fuelRateLph !== undefined
                     ? `${Math.floor(Math.random() * 3000)} rpm`
@@ -482,9 +539,9 @@ export default function AssetDetailPage() {
           {/* No tracker state */}
           {status === 'no_tracker' && (
             <div className="bg-surface border border-line rounded-lg p-4 text-center">
-              <div className="text-sm text-grey-500">No tracker fitted</div>
+              <div className="text-sm text-grey-500">{t('asset.noTrackerFitted', 'No tracker fitted')}</div>
               <div className="text-xs text-grey-500 mt-1">
-                This asset has no tracker. Contact Kasper to fit one.
+                {t('asset.noTrackerHelp', 'This asset has no tracker. Contact Kasper to fit one.')}
               </div>
             </div>
           )}
@@ -494,7 +551,7 @@ export default function AssetDetailPage() {
       {!playback && activeTab === 'history' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-grey-500 font-medium">Period:</span>
+            <span className="text-xs text-grey-500 font-medium">{t('asset.period', 'Period')}:</span>
             {(['24h', '7d'] as const).map(p => (
               <button
                 key={p}
@@ -504,7 +561,7 @@ export default function AssetDetailPage() {
                   period === p ? 'bg-ink text-white border-ink' : 'bg-surface text-grey-700 border-line hover:text-ink',
                 )}
               >
-                {p === '24h' ? 'Last 24 hours' : 'Last 7 days'}
+                {p === '24h' ? t('common.last24h', 'Last 24 hours') : t('common.last7d', 'Last 7 days')}
               </button>
             ))}
             <Button
@@ -513,43 +570,45 @@ export default function AssetDetailPage() {
               className="ml-auto"
               onClick={() => setPlayback({ fromMs: periodFromMs, toMs: periodEndMs })}
             >
-              Play this period
+              {t('asset.playback.playPeriod', 'Play this period')}
             </Button>
           </div>
 
           {window && window.start > periodEndMs - 7 * 24 * 3600 * 1000 && (
             <div className="text-xs text-amber-dark bg-amber/10 border border-amber/30 rounded px-3 py-2">
-              Your rental history starts {clock.formatDubaiDateTime(window.start)} — nothing before that is shown.
+              {t('asset.rental.historyNotice', `Your rental history starts ${clock.formatDubaiDateTime(window.start)} — nothing before that is shown.`, {
+                time: clock.formatDubaiDateTime(window.start),
+              })}
             </div>
           )}
 
           <div className="bg-surface border border-line rounded-lg p-4">
             <div className="text-sm font-medium text-ink mb-3">
-              Positions · {clock.formatDubaiDateTime(periodFromMs)} — {clock.formatDubaiDateTime(periodEndMs)}
+              {t('asset.history.positions', 'Positions')} · {clock.formatDubaiDateTime(periodFromMs)} — {clock.formatDubaiDateTime(periodEndMs)}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line">
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Time</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Speed</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Ignition</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Heading</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.time', 'Time')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.speed', 'Speed')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.ignition', 'Ignition')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.heading', 'Heading')}</th>
                     {asset.canProfile.supported.includes('fuelLevel') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Fuel %</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.fuelPct', 'Fuel %')}</th>
                     )}
                     {asset.canProfile.supported.includes('rpm') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">RPM</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.rpm', 'RPM')}</th>
                     )}
                     {asset.canProfile.supported.includes('coolantTemp') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Coolant</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.coolant', 'Coolant')}</th>
                     )}
                   </tr>
                 </thead>
                 <tbody>
                   {historyRows.track.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-center text-grey-500">No data in this period</td>
+                      <td colSpan={6} className="px-3 py-4 text-center text-grey-500">{t('asset.table.noData', 'No data in this period')}</td>
                     </tr>
                   )}
                   {historyRows.track.map((p, i) => (
@@ -564,16 +623,16 @@ export default function AssetDetailPage() {
                       <tr className="border-b border-line">
                         <td className="px-3 py-2 font-mono text-xs">{clock.formatDubaiTime(p.t)}</td>
                         <td className="px-3 py-2 font-mono">{p.speedKmh.toFixed(1)} km/h</td>
-                        <td className="px-3 py-2">{p.ignition ? 'On' : 'Off'}</td>
+                        <td className="px-3 py-2">{p.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
                         <td className="px-3 py-2 font-mono">{Math.round(p.heading)}°</td>
                         {asset.canProfile.supported.includes('fuelLevel') && (
-                          <td className="px-3 py-2 font-mono">{p.fuelLevelPct !== undefined ? `${p.fuelLevelPct.toFixed(0)}%` : 'Not measured'}</td>
+                          <td className="px-3 py-2 font-mono">{p.fuelLevelPct !== undefined ? `${p.fuelLevelPct.toFixed(0)}%` : t('asset.notMeasured', 'Not measured')}</td>
                         )}
                         {asset.canProfile.supported.includes('rpm') && (
-                          <td className="px-3 py-2 font-mono">{p.rpm !== undefined ? Math.round(p.rpm) : 'Not measured'}</td>
+                          <td className="px-3 py-2 font-mono">{p.rpm !== undefined ? Math.round(p.rpm) : t('asset.notMeasured', 'Not measured')}</td>
                         )}
                         {asset.canProfile.supported.includes('coolantTemp') && (
-                          <td className="px-3 py-2 font-mono">{p.coolantC !== undefined ? `${p.coolantC.toFixed(0)}°C` : 'Not measured'}</td>
+                          <td className="px-3 py-2 font-mono">{p.coolantC !== undefined ? `${p.coolantC.toFixed(0)}°C` : t('asset.notMeasured', 'Not measured')}</td>
                         )}
                       </tr>
                     </React.Fragment>
@@ -582,7 +641,8 @@ export default function AssetDetailPage() {
               </table>
             </div>
             <div className="text-xs text-grey-500 mt-2">
-              GPS distance in this period: <span className="font-mono text-grey-700">{playbackData ? playbackData.totalDistanceKm.toFixed(1) : '0'} km</span>
+              {t('asset.history.gpsDistance', 'GPS distance in this period:')}{' '}
+              <span className="font-mono text-grey-700">{playbackData ? playbackData.totalDistanceKm.toFixed(1) : '0'} km</span>
             </div>
           </div>
         </div>
@@ -591,33 +651,39 @@ export default function AssetDetailPage() {
       {!playback && activeTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-medium text-ink">Trips</div>
+            <div className="text-sm font-medium text-ink">{t('asset.tabs.trips', 'Trips')}</div>
             <span className="text-xs text-grey-500">
-              {period === '24h' ? 'Last 24 hours' : 'Last 7 days'} · Trips start at ignition on with speed above 3 km/h
+              {period === '24h' ? t('common.last24h', 'Last 24 hours') : t('common.last7d', 'Last 7 days')}
+              {' · '}
+              {t('asset.trips.rule', 'Trips start at ignition on with speed above 3 km/h')}
             </span>
           </div>
           {!playbackData || playbackData.trips.length === 0 ? (
             <div className="text-sm text-grey-500">
-              No trips recorded in this period. Trips start when ignition is on and speed exceeds 3 km/h.
+              {t('asset.trips.empty', 'No trips recorded in this period. Trips start when ignition is on and speed exceeds 3 km/h.')}
             </div>
           ) : (
             <>
               <div className="text-xs text-grey-500 mb-2">
-                {playbackData.trips.length} trip{playbackData.trips.length === 1 ? '' : 's'} ·{' '}
-                <span className="font-mono text-grey-700">{playbackData.totalDistanceKm.toFixed(1)} km</span> total
+                {t('asset.trips.count', playbackData.trips.length === 1 ? '1 trip' : `${playbackData.trips.length} trips`, {
+                  count: playbackData.trips.length,
+                })}
+                {' · '}
+                <span className="font-mono text-grey-700">{playbackData.totalDistanceKm.toFixed(1)} km</span>
+                {' '}{t('asset.trips.total', 'total')}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Trip</th>
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Start</th>
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">End</th>
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">From</th>
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">To</th>
-                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Distance</th>
-                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Duration</th>
-                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Max speed</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.trip', 'Trip')}</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.start', 'Start')}</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.end', 'End')}</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.from', 'From')}</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.to', 'To')}</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.distance', 'Distance')}</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.duration', 'Duration')}</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">{t('asset.table.maxSpeed', 'Max speed')}</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -642,7 +708,7 @@ export default function AssetDetailPage() {
                             size="sm"
                             onClick={() => setPlayback({ fromMs: Math.max(trip.startMs - 5 * 60000, periodFromMs), toMs: Math.min(trip.endMs + 5 * 60000, periodEndMs), tripId: trip.id })}
                           >
-                            Play
+                            {t('asset.playback.play', 'Play')}
                           </Button>
                         </td>
                       </tr>
@@ -657,10 +723,10 @@ export default function AssetDetailPage() {
 
       {!playback && activeTab === 'engine' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Engine & fuel</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset.tabs.engineAndFuel', 'Engine & fuel')}</div>
           {isTier1 ? (
             <div className="text-sm text-grey-500">
-              Tier 1 assets don't have CAN data available.
+              {t('asset.engine.tier1', "Tier 1 assets don't have CAN data available.")}
             </div>
           ) : (
             <div className="text-sm text-grey-500">
@@ -672,7 +738,7 @@ export default function AssetDetailPage() {
 
       {!playback && activeTab === 'driving' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Driving events</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset.drivingEvents', 'Driving events')}</div>
           <div className="text-sm text-grey-500">
             No driving events recorded yet.
           </div>
@@ -681,7 +747,7 @@ export default function AssetDetailPage() {
 
       {!playback && activeTab === 'utilisation' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Utilisation</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset.tabs.utilisation', 'Utilisation')}</div>
           <div className="text-sm text-grey-500">
             Last 7 days utilisation for this asset.
           </div>
@@ -690,7 +756,7 @@ export default function AssetDetailPage() {
 
       {!playback && activeTab === 'alerts' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Alerts</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset.tabs.alerts', 'Alerts')}</div>
           <div className="text-sm text-grey-500">
             No alerts for this asset.
           </div>

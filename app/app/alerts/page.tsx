@@ -6,6 +6,7 @@ import {
   Badge, Button, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible } from '@/server/access';
@@ -52,8 +53,48 @@ const ALERT_TYPE_WORDS: Record<AlertType, string> = {
   low_fuel: 'Low fuel: 15%',
 };
 
+/** Catalogue keys for the type names and the sentence describing each alert. */
+const ALERT_TYPE_KEYS: Record<AlertType, string> = {
+  offline: 'alerts.offline',
+  power_cut: 'alerts.powerCut',
+  low_battery: 'alerts.lowBattery',
+  towing: 'alerts.towing',
+  overspeed: 'alerts.overSpeed',
+  harsh_driving: 'alerts.harshDriving',
+  fuel_drop: 'alerts.fuelDrop',
+  fault_code: 'alerts.faultCode',
+  geofence_enter: 'alerts.geofenceEnter',
+  geofence_exit: 'alerts.geofenceExit',
+  after_hours_move: 'alerts.afterHoursMove',
+  maintenance_due: 'alerts.maintenanceDue',
+  maintenance_overdue: 'alerts.maintenanceOverdue',
+  invoice_overdue: 'alerts.invoiceOverdue',
+  idle: 'alerts.idle',
+  low_fuel: 'alerts.lowFuel',
+};
+
+const ALERT_WORD_KEYS: Record<AlertType, string> = {
+  offline: 'alerts.words.offline',
+  power_cut: 'alerts.words.powerCut',
+  low_battery: 'alerts.words.lowBattery',
+  towing: 'alerts.words.towing',
+  overspeed: 'alerts.words.overspeed',
+  harsh_driving: 'alerts.words.harshDriving',
+  fuel_drop: 'alerts.words.fuelDrop',
+  fault_code: 'alerts.words.faultCode',
+  geofence_enter: 'alerts.words.geofenceEnter',
+  geofence_exit: 'alerts.words.geofenceExit',
+  after_hours_move: 'alerts.words.afterHoursMove',
+  maintenance_due: 'alerts.words.maintenanceDue',
+  maintenance_overdue: 'alerts.words.maintenanceOverdue',
+  invoice_overdue: 'alerts.words.invoiceOverdue',
+  idle: 'alerts.words.idle',
+  low_fuel: 'alerts.words.lowFuel',
+};
+
 export default function AlertsPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
@@ -98,8 +139,8 @@ export default function AlertsPage() {
             assetCode: asset.code,
             assetName: asset.name,
             type: 'offline',
-            typeLabel: 'Offline',
-            typeWords: 'Offline since 14:32',
+            typeLabel: t(ALERT_TYPE_KEYS.offline, ALERT_TYPE_LABELS.offline),
+            typeWords: t(ALERT_WORD_KEYS.offline, ALERT_TYPE_WORDS.offline),
             status: 'open',
             acknowledgedBy: null,
             acknowledgedAt: null,
@@ -118,8 +159,8 @@ export default function AlertsPage() {
             assetCode: asset.code,
             assetName: asset.name,
             type,
-            typeLabel: ALERT_TYPE_LABELS[type],
-            typeWords: ALERT_TYPE_WORDS[type],
+            typeLabel: t(ALERT_TYPE_KEYS[type], ALERT_TYPE_LABELS[type]),
+            typeWords: t(ALERT_WORD_KEYS[type], ALERT_TYPE_WORDS[type]),
             status: isAcknowledged ? 'acknowledged' : 'open',
             acknowledgedBy: isAcknowledged ? session.user.name : null,
             acknowledgedAt: isAcknowledged ? clock.formatDubaiTime(clock.now() - Math.random() * 86400000) : null,
@@ -131,7 +172,7 @@ export default function AlertsPage() {
     }
 
     return result;
-  }, [session, visibleAssets, phase]);
+  }, [session, visibleAssets, phase, t]);
 
   const filteredAlerts = useMemo(() => {
     return alerts.filter(a => {
@@ -152,16 +193,20 @@ export default function AlertsPage() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold text-ink">Alerts</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('alerts.title', 'Alerts')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          {openCount} open alert{openCount !== 1 ? 's' : ''}
-          {phase === 'day_one' && ' (Day one: offline alerts only)'}
+          {t(
+            'alerts.openCount',
+            openCount === 1 ? '1 open alert' : `${openCount} open alerts`,
+            { count: openCount },
+          )}
+          {phase === 'day_one' && ` ${t('alerts.dayOneNote', '(Day one: offline alerts only)')}`}
         </p>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <span className="text-xs text-grey-500 font-medium">Show:</span>
+        <span className="text-xs text-grey-500 font-medium">{t('alerts.filters.show', 'Show:')}</span>
         <button
           onClick={() => setAlertFilter('unacknowledged')}
           className={clsx(
@@ -169,7 +214,7 @@ export default function AlertsPage() {
             alertFilter === 'unacknowledged' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          Unacknowledged
+          {t('alerts.filters.unacknowledged', 'Unacknowledged')}
         </button>
         <button
           onClick={() => setAlertFilter('acknowledged')}
@@ -178,7 +223,7 @@ export default function AlertsPage() {
             alertFilter === 'acknowledged' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          Acknowledged
+          {t('alerts.filters.acknowledged', 'Acknowledged')}
         </button>
         <button
           onClick={() => setAlertFilter('all')}
@@ -187,15 +232,15 @@ export default function AlertsPage() {
             alertFilter === 'all' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          All
+          {t('alerts.filters.all', 'All')}
         </button>
       </div>
 
       {/* Alerts list */}
       {filteredAlerts.length === 0 ? (
         <EmptyState
-          title="No alerts"
-          description="There are no alerts to show."
+          title={t('alerts.empty', 'No alerts')}
+          description={t('alerts.emptyDescription', 'There are no alerts to show.')}
         />
       ) : (
         <div className="space-y-2">
@@ -220,17 +265,23 @@ export default function AlertsPage() {
                   </div>
                   <div className="text-sm text-grey-700 mt-1">{alert.typeWords}</div>
                   <div className="text-xs text-grey-500 mt-1">
-                    Since {alert.since} · {alert.siteName}
+                    {t('alerts.since', `Since ${alert.since} · ${alert.siteName}`, {
+                      time: alert.since,
+                      site: alert.siteName,
+                    })}
                   </div>
                   {alert.status === 'acknowledged' && alert.acknowledgedBy && (
                     <div className="text-xs text-grey-500 mt-1">
-                      Acknowledged by {alert.acknowledgedBy} at {alert.acknowledgedAt}
+                      {t('alerts.acknowledgedBy', `Acknowledged by ${alert.acknowledgedBy} at ${alert.acknowledgedAt}`, {
+                        name: alert.acknowledgedBy,
+                        time: alert.acknowledgedAt ?? '',
+                      })}
                     </div>
                   )}
                 </div>
                 {alert.status === 'open' && canAcknowledge && (
                   <Button size="sm" variant="secondary">
-                    Acknowledge
+                    {t('alerts.acknowledge', 'Acknowledge')}
                   </Button>
                 )}
               </div>

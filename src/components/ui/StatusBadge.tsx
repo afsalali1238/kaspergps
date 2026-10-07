@@ -8,6 +8,8 @@ interface StatusBadgeProps {
   status: AssetStatus;
   className?: string;
   size?: 'sm' | 'md';
+  /** Translated label for the mirrored screens; the console keeps the default. */
+  label?: string;
 }
 
 const statusConfig: Record<AssetStatus, { label: string; dot: string; bg: string; text: string }> = {
@@ -19,7 +21,7 @@ const statusConfig: Record<AssetStatus, { label: string; dot: string; bg: string
   no_tracker: { label: 'No tracker', dot: 'bg-no-tracker', bg: 'bg-no-tracker/10', text: 'text-grey-700' },
 };
 
-export function StatusBadge({ status, className = '', size = 'md' }: StatusBadgeProps) {
+export function StatusBadge({ status, className = '', size = 'md', label }: StatusBadgeProps) {
   const cfg = statusConfig[status];
   const isSm = size === 'sm';
 
@@ -33,7 +35,7 @@ export function StatusBadge({ status, className = '', size = 'md' }: StatusBadge
       )}
     >
       <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', cfg.dot)} />
-      <span className={clsx(cfg.text, isSm ? 'font-medium' : 'font-semibold')}>{cfg.label}</span>
+      <span className={clsx(cfg.text, isSm ? 'font-medium' : 'font-semibold')}>{label ?? cfg.label}</span>
     </span>
   );
 }
