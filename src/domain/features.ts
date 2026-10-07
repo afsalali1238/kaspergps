@@ -19,8 +19,8 @@ export const FEATURES: FeatureDef[] = [
   { key: 'power.status', label: 'Vehicle battery & tracker battery', needs: ['extVoltage', 'intBattery'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'connection.quality', label: 'GSM level & satellites', needs: ['gsm'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'hours.ignition', label: 'Ignition hours (Estimated)', needs: ['ignition'], phase: 'phase2', group: 'Seeing assets' },
-  { key: 'hours.ecu', label: 'Engine hours · ECU (billing-grade)', needs: ['engineHours'], phase: 'phase2', group: 'Seeing assets' },
-  { key: 'hours.ecuPartial', label: 'Engine hours · ECU · partial, not for billing', needs: ['engineHours'], phase: 'phase2', group: 'Seeing assets' },
+  { key: 'hours.ecu', label: 'Engine hours · ECU (billing-grade)', needs: ['engineHours'], adapter: ['ALL-CAN300'], phase: 'phase2', group: 'Seeing assets' },
+  { key: 'hours.ecuPartial', label: 'Engine hours · ECU · partial, not for billing', needs: ['engineHours'], adapter: ['LVCAN200'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'driving.events', label: 'Harsh braking, acceleration, cornering', needs: ['accelEvents', 'speed'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'alerts.power', label: 'Power cut & low battery alerts', needs: ['extVoltage', 'intBattery'], phase: 'phase2', group: 'Alerts' },
   { key: 'alerts.towing', label: 'Towing alerts', needs: ['movement', 'ignition'], phase: 'phase2', group: 'Alerts' },
@@ -36,7 +36,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'geofence.events', label: 'Geofence enter/exit events', needs: ['gnss'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'playback', label: 'Trip playback on the map', needs: ['gnss', 'speed'], phase: 'phase2', group: 'Seeing assets' },
   { key: 'eta', label: 'ETA on the tracking page', needs: ['gnss', 'speed'], phase: 'phase2', group: 'Seeing assets' },
-  { key: 'muc', label: 'Monthly Utilisation Certificate (sealed)', needs: ['engineHours'], phase: 'phase2', group: 'Certificates & billing' },
+  { key: 'muc', label: 'Monthly Utilisation Certificate (sealed)', needs: ['engineHours'], adapter: ['ALL-CAN300'], phase: 'phase2', group: 'Certificates & billing' },
   { key: 'billing.hours', label: 'Hourly rental billing from measured hours', needs: ['engineHours', 'ignition'], phase: 'phase2', group: 'Certificates & billing' },
   { key: 'report.geofence', label: 'Geofence report', needs: ['gnss'], phase: 'phase2', group: 'Reports & downloads' },
 
@@ -51,6 +51,7 @@ export const FEATURES: FeatureDef[] = [
 export function hasFeature(asset: Asset, key: string): boolean {
   const feature = FEATURES.find(f => f.key === key);
   if (!feature) return false;
+  if (feature.adapter && !feature.adapter.includes(asset.canProfile.adapter)) return false;
   return feature.needs.every(need => asset.canProfile.supported.includes(need));
 }
 

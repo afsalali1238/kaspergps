@@ -1,6 +1,9 @@
 // Seed data unit tests — verify counts and key facts from section 8.
 import { describe, it, expect } from 'vitest';
 import { seed } from './data';
+// Standard Luhn (doubling from the right, check digit not doubled) — the shared
+// implementation used by the console and the import page.
+import { luhnValid as luhnCheck } from '@/domain/tracker-id';
 
 describe('seed data', () => {
   it('has 5 tenants', () => {
@@ -121,17 +124,4 @@ describe('seed data', () => {
   });
 });
 
-/** Luhn check for 15-digit IMEIs */
-function luhnCheck(imei: string): boolean {
-  const digits = imei.split('').map(d => parseInt(d, 10));
-  let sum = 0;
-  for (let i = 0; i < digits.length; i++) {
-    let d = digits[i];
-    if (i % 2 === 0) {
-      d *= 2;
-      if (d > 9) d -= 9;
-    }
-    sum += d;
-  }
-  return sum % 10 === 0;
-}
+

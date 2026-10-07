@@ -530,6 +530,8 @@ export interface FeatureDef {
   needs: ParamKey[];
   phase: 'day_one' | 'phase2' | 'later';
   group: string;
+  /** Optional adapter condition — e.g. billing-grade ECU hours need ALL-CAN300 (spec 6.3). */
+  adapter?: Adapter[];
 }
 
 export interface FeatureVisibility {

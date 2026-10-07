@@ -9,6 +9,7 @@ import type {
   MaintenancePlan, ServiceRecord, Muc, Invoice, Payment, ReportSchedule,
   ReportRun, Role, AssetClass, CanProfile, SimBehaviour
 } from '@/domain/types';
+import { makeImei as makeImeiFromBody } from '@/domain/tracker-id';
 
 // ── PRNG ────────────────────────────────────────────────────────────────────────
 
@@ -138,32 +139,9 @@ export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CA
 
 // ── Trackers ───────────────────────────────────────────────────────────────────
 
-// IMEI = 35209310 + 6 digits + Luhn check digit
+// IMEI = 35209310 + 6 digits + Luhn check digit (standard Luhn — see src/domain/tracker-id.ts)
 function makeImei(last6: string): string {
-  // Generates a 15-digit IMEI that passes a Luhn validator doubling even indices
-  // (0,2,4,...,14). The base (14 digits) is doubled at odd indices (1,3,5,...,13).
-  // validatorSum = baseSum + 2*check  (check digit at pos 14 is doubled).
-  // Need: baseSum + 2*check ≡ 0 (mod 10) → 2*check ≡ (10 - baseSum%10) % 10 (mod 10).
-  // Since baseSum%10 may be odd or even, we solve: check such that 2*check ≡ target (mod 10).
-  // For target = (10 - baseSum%10) % 10:
-  //   - If target is even: check = target/2 (always an integer 0–4).
-  //   - If target is odd: check = (target+10)/2 (which is integer 5–9).
-  //   Both give 2*check ≡ target (mod 10). We always choose the smaller (even case).
-  const base = '35209310' + last6;
-  const digits = base.split('').map(Number);
-  let baseSum = 0;
-  for (let i = 0; i < digits.length; i++) {
-    let d = digits[i];
-    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
-    baseSum += d;
-  }
-  const twoBaseSumMod10 = (2 * baseSum) % 10;
-  // Need 2*check ≡ (10 - twoBaseSumMod10) (mod 10). Let t = (10 - twoBaseSumMod10) % 10.
-  // t is always even (0,2,4,6,8). For t=0,2,4 (t<5): check=(t+10)/2. For t=6,8 (t≥5): check=t/2.
-  // Check: 2*((t+10)/2)=t+10≡t ✓ (t<5); 2*(t/2)=t≡t ✓ (t≥5).
-  const t = (10 - twoBaseSumMod10) % 10;
-  const check = t < 5 ? (t + 10) / 2 : t / 2;
-  return base + check;
+  return makeImeiFromBody('35209310' + last6);
 }
 
 function makeSim(): string {
@@ -277,15 +255,21 @@ type AssetRow = {
 };
 
 const DAY_ONE_PARAMS = ['gnss', 'speed', 'ignition', 'movement', 'extVoltage', 'intBattery', 'gsm', 'gnssOdometer', 'accelEvents'];
-const CAN_PARAMS = ['fuelLevel', 'fuelUsed', 'fuelRate', 'rpm', 'canOdometer', 'coolantTemp', 'engineLoad', 'engineHours', 'faultCodes', 'adBlue'];
+// Adapter defaults per spec 6.2.
+const COMMON_CAN_PARAMS = ['fuelLevel', 'fuelUsed', 'rpm', 'canOdometer'];
+const LVCAN_PARAMS = ['coolantTemp', 'engineHours']; // engineHours is partial on Tier 2
+const ALL_CAN_PARAMS = ['fuelRate', 'engineLoad', 'faultCodes', 'adBlue'];
 
 function allParamsExcept(adapter: AssetRow['canProfile']['adapter'], ...exclude: string[]): string[] {
   if (adapter === 'none') {
     // Tier 1: day-one params only, no CAN
     return DAY_ONE_PARAMS.filter(p => !exclude.includes(p));
   }
-  // Tier 2 (LVCAN200) and Tier 3 (ALL-CAN300): day-one + all CAN params except excluded
-  const all = [...DAY_ONE_PARAMS, ...CAN_PARAMS];
+  // Tier 2 (LVCAN200) and Tier 3 (ALL-CAN300): day-one + the adapter's CAN params,
+  // minus anything the vehicle's CAN check removed.
+  const all = adapter === 'LVCAN200'
+    ? [...DAY_ONE_PARAMS, ...COMMON_CAN_PARAMS, ...LVCAN_PARAMS]
+    : [...DAY_ONE_PARAMS, ...COMMON_CAN_PARAMS, ...LVCAN_PARAMS, ...ALL_CAN_PARAMS];
   return all.filter(p => !exclude.includes(p));
 }
 
@@ -325,9 +309,9 @@ const assetRows: AssetRow[] = [
   { id: 'a-bl01', code: 'BL-01', name: 'Boom lift', type: 'Boom lift', assetClass: 'lifting', make: 'JLG', model: '600S', year: 2018, plateOrSerial: 'GL-008', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-sl02', code: 'SL-02', name: 'Scissor lift', type: 'Scissor lift', assetClass: 'lifting', make: 'Genie', model: 'GS-3246', year: 2020, plateOrSerial: 'GL-009', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-mw01', code: 'MW-01', name: 'Mobile welder trailer', type: 'Mobile welder', assetClass: 'power', make: 'Lincoln', model: 'Vantage', year: 2023, plateOrSerial: 'GL-010', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
-  { id: 'a-pu41', code: 'PU-41', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Nissan', model: 'Navara', year: 2020, plateOrSerial: 'GL-011', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp', 'engineHours'), checkedAt: new Date(daysAgo(10)).toISOString(), notes: 'coolantTemp and engineHours not supported by this vehicle CAN bus' }, behaviour: 'light_vehicle_day', createdBy: 'u-priya' },
+  { id: 'a-pu41', code: 'PU-41', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Nissan', model: 'Navara', year: 2020, plateOrSerial: 'GL-011', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp'), checkedAt: new Date(daysAgo(10)).toISOString(), notes: 'coolantTemp not supported by this vehicle CAN bus; engine hours are partial' }, behaviour: 'light_vehicle_day', createdBy: 'u-priya' },
   // Tier 2 — Marina Builders
-  { id: 'a-pu51', code: 'PU-51', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hilux', year: 2022, plateOrSerial: 'MB-001', ownerTenantId: 't-marina', homeSiteId: 's-marina-dh', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours partial support — not billing-grade' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
+  { id: 'a-pu51', code: 'PU-51', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hilux', year: 2022, plateOrSerial: 'MB-001', ownerTenantId: 't-marina', homeSiteId: 's-marina-dh', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours partial support — not billing-grade' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
   { id: 'a-pu52', code: 'PU-52', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Ford', model: 'Ranger', year: 2021, plateOrSerial: 'MB-002', ownerTenantId: 't-marina', homeSiteId: 's-marina-bb', tankLitres: 80, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'engineHours not supported' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
   { id: 'a-vn01', code: 'VN-01', name: 'Van', type: 'Van', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hiace', year: 2019, plateOrSerial: 'MB-003', ownerTenantId: 't-marina', homeSiteId: 's-marina-jvc', tankLitres: 70, canProfile: { adapter: 'LVCAN200', supported: allParamsExcept('LVCAN200', 'coolantTemp', 'engineHours'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'coolantTemp and engineHours not supported' }, behaviour: 'light_vehicle_day', createdBy: 'u-lina' },
 ];

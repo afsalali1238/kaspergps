@@ -53,8 +53,8 @@ describe('features — hasFeature (per asset)', () => {
     // adBlue was removed by CAN check
     expect(asset.canProfile.supported).not.toContain('adBlue');
     expect(hasFeature(asset, 'adblue')).toBe(false);
-    // coolantTemp was NOT removed — EX-04 supports it
-    expect(hasFeature(asset, 'coolantC')).toBe(true);
+    // coolantTemp was NOT removed — EX-04 still supports it
+    expect(asset.canProfile.supported).toContain('coolantTemp');
   });
 
   it('BD-02 (Tier 3, ALL-CAN300) has faultCodes', () => {
@@ -68,10 +68,10 @@ describe('features — hasFeature (per asset)', () => {
     const asset = seed.assets.find(a => a.code === 'GN-01')!;
     expect(hasFeature(asset, 'fuel.level')).toBe(true);
     expect(hasFeature(asset, 'fuel.used')).toBe(true);
-    expect(hasFeature(asset, 'fuelDrop')).toBe(true); // alerts.fuelDrop
-    expect(hasFeature(asset, 'muc')).toBe(false); // generators don't get MUCs? Let me check — GN-01 is power class, but it has ALL-CAN300
-    // Actually GN-01 has ALL-CAN300 and should have MUC if it has engineHours
-    expect(hasFeature(asset, 'engineHours')).toBe(true);
+    expect(hasFeature(asset, 'alerts.fuelDrop')).toBe(true);
+    // GN-01 has ALL-CAN300 and engineHours, so it gets a MUC like any Tier 3 asset
+    expect(hasFeature(asset, 'muc')).toBe(true);
+    expect(asset.canProfile.supported).toContain('engineHours');
     expect(hasFeature(asset, 'hours.ecu')).toBe(true);
   });
 
@@ -80,9 +80,9 @@ describe('features — hasFeature (per asset)', () => {
     expect(asset.canProfile.adapter).toBe('LVCAN200');
     expect(hasFeature(asset, 'fuel.level')).toBe(true);
     expect(hasFeature(asset, 'fuel.used')).toBe(true);
-    expect(hasFeature(asset, 'rpm')).toBe(true);
-    // engineHours partial — LVCAN200 supports partial engine hours
-    expect(hasFeature(asset, 'engineHours')).toBe(true);
+    expect(hasFeature(asset, 'engine.live')).toBe(true);
+    // engineHours partial — LVCAN200 reports it, but it is not billing-grade
+    expect(asset.canProfile.supported).toContain('engineHours');
     expect(hasFeature(asset, 'hours.ecuPartial')).toBe(true);
     // No billing-grade ECU hours for Tier 2
     expect(hasFeature(asset, 'hours.ecu')).toBe(false);
@@ -91,7 +91,7 @@ describe('features — hasFeature (per asset)', () => {
     // No MUC for Tier 2
     expect(hasFeature(asset, 'muc')).toBe(false);
     // coolantTemp was removed by CAN check for PU-41
-    expect(asset.canProfile.supported).not.toContain('coolantC');
+    expect(asset.canProfile.supported).not.toContain('coolantTemp');
   });
 
   it('PU-51 (Tier 2, LVCAN200, engineHours partial) has partial ECU hours', () => {
