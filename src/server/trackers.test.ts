@@ -236,7 +236,7 @@ describe('tracker requests', () => {
     expect(notifications[0].text).toContain('MW-01');
     expect(notifications[0].read).toBe(false);
     expect(hasOpenTrackerRequest('a-mw01')).toBe(false);
-    expect(pairTrackerRequest(ravi(), request.id, stock[0]?.id ?? 'tr-nope').ok).toBe(false);
+    expect(pairTrackerRequest(ravi(), request.id, 'tr-nope').ok).toBe(false);
     expect(declineTrackerRequest(ravi(), request.id, 'Already handled this one').ok).toBe(false);
     expect(declineTrackerRequest(ravi(), 'trreq-nope', 'No such request here').ok).toBe(false);
     expect(pairTrackerRequest(priya(), request.id, stock.id).ok).toBe(false);

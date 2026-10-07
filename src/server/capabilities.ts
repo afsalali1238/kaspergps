@@ -50,15 +50,13 @@ export type Capability =
   | 'console.bookings.view'
   | 'console.bookings.manage'
   | 'console.staff.manage'
-  | 'console.import'
-  | 'console.bookings.view'
-  | 'console.staff.manage';
+  | 'console.import';
 
 const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
   kasper_admin: [
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry', 'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view', 'alert.acknowledge',
     'users.manage', 'sites.manage',
     'console.tenants.view', 'console.tenants.manage', 'console.assets.manage',
@@ -102,7 +100,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'asset.view', 'asset.viewHistory', 'asset.viewTelemetry',
     'asset.edit',
     'report.run',
-    'link.create', 'link.revoke',
+    'link.create', 'link.revoke', 'grant.endEarly',
     'alert.view',
     'label.view', 'label.manage',
     'geofence.view', 'geofence.manage',

@@ -1,0 +1,271 @@
+// Bookings (spec 11.7). A booking is a rental window: it grants the renter a
+// tracked view of the asset for exactly [start, end] and ties tracking links to
+// that window. Every create/change/cancel/close is audited, and the grant
+// window is derived from the booking (see access.ts), so it can never drift.
+
+import type { Asset, Booking, Session } from '@/domain/types';
+import { seed } from '@/server/seed/data';
+import * as clock from '@/lib/clock';
+import { fail, ok, type OpResult } from '@/server/result';
+import { canEndAccess, hasCapability } from '@/server/access';
+import { recordAuditForSession } from '@/server/audit';
+
+// Seed ids run b-1001..b-1012, so runtime ids start well clear of them.
+let bookingSeq = 2000;
+
+function toMs(v: string | number): number {
+  return typeof v === 'number' ? v : new Date(v).getTime();
+}
+
+export function bookingById(bookingId: string): Booking | null {
+  return seed.bookings.find(b => b.id === bookingId) ?? null;
+}
+
+/** BK-#### continues past the highest number in the seed. */
+export function nextBookingReference(): string {
+  const highest = seed.bookings.reduce((max, b) => {
+    const n = Number(b.reference.replace(/\D/g, ''));
+    return Number.isFinite(n) ? Math.max(max, n) : max;
+  }, 1000);
+  return `BK-${highest + 1}`;
+}
+
+/** Bookings that still hold the asset: scheduled or active, not closed/cancelled. */
+export function openBookingsForAsset(assetId: string): Booking[] {
+  return seed.bookings.filter(
+    b => b.assetId === assetId && (b.status === 'scheduled' || b.status === 'active')
+  );
+}
+
+export function overlappingBooking(assetId: string, startMs: number, endMs: number, ignoreBookingId?: string): Booking | null {
+  return openBookingsForAsset(assetId).find(b => {
+    if (ignoreBookingId && b.id === ignoreBookingId) return false;
+    const s = toMs(b.start);
+    const e = b.closedAt ? toMs(b.closedAt) : toMs(b.end);
+    return startMs < e && s < endMs;
+  }) ?? null;
+}
+
+/**
+ * Who can put a booking on an asset: Kasper (console.bookings.manage) or the
+ * asset's own Tenant Admin. Renters never create their own bookings.
+ */
+export function canManageBookings(session: Session, asset: Asset): boolean {
+  if (hasCapability(session, 'console.bookings.manage')) return true;
+  return session.role === 'tenant_admin' && session.tenantId === asset.ownerTenantId;
+}
+
+// ── Create ────────────────────────────────────────────────────────────────────
+
+export interface CreateBookingInput {
+  assetId: string;
+  /** Renter tenant, or null for an outside hirer (tracking link only). */
+  renterTenantId: string | null;
+  renterSiteId?: string | null;
+  start: string | number;
+  end: string | number;
+  rateType?: Booking['rateType'];
+  rateAed?: number;
+  destination?: { name: string; lat: number; lng: number };
+}
+
+export function createBooking(session: Session, input: CreateBookingInput): OpResult<Booking> {
+  const asset = seed.assets.find(a => a.id === input.assetId);
+  if (!asset) return fail('Asset not found.');
+  if (!canManageBookings(session, asset)) {
+    return fail('Only Kasper or the asset owner can create a booking.');
+  }
+  if (asset.retiredAt) {
+    return fail(`${asset.code} is retired and can't be booked.`);
+  }
+
+  const startMs = toMs(input.start);
+  const endMs = toMs(input.end);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return fail('Pick a start and an end.');
+  if (endMs <= startMs) return fail('The end must be after the start.');
+
+  const renter = input.renterTenantId
+    ? seed.tenants.find(t => t.id === input.renterTenantId) ?? null
+    : null;
+  if (input.renterTenantId && !renter) return fail('Renter not found.');
+  if (renter && renter.id === asset.ownerTenantId) {
+    return fail(`A company can't rent its own asset — ${asset.code} belongs to ${renter.name}.`);
+  }
+  if (renter && renter.status === 'suspended') {
+    return fail(`${renter.name} is suspended.`);
+  }
+
+  // The renter site must belong to the renter, so the grant narrows to it.
+  if (renter && input.renterSiteId) {
+    const site = seed.sites.find(s => s.id === input.renterSiteId);
+    if (!site) return fail('Site not found.');
+    if (site.tenantId !== renter.id) {
+      return fail(`${site.name} belongs to another company.`);
+    }
+  }
+
+  const clash = overlappingBooking(asset.id, startMs, endMs);
+  if (clash) {
+    const clashRenter = seed.tenants.find(t => t.id === clash.renterTenantId)?.name ?? 'an outside hirer';
+    return fail(`${asset.code} is already booked ${clock.formatDubaiDate(toMs(clash.start))} – ${clock.formatDubaiDate(toMs(clash.end))} (${clash.reference}, ${clashRenter}).`);
+  }
+
+  const nowMs = clock.now();
+  const booking: Booking = {
+    id: `b-${++bookingSeq}`,
+    reference: nextBookingReference(),
+    assetId: asset.id,
+    ownerTenantId: asset.ownerTenantId,
+    renterTenantId: renter?.id ?? null,
+    renterSiteId: renter ? input.renterSiteId ?? null : null,
+    start: new Date(startMs).toISOString(),
+    end: new Date(endMs).toISOString(),
+    status: startMs <= nowMs && nowMs <= endMs ? 'active' : 'scheduled',
+    rateType: input.rateType ?? 'daily',
+    rateAed: input.rateAed ?? 0,
+    destination: input.destination,
+  };
+  seed.bookings.push(booking);
+
+  recordAuditForSession(session, {
+    action: 'booking.create',
+    assetId: asset.id,
+    tenantId: asset.ownerTenantId,
+    bookingId: booking.id,
+    detail: `${booking.reference} created: ${asset.code} to ${renter?.name ?? 'an outside hirer'} ${clock.formatDubaiDate(startMs)} – ${clock.formatDubaiDate(endMs)}`,
+  });
+  return ok(booking, `${booking.reference} created.`);
+}
+
+// ── Change ────────────────────────────────────────────────────────────────────
+
+function changeWindow(session: Session, bookingId: string, newEnd: string | number, action: 'extend' | 'shorten'): OpResult<Booking> {
+  const booking = bookingById(bookingId);
+  if (!booking) return fail('Booking not found.');
+  const asset = seed.assets.find(a => a.id === booking.assetId);
+  if (!asset) return fail('Asset not found.');
+  if (!canManageBookings(session, asset)) return fail('Only Kasper or the asset owner can change a booking.');
+  if (booking.status === 'closed' || booking.status === 'cancelled') {
+    return fail('This booking has ended.');
+  }
+
+  const endMs = toMs(newEnd);
+  const startMs = toMs(booking.start);
+  if (!Number.isFinite(endMs)) return fail('Pick an end date.');
+  if (endMs <= startMs) return fail('The end must be after the start.');
+
+  if (action === 'extend') {
+    const clash = overlappingBooking(asset.id, toMs(booking.end), endMs, booking.id);
+    if (clash) {
+      return fail(`Another booking starts ${clock.formatDubaiDate(toMs(clash.start))} (${clash.reference}).`);
+    }
+  }
+
+  const old = booking.end;
+  booking.end = new Date(endMs).toISOString();
+  if (booking.status === 'scheduled' && startMs <= clock.now() && clock.now() <= endMs) {
+    booking.status = 'active';
+  }
+
+  recordAuditForSession(session, {
+    action: action === 'extend' ? 'booking.extend' : 'booking.shorten',
+    assetId: asset.id,
+    tenantId: asset.ownerTenantId,
+    bookingId: booking.id,
+    detail: `${booking.reference} ${action === 'extend' ? 'extended' : 'shortened'} to ${clock.formatDubaiDate(endMs)}`,
+    reason: `was ${clock.formatDubaiDate(toMs(old))}`,
+  });
+  return ok(booking, `${booking.reference} ${action === 'extend' ? 'extended' : 'shortened'} to ${clock.formatDubaiDate(endMs)}.`);
+}
+
+export function extendBooking(session: Session, bookingId: string, newEnd: string | number): OpResult<Booking> {
+  return changeWindow(session, bookingId, newEnd, 'extend');
+}
+
+export function shortenBooking(session: Session, bookingId: string, newEnd: string | number): OpResult<Booking> {
+  return changeWindow(session, bookingId, newEnd, 'shorten');
+}
+
+export function cancelBooking(session: Session, bookingId: string, reason = ''): OpResult<Booking> {
+  const booking = bookingById(bookingId);
+  if (!booking) return fail('Booking not found.');
+  const asset = seed.assets.find(a => a.id === booking.assetId);
+  if (!asset) return fail('Asset not found.');
+  if (!canManageBookings(session, asset)) return fail('Only Kasper or the asset owner can cancel a booking.');
+  if (booking.status === 'cancelled') return fail('This booking is already cancelled.');
+  if (booking.status === 'closed') return fail('This booking has already ended.');
+
+  booking.status = 'cancelled';
+  booking.cancelledAt = new Date(clock.now()).toISOString();
+
+  recordAuditForSession(session, {
+    action: 'booking.cancel',
+    assetId: asset.id,
+    tenantId: asset.ownerTenantId,
+    bookingId: booking.id,
+    detail: `${booking.reference} cancelled`,
+    reason: reason.trim() || undefined,
+  });
+  return ok(booking, `${booking.reference} cancelled — the renter's access ends now.`);
+}
+
+export function closeBooking(session: Session, bookingId: string, reason = ''): OpResult<Booking> {
+  const booking = bookingById(bookingId);
+  if (!booking) return fail('Booking not found.');
+  const asset = seed.assets.find(a => a.id === booking.assetId);
+  if (!asset) return fail('Asset not found.');
+  if (!canManageBookings(session, asset)) return fail('Only Kasper or the asset owner can close a booking.');
+  if (booking.status === 'closed') return fail('This booking is already closed.');
+  if (booking.status === 'cancelled') return fail('This booking was cancelled.');
+
+  booking.status = 'closed';
+  booking.closedAt = new Date(clock.now()).toISOString();
+
+  recordAuditForSession(session, {
+    action: 'booking.close',
+    assetId: asset.id,
+    tenantId: asset.ownerTenantId,
+    bookingId: booking.id,
+    detail: `${booking.reference} job closed`,
+    reason: reason.trim() || undefined,
+  });
+  return ok(booking, `${booking.reference} closed — the renter's access ends now.`);
+}
+
+/**
+ * Cut a rental short before its end (capability `grant.endEarly`).
+ * The reason is required and shows as a "cut short" note on the grant.
+ */
+export function endEarly(session: Session, bookingId: string, reason: string): OpResult<Booking> {
+  const booking = bookingById(bookingId);
+  if (!booking) return fail('Booking not found.');
+  const asset = seed.assets.find(a => a.id === booking.assetId);
+  if (!asset) return fail('Asset not found.');
+  if (!canEndAccess(session, asset.id)) {
+    return fail('Only the owner or Kasper can end this rental early.');
+  }
+  if (booking.status === 'closed' || booking.status === 'cancelled') return fail('This booking has already ended.');
+  if (reason.trim().length < 10) return fail('Give a reason of at least 10 characters.');
+
+  const nowMs = clock.now();
+  booking.status = 'closed';
+  booking.closedAt = new Date(nowMs).toISOString();
+
+  // The renter keeps the window they had up to now; the override is audited.
+  seed.grantOverrides.push({
+    bookingId: booking.id,
+    endedAt: new Date(nowMs).toISOString(),
+    endedBy: session.userId,
+    reason: reason.trim(),
+  });
+
+  recordAuditForSession(session, {
+    action: 'grant.endEarly',
+    assetId: asset.id,
+    tenantId: asset.ownerTenantId,
+    bookingId: booking.id,
+    detail: `${asset.code} rental ended early by ${session.user.name}`,
+    reason: reason.trim(),
+  });
+  return ok(booking, `${booking.reference} ended early — access cut off now.`);
+}

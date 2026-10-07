@@ -12,6 +12,7 @@ export interface AuditInput {
   action: string;
   tenantId?: string;
   assetId?: string;
+  bookingId?: string;
   detail: string;
   reason?: string;
 }
@@ -25,6 +26,7 @@ export function recordAudit(input: AuditInput): AuditEntry {
     action: input.action,
     tenantId: input.tenantId,
     assetId: input.assetId,
+    bookingId: input.bookingId,
     detail: input.detail,
     reason: input.reason,
   };
