@@ -37,16 +37,15 @@ export function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'l
 }
 
 function currentTrackerFor(asset: Asset): typeof seed.trackers[0] | null {
-  // Find the current pairing
   const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (!currentPairing) return null;
-  return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
 function hasAnyReading(asset: Asset): boolean {
   const tracker = currentTrackerFor(asset);
   if (!tracker) return false;
-  const _key = cacheKey(tracker.id, 0);
+  getReadingsForAsset(asset, clock.now() - 86400000, clock.now() + 86400000);
   const dayMap = cache.get(tracker.id);
   if (!dayMap) return false;
   for (const readings of dayMap.values()) {
@@ -60,6 +59,7 @@ function hasAnyReading(asset: Asset): boolean {
 function lastReadingFor(asset: Asset): Reading | null {
   const tracker = currentTrackerFor(asset);
   if (!tracker) return null;
+  getReadingsForAsset(asset, clock.now() - 86400000, clock.now() + 86400000);
   const dayMap = cache.get(tracker.id);
   if (!dayMap) return null;
   let latest: Reading | null = null;
@@ -478,8 +478,8 @@ function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prn
 
 function currentTrackerAndAsset(asset: Asset): typeof seed.trackers[0] | null {
   const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (!currentPairing) return null;
-  return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
 // ── FB-12 scripted movement (drives to destination) ────────────────────────────

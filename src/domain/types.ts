@@ -104,6 +104,7 @@ export interface Asset {
 
 export interface Tracker {
   id: string;
+  assetId?: string | null;
   imei: string;
   model: 'FMC130';
   simIccid: string;

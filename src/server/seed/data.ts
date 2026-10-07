@@ -202,6 +202,20 @@ const trackerRows = [
   ['tr-spare-3', null, null, null, '35209310000063', true], // CR-08's old tracker
 ];
 
+// Asset IDs reference
+const assetIds: Record<string, string> = {
+  'FB-12': 'a-fb12', 'FB-14': 'a-fb14', 'LB-02': 'a-lb02', 'LB-05': 'a-lb05',
+  'TP-21': 'a-tp21', 'TP-22': 'a-tp22', 'TP-23': 'a-tp23', 'WT-07': 'a-wt07',
+  'WT-08': 'a-wt08', 'PU-31': 'a-pu31',
+  'EX-04': 'a-ex04', 'EX-07': 'a-ex07', 'EX-11': 'a-ex11', 'WL-03': 'a-wl03',
+  'WL-06': 'a-wl06', 'BD-02': 'a-bd02', 'BH-05': 'a-bh05', 'GR-01': 'a-gr01',
+  'CP-03': 'a-cp03', 'GN-01': 'a-gn01', 'GN-02': 'a-gn02', 'LD-09': 'a-ld09',
+  'CR-02': 'a-cr02', 'CR-05': 'a-cr05', 'CR-08': 'a-cr08',
+  'TH-01': 'a-th01', 'TH-04': 'a-th04', 'FL-09': 'a-fl09', 'FL-10': 'a-fl10',
+  'BL-01': 'a-bl01', 'SL-02': 'a-sl02', 'MW-01': 'a-mw01',
+  'PU-41': 'a-pu41', 'PU-51': 'a-pu51', 'PU-52': 'a-pu52', 'VN-01': 'a-vn01',
+};
+
 export const trackers: Tracker[] = trackerRows.map(row => {
   const id = row[0] as string;
   const assetCode = row[1] as string | null;
@@ -209,10 +223,11 @@ export const trackers: Tracker[] = trackerRows.map(row => {
   const _siteId = row[3] as string | null;
   const imei = row[4] as string;
   const isSpare = row[5] as boolean;
-  const _assetLookupId = assetCode ? assetIds[assetCode] : null;
+  const assetId = assetCode ? assetIds[assetCode] : null;
   const trackerId = id;
   return {
     id: trackerId,
+    assetId,
     imei: makeImei(imei.slice(-6)),
     model: 'FMC130',
     simIccid: makeSim(),
@@ -237,19 +252,6 @@ export const pairings: Pairing[] = [
   { id: 'p-fl09', trackerId: 'tr-fl09', assetId: 'a-fl09', from: new Date(daysAgo(0.5)).toISOString(), to: null },
 ];
 
-// Asset IDs reference
-const assetIds: Record<string, string> = {
-  'FB-12': 'a-fb12', 'FB-14': 'a-fb14', 'LB-02': 'a-lb02', 'LB-05': 'a-lb05',
-  'TP-21': 'a-tp21', 'TP-22': 'a-tp22', 'TP-23': 'a-tp23', 'WT-07': 'a-wt07',
-  'WT-08': 'a-wt08', 'PU-31': 'a-pu31',
-  'EX-04': 'a-ex04', 'EX-07': 'a-ex07', 'EX-11': 'a-ex11', 'WL-03': 'a-wl03',
-  'WL-06': 'a-wl06', 'BD-02': 'a-bd02', 'BH-05': 'a-bh05', 'GR-01': 'a-gr01',
-  'CP-03': 'a-cp03', 'GN-01': 'a-gn01', 'GN-02': 'a-gn02', 'LD-09': 'a-ld09',
-  'CR-02': 'a-cr02', 'CR-05': 'a-cr05', 'CR-08': 'a-cr08',
-  'TH-01': 'a-th01', 'TH-04': 'a-th04', 'FL-09': 'a-fl09', 'FL-10': 'a-fl10',
-  'BL-01': 'a-bl01', 'SL-02': 'a-sl02', 'MW-01': 'a-mw01',
-  'PU-41': 'a-pu41', 'PU-51': 'a-pu51', 'PU-52': 'a-pu52', 'VN-01': 'a-vn01',
-};
 
 // ── Assets ─────────────────────────────────────────────────────────────────────
 

@@ -4,10 +4,11 @@
 
 import { startOfDay, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { ANCHOR_MS } from '@/server/seed/data';
 
 const DUBAI_TZ = 'Asia/Dubai';
 
-let _anchor: number | null = null;
+let _anchor: number | null = ANCHOR_MS;
 let _offsetMs = 0;
 
 export function setAnchor(ms: number): void {
