@@ -8,7 +8,7 @@ import type {
   Alert, AuditEntry, Label, AssetLabel, Geofence, GeofenceEvent,
   MaintenancePlan, ServiceRecord, Muc, Invoice, Payment, ReportSchedule,
   ReportRun, Role, AssetClass, CanProfile, SimBehaviour, Notification,
-  TrackerRequest
+  TrackerRequest, AdapterFitting, CanAdapter
 } from '@/domain/types';
 import { makeImei as makeImeiFromBody } from '@/domain/tracker-id';
 
@@ -110,7 +110,7 @@ export const users: User[] = userRows.map(u => ({
 
 // ── CAN adapters ───────────────────────────────────────────────────────────────
 
-export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CAN300'; status: 'in_stock' | 'fitted' | 'faulty' | 'retired'; assetId: string | null; fittedAt?: string; registeredAt: string }[] = [
+export const adapters: CanAdapter[] = [
   // Fitted — one per CAN asset (fitted at various dates)
   { id: 'a-ex04', serial: 'AC3-004123', model: 'ALL-CAN300', status: 'fitted', assetId: 'a-ex04', fittedAt: '2026-01-15T09:00:00Z', registeredAt: '2026-01-15T09:00:00Z' },
   { id: 'a-ex07', serial: 'AC3-004124', model: 'ALL-CAN300', status: 'fitted', assetId: 'a-ex07', fittedAt: '2026-01-20T10:00:00Z', registeredAt: '2026-01-20T10:00:00Z' },
@@ -137,6 +137,19 @@ export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CA
   // Faulty
   { id: 'a-faulty-1', serial: 'AC3-005501', model: 'ALL-CAN300', status: 'faulty', assetId: null, registeredAt: '2026-08-15T10:00:00Z' },
 ];
+
+// Dated fitting history, like Pairing (spec §7 / 11.9)
+export const adapterFittings: AdapterFitting[] = adapters
+  .filter(a => a.status === 'fitted' && a.assetId && a.fittedAt)
+  .map((a, i) => ({
+    id: `fit-${i + 1}`,
+    adapterId: a.id,
+    assetId: a.assetId as string,
+    from: a.fittedAt as string,
+    to: null,
+  }));
+
+
 
 // ── Trackers ───────────────────────────────────────────────────────────────────
 
@@ -255,13 +268,13 @@ type AssetRow = {
   behaviour: string; createdBy: string;
 };
 
-const DAY_ONE_PARAMS = ['gnss', 'speed', 'ignition', 'movement', 'extVoltage', 'intBattery', 'gsm', 'gnssOdometer', 'accelEvents'];
+export const DAY_ONE_PARAMS = ['gnss', 'speed', 'ignition', 'movement', 'extVoltage', 'intBattery', 'gsm', 'gnssOdometer', 'accelEvents'];
 // Adapter defaults per spec 6.2.
 const COMMON_CAN_PARAMS = ['fuelLevel', 'fuelUsed', 'rpm', 'canOdometer'];
 const LVCAN_PARAMS = ['coolantTemp', 'engineHours']; // engineHours is partial on Tier 2
 const ALL_CAN_PARAMS = ['fuelRate', 'engineLoad', 'faultCodes', 'adBlue'];
 
-function allParamsExcept(adapter: AssetRow['canProfile']['adapter'], ...exclude: string[]): string[] {
+export function allParamsExcept(adapter: AssetRow['canProfile']['adapter'], ...exclude: string[]): string[] {
   if (adapter === 'none') {
     // Tier 1: day-one params only, no CAN
     return DAY_ONE_PARAMS.filter(p => !exclude.includes(p));
@@ -773,6 +786,7 @@ export const seed = {
   notifications,
   onboardingDrafts,
   adapters,
+  adapterFittings,
 };
 
 export default seed;
