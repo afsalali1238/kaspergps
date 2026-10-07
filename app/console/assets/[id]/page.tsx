@@ -128,7 +128,7 @@ export default function ConsoleAssetDetailPage() {
           <div className="text-xs text-grey-500">CAN adapter</div>
           <div className="text-ink font-medium mt-1 text-sm">
             {asset.canProfile.adapter === 'none' ? 'None' : (
-              <Badge variant="secondary">{asset.canProfile.adapter}</Badge>
+              <Badge variant="grey">{asset.canProfile.adapter}</Badge>
             )}
           </div>
         </div>
