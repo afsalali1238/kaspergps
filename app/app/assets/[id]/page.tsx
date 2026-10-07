@@ -405,15 +405,15 @@ export default function AssetDetailPage() {
 
 
   const tabs: { id: TabId; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
-    { id: 'overview', label: 'Overview', phase: 'day_one', enabled: true },
-    { id: 'history', label: 'History', phase: 'day_one', enabled: true },
-    { id: 'trips', label: 'Trips', phase: 'day_one', enabled: true },
-    { id: 'engine', label: 'Engine & fuel', phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
-    { id: 'driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'certificates', label: 'Certificates', phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
-    { id: 'maintenance', label: 'Maintenance', phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
-    { id: 'alerts', label: 'Alerts', phase: 'day_one', enabled: true },
+    { id: 'overview', label: t('asset.tabs.overview', 'Overview'), phase: 'day_one', enabled: true },
+    { id: 'history', label: t('asset.tabs.history', 'History'), phase: 'day_one', enabled: true },
+    { id: 'trips', label: t('asset.tabs.trips', 'Trips'), phase: 'day_one', enabled: true },
+    { id: 'engine', label: t('asset.tabs.engineAndFuel', 'Engine & fuel'), phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
+    { id: 'driving', label: t('asset.tabs.driving', 'Driving'), phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'utilisation', label: t('asset.tabs.utilisation', 'Utilisation'), phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'certificates', label: t('asset.tabs.certificates', 'Certificates'), phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
+    { id: 'maintenance', label: t('asset.tabs.maintenance', 'Maintenance'), phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
+    { id: 'alerts', label: t('asset.tabs.alerts', 'Alerts'), phase: 'day_one', enabled: true },
   ];
 
   return (
@@ -424,7 +424,7 @@ export default function AssetDetailPage() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-semibold text-ink">{asset.code}</span>
             <span className="text-sm text-grey-500">— {asset.name}</span>
-            {rel === 'renter' && <Badge variant="yellow">Rented</Badge>}
+            {rel === 'renter' && <Badge variant="yellow">{t('asset.rented', 'Rented')}</Badge>}
           </div>
           <div className="text-sm text-grey-500 mt-1">
             {asset.make} {asset.model} · {asset.year} · {asset.plateOrSerial}
@@ -441,11 +441,17 @@ export default function AssetDetailPage() {
 
       {/* Last updated */}
       <div className="text-sm text-grey-500">
-        Last updated {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}{' '}
-        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago` : ''}
+        {t('asset.lastUpdated', `Last updated ${reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}`, {
+          time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—',
+        })}{' '}
+        {reading
+          ? `· ${t('asset.minutesAgo', `${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago`, {
+              count: clock.minutesSinceDubai(new Date(reading.deviceTime).getTime()),
+            })}`
+          : ''}
         {reading && (
           <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
-            (hover for details)
+            {' '}{t('asset.hoverForDetails', '(hover for details)')}
           </span>
         )}
       </div>
@@ -456,30 +462,43 @@ export default function AssetDetailPage() {
           <div className="text-sm">
             {currentBooking ? (
               <div>
-                <div className="font-medium text-ink">Current rental</div>
+                <div className="font-medium text-ink">{t('asset.rental.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? 'No destination'} ·
-                  until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
+                  {t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? '—'}`, {
+                    name: seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? '—',
+                  })} ·
+                  {currentBooking.destination?.name ?? t('asset.rental.noDestination', 'No destination')} ·
+                  {t('asset.rental.until', `until ${clock.formatDubaiDate(new Date(currentBooking.end).getTime())} ${clock.formatDubaiTime(new Date(currentBooking.end).getTime())}`, {
+                    time: `${clock.formatDubaiDate(new Date(currentBooking.end).getTime())} ${clock.formatDubaiTime(new Date(currentBooking.end).getTime())}`,
+                  })}
                 </div>
               </div>
             ) : upcomingBooking ? (
               <div>
-                <div className="font-medium text-ink">Upcoming rental</div>
+                <div className="font-medium text-ink">{t('asset.rental.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name} ·
-                  from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
+                  {t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name ?? '—'}`, {
+                    name: seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name ?? '—',
+                  })} ·
+                  {t('asset.rental.from', `from ${clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} ${clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}`, {
+                    time: `${clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} ${clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}`,
+                  })}
                 </div>
               </div>
             ) : (
-              <div className="text-grey-500">No active or upcoming rentals</div>
+              <div className="text-grey-500">{t('asset.rental.none', 'No active or upcoming rentals')}</div>
             )}
             {recentBookings.length > 0 && (
               <div className="mt-3 pt-3 border-t border-line">
-                <div className="font-medium text-ink text-sm">Recent rentals</div>
+                <div className="font-medium text-ink text-sm">{t('asset.rental.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? 'Rented to' : 'Cancelled'} {seed.tenants.find(t => t.id === b.renterTenantId)?.name} ·
+                    {b.status === 'closed'
+                      ? t('asset.rental.rentedTo', `Rented to ${seed.tenants.find(t => t.id === b.renterTenantId)?.name ?? '—'}`, {
+                          name: seed.tenants.find(t => t.id === b.renterTenantId)?.name ?? '—',
+                        })
+                      : t('asset.rental.cancelled', 'Cancelled')}{' '}
+                    {seed.tenants.find(t => t.id === b.renterTenantId)?.name} ·
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}
@@ -489,19 +508,26 @@ export default function AssetDetailPage() {
         )}
         {rel === 'renter' && renterBooking && (
           <div className="text-sm">
-            <div className="font-medium text-ink">Your rental</div>
+            <div className="font-medium text-ink">{t('asset.rental.yours', 'Your rental')}</div>
             <div className="text-grey-700 mt-1">
-              Rented from {ownerTenant?.name} until {clock.formatDubaiDate(new Date(renterBooking.end).getTime())} {clock.formatDubaiTime(new Date(renterBooking.end).getTime())}
+              {t('asset.rental.rentedFrom', 'Rented from')} {ownerTenant?.name}{' '}
+              {t('asset.rental.until', `until ${clock.formatDubaiDate(new Date(renterBooking.end).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.end).getTime())}`, {
+                time: `${clock.formatDubaiDate(new Date(renterBooking.end).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.end).getTime())}`,
+              })}
             </div>
             <div className="text-grey-500 mt-1">
-              History starts {clock.formatDubaiDate(new Date(renterBooking.start).getTime())} {clock.formatDubaiTime(new Date(renterBooking.start).getTime())}
+              {t('asset.rental.historyStarts', `History starts ${clock.formatDubaiDate(new Date(renterBooking.start).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.start).getTime())}`, {
+                time: `${clock.formatDubaiDate(new Date(renterBooking.start).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.start).getTime())}`,
+              })}
             </div>
           </div>
         )}
         {rel === 'kasper' && (
           <div className="text-sm text-grey-700">
-            Kasper view · Owner: {ownerTenant?.name} · Current rental:{' '}
-            {currentBooking ? seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name : 'None'}
+            {t('asset.kasperView', `Kasper view · Owner: ${ownerTenant?.name} · Current rental: ${currentBooking ? seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name : 'None'}`, {
+              owner: ownerTenant?.name ?? '',
+              renter: currentBooking ? seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? '' : t('common.none', 'None'),
+            })}
           </div>
         )}
       </div>
@@ -512,24 +538,24 @@ export default function AssetDetailPage() {
           <div className="flex flex-wrap gap-2">
             {canEdit && (
               <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'edit' ? null : 'edit')}>
-                Edit asset
+                {t('asset.actions.editAsset', 'Edit asset')}
               </Button>
             )}
             {canShare && (
               <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'share' ? null : 'share')}>
-                Share tracking link
+                {t('asset.actions.shareTrackingLink', 'Share tracking link')}
               </Button>
             )}
             {canEndAccess && rel === 'owner' && currentBooking && (
               <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
-                End access now
+                {t('asset.actions.endAccessNow', 'End access now')}
               </Button>
             )}
             <a
               className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
               href="/app/reports"
             >
-              Run report
+              {t('asset.actions.runReport', 'Run report')}
             </a>
           </div>
 
@@ -739,19 +765,21 @@ export default function AssetDetailPage() {
             <div className="bg-surface border border-line rounded-lg p-4">
               {openRequest ? (
                 <div className="text-center">
-                  <div className="text-sm text-grey-500">No tracker fitted</div>
+                  <div className="text-sm text-grey-500">{t('asset.noTrackerFitted', 'No tracker fitted')}</div>
                   <div className="text-xs text-grey-500 mt-1">
-                    Tracker requested {clock.formatDubaiDate(typeof openRequest.at === 'number' ? openRequest.at : new Date(openRequest.at).getTime())} — Kasper will follow up.
+                    {t('asset.noTracker.requestedOn', `Tracker requested ${clock.formatDubaiDate(typeof openRequest.at === 'number' ? openRequest.at : new Date(openRequest.at).getTime())} — Kasper will follow up.`, {
+                      date: clock.formatDubaiDate(typeof openRequest.at === 'number' ? openRequest.at : new Date(openRequest.at).getTime()),
+                    })}
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="text-center">
-                    <div className="text-sm text-grey-500">No tracker fitted</div>
+                    <div className="text-sm text-grey-500">{t('asset.noTrackerFitted', 'No tracker fitted')}</div>
                     <div className="text-xs text-grey-500 mt-1">
                       {canRequestTracker
-                        ? 'Request a tracker and Kasper will confirm a fitting time.'
-                        : 'This asset has no tracker. Contact Kasper to fit one.'}
+                        ? t('asset.noTracker.requestPrompt', 'Request a tracker and Kasper will confirm a fitting time.')
+                        : t('asset.noTrackerHelp', 'This asset has no tracker. Contact Kasper to fit one.')}
                     </div>
                   </div>
                   {canRequestTracker && (
@@ -760,10 +788,10 @@ export default function AssetDetailPage() {
                         type="text"
                         value={requestNote}
                         onChange={e => setRequestNote(e.target.value)}
-                        placeholder="Optional note for Kasper"
+                        placeholder={t('asset.noTracker.requestNote', 'Optional note for Kasper')}
                         className="flex-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                       />
-                      <Button size="sm" onClick={submitTrackerRequest}>Request a tracker</Button>
+                      <Button size="sm" onClick={submitTrackerRequest}>{t('asset.noTracker.requestButton', 'Request a tracker')}</Button>
                     </div>
                   )}
                 </>

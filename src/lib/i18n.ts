@@ -27,10 +27,15 @@ function lookup(path: string): string | undefined {
 export function translate(language: Language, key: string, fallback: string, vars?: Vars): string {
   const template = language === 'ar' ? lookup(key) : undefined;
   if (template === undefined) return fallback;
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
-    vars[name] === undefined ? whole : String(vars[name]),
-  );
+  const text = !vars
+    ? template
+    : template.replace(/\{(\w+)\}/g, (whole, name: string) =>
+        vars[name] === undefined ? whole : String(vars[name]),
+      );
+  // A screen that forgets to pass a value must not print "{time}" at the
+  // customer: fall back to the English sentence, which reads as written.
+  if (/\{\w+\}/.test(text) && !/\{\w+\}/.test(fallback)) return fallback;
+  return text;
 }
 
 export type TFunction = (key: string, fallback: string, vars?: Vars) => string;

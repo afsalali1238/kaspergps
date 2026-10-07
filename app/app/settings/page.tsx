@@ -7,23 +7,66 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { useT } from '@/lib/useT';
+import type { TFunction } from '@/lib/i18n';
 
-function roleBadge(userRole: string): React.ReactNode {
+function roleBadge(userRole: string, t: TFunction): React.ReactNode {
   return <Badge variant={userRole === 'tenant_admin' ? 'default' : 'grey'}>
-    {userRole === 'tenant_admin' ? 'Tenant Admin' : 'Site User'}
+    {userRole === 'tenant_admin'
+      ? t('settings.users.roles.tenantAdmin', 'Tenant Admin')
+      : t('settings.users.roles.siteUser', 'Site User')}
   </Badge>;
 }
 
-function userStatusBadge(status: string): React.ReactNode {
+const USER_STATUS_KEYS: Record<string, string> = {
+  active: 'settings.users.statuses.active',
+  invited: 'settings.users.statuses.invited',
+  deactivated: 'settings.users.statuses.deactivated',
+};
+
+function userStatusBadge(status: string, t: TFunction): React.ReactNode {
   return <Badge variant={
     status === 'active' ? 'green'
     : status === 'invited' ? 'yellow'
     : 'grey'
-  }>{status}</Badge>;
+  }>{t(USER_STATUS_KEYS[status] ?? `settings.users.statuses.${status}`, status)}</Badge>;
 }
+
+/** Catalogue keys for the pick-lists on the add-asset form. */
+const ASSET_TYPE_KEYS: Record<string, string> = {
+  excavator: 'settings.assets.types.excavator',
+  wheel_loader: 'settings.assets.types.wheelLoader',
+  dozer: 'settings.assets.types.dozer',
+  crane: 'settings.assets.types.crane',
+  pickup: 'settings.assets.types.pickup',
+  tipper: 'settings.assets.types.tipper',
+};
+
+const ASSET_CLASS_KEYS: Record<string, string> = {
+  plant: 'settings.assets.classes.plant',
+  lifting: 'settings.assets.classes.lifting',
+  truck: 'settings.assets.classes.truck',
+  light_vehicle: 'settings.assets.classes.lightVehicle',
+  power: 'settings.assets.classes.power',
+};
+
+const ASSET_BEHAVIOUR_KEYS: Record<string, string> = {
+  parked: 'settings.assets.behaviours.parked',
+  works_at_site: 'settings.assets.behaviours.worksAtSite',
+  drives_between_sites: 'settings.assets.behaviours.drivesBetweenSites',
+  light_vehicle_day: 'settings.assets.behaviours.lightVehicleDay',
+};
+
+const ASSET_STATUS_KEYS: Record<string, string> = {
+  live: 'settings.assets.statuses.live',
+  offline: 'settings.assets.statuses.offline',
+  unknown: 'settings.assets.statuses.unknown',
+  no_tracker: 'settings.assets.statuses.noTracker',
+};
 
 export default function SettingsPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
@@ -37,10 +80,10 @@ export default function SettingsPage() {
   if (phase === 'day_one') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Settings</h1>
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('settings.title', 'Settings')}</h1>
         <EmptyState
-          title="Not available"
-          description="Settings are available in Phase 2."
+          title={t('settings.notAvailable', 'Not available')}
+          description={t('settings.phase2', 'Settings are available in Phase 2.')}
         />
       </div>
     );
@@ -68,17 +111,17 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Settings</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('settings.title', 'Settings')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Manage your company's users, sites, and assets.
+          {t('settings.subtitle', "Manage your company's users, sites, and assets.")}
         </p>
       </div>
 
       <Tabs
         tabs={[
-          { id: 'users', label: 'Users' },
-          { id: 'sites', label: 'Sites' },
-          { id: 'assets', label: 'Assets' },
+          { id: 'users', label: t('settings.tabs.users', 'Users') },
+          { id: 'sites', label: t('settings.tabs.sites', 'Sites') },
+          { id: 'assets', label: t('settings.tabs.assets', 'Assets') },
         ]}
         activeId={activeTab}
         onChange={setActiveTab}
@@ -88,26 +131,26 @@ export default function SettingsPage() {
       {activeTab === 'users' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-ink">Users</h2>
+            <h2 className="text-sm font-medium text-ink">{t('settings.tabs.users', 'Users')}</h2>
             <Button size="sm" onClick={() => setShowInvite(!showInvite)}>
-              {showInvite ? 'Cancel' : 'Invite user'}
+              {showInvite ? t('common.cancel', 'Cancel') : t('settings.users.invite', 'Invite user')}
             </Button>
           </div>
 
           {showInvite && (
             <div className="bg-paper-2 rounded-lg p-4 border border-line space-y-3 mb-4">
-              <h3 className="text-xs font-medium text-grey-500">Invite a user</h3>
+              <h3 className="text-xs font-medium text-grey-500">{t('settings.users.inviteTitle', 'Invite a user')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Name</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.columns.name', 'Name')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="Full name"
+                    placeholder={t('settings.users.namePlaceholder', 'Full name')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Email</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.columns.email', 'Email')}</label>
                   <input
                     type="email"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
@@ -115,16 +158,16 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Role</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.columns.role', 'Role')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="tenant_admin">Tenant Admin</option>
-                    <option value="site_user">Site User</option>
+                    <option value="tenant_admin">{t('settings.users.roles.tenantAdmin', 'Tenant Admin')}</option>
+                    <option value="site_user">{t('settings.users.roles.siteUser', 'Site User')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Sites</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.columns.site', 'Sites')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="">Pick at least one site (Site User only)</option>
+                    <option value="">{t('settings.users.sitesPlaceholder', 'Pick at least one site (Site User only)')}</option>
                     {mySites.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -132,11 +175,11 @@ export default function SettingsPage() {
                 </div>
               </div>
               {existingEmails.has('') && (
-                <p className="text-xs text-red">This email already has an account.</p>
+                <p className="text-xs text-red">{t('settings.users.duplicateEmail', 'This email already has an account.')}</p>
               )}
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleInvite}>Send invite</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowInvite(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleInvite}>{t('settings.users.sendInvite', 'Send invite')}</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowInvite(false)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
             </div>
           )}
@@ -145,12 +188,12 @@ export default function SettingsPage() {
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Email</th>
-                  <th className="px-3 py-2 text-left font-medium">Role</th>
-                  <th className="px-3 py-2 text-left font-medium">Sites</th>
-                  <th className="px-3 py-2 text-left font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.name', 'Name')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.email', 'Email')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.role', 'Role')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.site', 'Sites')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.status', 'Status')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('settings.users.columns.actions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,21 +201,21 @@ export default function SettingsPage() {
                   <tr key={u.id} className="bg-paper hover:bg-paper-2">
                     <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
                     <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
-                    <td className="px-3 py-2 border-b border-line">{roleBadge(u.role)}</td>
+                    <td className="px-3 py-2 border-b border-line">{roleBadge(u.role, t)}</td>
                     <td className="px-3 py-2 border-b border-line text-grey-700 text-xs">
                       {u.siteIds.map(sid => {
                         const s = seed.sites.find(si => si.id === sid);
                         return s?.name ?? sid;
                       }).join(', ') || '—'}
                     </td>
-                    <td className="px-3 py-2 border-b border-line">{userStatusBadge(u.status)}</td>
+                    <td className="px-3 py-2 border-b border-line">{userStatusBadge(u.status, t)}</td>
                     <td className="px-3 py-2 text-right border-b border-line">
                       <div className="flex gap-1 justify-end">
-                        <Button variant="secondary" size="sm">Edit</Button>
+                        <Button variant="secondary" size="sm">{t('common.edit', 'Edit')}</Button>
                         {u.status === 'active' ? (
-                          <Button variant="danger" size="sm">Deactivate</Button>
+                          <Button variant="danger" size="sm">{t('settings.users.deactivate', 'Deactivate')}</Button>
                         ) : (
-                          <Button variant="secondary" size="sm">Reactivate</Button>
+                          <Button variant="secondary" size="sm">{t('settings.users.reactivate', 'Reactivate')}</Button>
                         )}
                       </div>
                     </td>
@@ -181,7 +224,7 @@ export default function SettingsPage() {
                 {myUsers.length === 0 && (
                   <tr className="bg-paper">
                     <td colSpan={6} className="px-3 py-8 text-center text-sm text-grey-500">
-                      No users yet. Invite the first admin.
+                      {t('settings.users.empty', 'No users yet. Invite the first admin.')}
                     </td>
                   </tr>
                 )}
@@ -191,7 +234,7 @@ export default function SettingsPage() {
 
           {myUsers.filter(u => u.role === 'tenant_admin' && u.status === 'active').length < 1 && myUsers.length > 0 && (
             <div className="bg-yellow/10 border border-yellow/30 text-yellow-dark text-sm px-4 py-3 rounded-lg mt-4">
-              Every company needs at least one Tenant Admin.
+              {t('settings.users.needsAdmin', 'Every company needs at least one Tenant Admin.')}
             </div>
           )}
         </div>
@@ -201,32 +244,32 @@ export default function SettingsPage() {
       {activeTab === 'sites' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-ink">Sites</h2>
+            <h2 className="text-sm font-medium text-ink">{t('settings.tabs.sites', 'Sites')}</h2>
             <Button size="sm" onClick={() => setShowAddSite(!showAddSite)}>
-              {showAddSite ? 'Cancel' : 'Add site'}
+              {showAddSite ? t('common.cancel', 'Cancel') : t('settings.sites.add', 'Add site')}
             </Button>
           </div>
 
           {showAddSite && (
             <div className="bg-paper-2 rounded-lg p-4 border border-line space-y-3 mb-4">
-              <h3 className="text-xs font-medium text-grey-500">Add a site</h3>
+              <h3 className="text-xs font-medium text-grey-500">{t('settings.sites.addTitle', 'Add a site')}</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Site name</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.siteName', 'Site name')}</label>
                   <input
                     type="text"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="e.g. Business Bay Tower"
+                    placeholder={t('settings.sites.namePlaceholder', 'e.g. Business Bay Tower')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Location</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.columns.location', 'Location')}</label>
                   <div className="bg-paper-2 rounded-lg p-3 border border-line text-xs text-grey-500">
-                    Click on the map to pick a location, or search a Dubai area.
+                    {t('settings.sites.mapHint', 'Click on the map to pick a location, or search a Dubai area.')}
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Radius (100–2,000 m)</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.radiusLabel', 'Radius (100–2,000 m)')}</label>
                   <input
                     type="number"
                     min={100}
@@ -236,8 +279,8 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm">Save site</Button>
-                  <Button variant="secondary" size="sm" onClick={() => setShowAddSite(false)}>Cancel</Button>
+                  <Button size="sm">{t('settings.sites.save', 'Save site')}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setShowAddSite(false)}>{t('common.cancel', 'Cancel')}</Button>
                 </div>
               </div>
             </div>
@@ -247,12 +290,12 @@ export default function SettingsPage() {
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Location</th>
-                  <th className="px-3 py-2 text-right font-medium">Radius</th>
-                  <th className="px-3 py-2 text-right font-medium">Assets</th>
-                  <th className="px-3 py-2 text-left font-medium">Users</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.sites.columns.name', 'Name')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.sites.columns.location', 'Location')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('settings.sites.columns.radius', 'Radius')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('settings.sites.columns.assets', 'Assets')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.sites.usersColumn', 'Users')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('settings.sites.columns.actions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,9 +312,9 @@ export default function SettingsPage() {
                     </td>
                     <td className="px-3 py-2 text-right border-b border-line">
                       <div className="flex gap-1 justify-end">
-                        <Button variant="secondary" size="sm">Edit</Button>
+                        <Button variant="secondary" size="sm">{t('common.edit', 'Edit')}</Button>
                         {s.assetCount === 0 && s.userCount === 0 ? (
-                          <Button variant="danger" size="sm">Delete</Button>
+                          <Button variant="danger" size="sm">{t('common.delete', 'Delete')}</Button>
                         ) : (
                           <span className="text-xs text-grey-400">—</span>
                         )}
@@ -282,7 +325,7 @@ export default function SettingsPage() {
                 {mySites.length === 0 && (
                   <tr className="bg-paper">
                     <td colSpan={6} className="px-3 py-8 text-center text-sm text-grey-500">
-                      No sites yet. Add your first site.
+                      {t('settings.sites.empty', 'No sites yet. Add your first site.')}
                     </td>
                   </tr>
                 )}
@@ -296,18 +339,18 @@ export default function SettingsPage() {
       {activeTab === 'assets' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-ink">Assets</h2>
+            <h2 className="text-sm font-medium text-ink">{t('settings.tabs.assets', 'Assets')}</h2>
             <Button size="sm" onClick={() => setShowAddAsset(!showAddAsset)}>
-              {showAddAsset ? 'Cancel' : 'Add asset'}
+              {showAddAsset ? t('common.cancel', 'Cancel') : t('settings.assets.add', 'Add asset')}
             </Button>
           </div>
 
           {showAddAsset && (
             <div className="bg-paper-2 rounded-lg p-4 border border-line space-y-3 mb-4">
-              <h3 className="text-xs font-medium text-grey-500">Add an asset</h3>
+              <h3 className="text-xs font-medium text-grey-500">{t('settings.assets.addTitle', 'Add an asset')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Code</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.code', 'Code')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
@@ -315,36 +358,31 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Name</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.name', 'Name')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    placeholder="Excavator 15"
+                    placeholder={t('settings.assets.namePlaceholder', 'Excavator 15')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Type</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.typeLabel', 'Type')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option>excavator</option>
-                    <option>wheel_loader</option>
-                    <option>dozer</option>
-                    <option>crane</option>
-                    <option>pickup</option>
-                    <option>tipper</option>
+                    {Object.keys(ASSET_TYPE_KEYS).map(type => (
+                      <option key={type} value={type}>{t(ASSET_TYPE_KEYS[type], type)}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Class</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.class', 'Class')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option>plant</option>
-                    <option>lifting</option>
-                    <option>truck</option>
-                    <option>light_vehicle</option>
-                    <option>power</option>
+                    {Object.keys(ASSET_CLASS_KEYS).map(cls => (
+                      <option key={cls} value={cls}>{t(ASSET_CLASS_KEYS[cls], cls)}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Make</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.make', 'Make')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
@@ -352,7 +390,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Model</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.model', 'Model')}</label>
                   <input
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
@@ -360,30 +398,29 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Home site</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.columns.homeSite', 'Home site')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="">Select a site</option>
+                    <option value="">{t('settings.sites.selectSite', 'Select a site')}</option>
                     {mySites.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">Behaviour</label>
+                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.behaviour', 'Behaviour')}</label>
                   <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
-                    <option value="parked">Parked</option>
-                    <option value="works_at_site">Works at site</option>
-                    <option value="drives_between_sites">Drives between sites</option>
-                    <option value="light_vehicle_day">Light vehicle (day trips)</option>
+                    {Object.keys(ASSET_BEHAVIOUR_KEYS).map(b => (
+                      <option key={b} value={b}>{t(ASSET_BEHAVIOUR_KEYS[b], b)}</option>
+                    ))}
                   </select>
                 </div>
               </div>
               <div className="text-xs text-grey-500 italic mt-1">
-                The asset starts as No tracker, Tier 1. Contact Kasper to fit hardware.
+                {t('settings.assets.newAssetNote', 'The asset starts as No tracker, Tier 1. Contact Kasper to fit hardware.')}
               </div>
               <div className="flex gap-2">
-                <Button size="sm">Save asset</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowAddAsset(false)}>Cancel</Button>
+                <Button size="sm">{t('settings.assets.save', 'Save asset')}</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowAddAsset(false)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
             </div>
           )}
@@ -392,13 +429,13 @@ export default function SettingsPage() {
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">Code</th>
-                  <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Class</th>
-                  <th className="px-3 py-2 text-left font-medium">Home site</th>
-                  <th className="px-3 py-2 text-left font-medium">Tracker</th>
-                  <th className="px-3 py-2 text-left font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.columns.code', 'Code')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.columns.name', 'Name')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.columns.class', 'Class')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.columns.homeSite', 'Home site')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.trackerColumn', 'Tracker')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('settings.assets.columns.status', 'Status')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('settings.assets.columns.actions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -418,7 +455,7 @@ export default function SettingsPage() {
                         {tracker ? (
                           <span className="font-mono text-xs text-grey-700">{tracker.imei}</span>
                         ) : (
-                          <span className="text-grey-400 text-xs">No tracker</span>
+                          <span className="text-grey-400 text-xs">{t('settings.assets.noTracker', 'No tracker')}</span>
                         )}
                       </td>
                       <td className="px-3 py-2 border-b border-line">
@@ -428,15 +465,15 @@ export default function SettingsPage() {
                           : a.status === 'unknown' ? 'yellow'
                           : a.status === 'no_tracker' ? 'grey'
                           : 'grey'
-                        }>{a.status}</Badge>
+                        }>{t(ASSET_STATUS_KEYS[a.status] ?? `settings.assets.statuses.${a.status}`, a.status)}</Badge>
                       </td>
                       <td className="px-3 py-2 text-right border-b border-line">
                         <div className="flex gap-1 justify-end">
                           <Link href={`/app/assets/${a.id}`} className="text-xs text-yellow-600 hover:text-yellow font-medium">
-                            View
+                            {t('common.view', 'View')}
                           </Link>
                           {!a.retiredAt && (
-                            <Button variant="danger" size="sm">Retire</Button>
+                            <Button variant="danger" size="sm">{t('settings.assets.retire', 'Retire')}</Button>
                           )}
                         </div>
                       </td>
@@ -446,7 +483,7 @@ export default function SettingsPage() {
                 {myAssets.length === 0 && (
                   <tr className="bg-paper">
                     <td colSpan={7} className="px-3 py-8 text-center text-sm text-grey-500">
-                      No assets yet. Add your first asset.
+                      {t('settings.assets.empty', 'No assets yet. Add your first asset.')}
                     </td>
                   </tr>
                 )}

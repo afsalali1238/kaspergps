@@ -12,6 +12,7 @@ import {
 import type { MucVerifyStatus } from '@/server/muc';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
+import { useT } from '@/lib/useT';
 import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {
@@ -45,6 +46,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
   verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
 }) {
+  const { t } = useT();
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
 
@@ -61,18 +63,18 @@ function MucRow({ muc, canView, verifyState, onView }: {
       </td>
       <td className="px-3 py-2 border-b border-line text-center">
         {verifyState === 'tampered' ? (
-          <Badge variant="red">Seal broken</Badge>
+          <Badge variant="red">{t('certificates.sealBroken', 'Seal broken')}</Badge>
         ) : muc.status === 'sealed' ? (
-          <Badge variant="green">Sealed</Badge>
+          <Badge variant="green">{t('certificates.sealed', 'Sealed')}</Badge>
         ) : (
-          <Badge variant="yellow">Voided</Badge>
+          <Badge variant="yellow">{t('certificates.voided', 'Voided')}</Badge>
         )}
       </td>
       <td className="px-3 py-2 text-right border-b border-line">
         {muc.status === 'sealed' && canView ? (
-          <Button size="sm" onClick={() => onView(muc.number)}>View</Button>
+          <Button size="sm" onClick={() => onView(muc.number)}>{t('certificates.view', 'View')}</Button>
         ) : muc.status === 'voided' ? (
-          <span className="text-xs text-grey-500">Voided</span>
+          <span className="text-xs text-grey-500">{t('certificates.voided', 'Voided')}</span>
         ) : (
           <span className="text-xs text-grey-400">—</span>
         )}
@@ -82,6 +84,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
 }
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
+  const { t } = useT();
   const muc = seed.mucs.find(m => m.number === number);
   const [status, setStatus] = useState<MucVerifyStatus | 'checking'>('checking');
 
@@ -113,55 +116,57 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
           <span className="text-sm font-semibold text-ink">Kasper GPS</span>
         </div>
         <Badge variant={isValid ? 'green' : status === 'checking' ? 'grey' : 'red'}>
-          {status === 'checking' ? 'Checking…' : isValid ? 'Seal intact' : 'Seal broken'}
+          {status === 'checking'
+            ? t('certificates.checking', 'Checking…')
+            : isValid ? t('certificates.sealIntact', 'Seal intact') : t('certificates.sealBroken', 'Seal broken')}
         </Badge>
       </div>
 
       <h1 className="text-base font-semibold text-ink">{muc.number}</h1>
-      <p className="text-xs text-grey-500">Monthly Utilisation Certificate</p>
+      <p className="text-xs text-grey-500">{t('certificates.muc', 'Monthly Utilisation Certificate')}</p>
 
       <div className="bg-paper-2 rounded-lg p-3 border border-line text-sm space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-grey-500">Asset</span>
-          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? 'Unknown'}</span>
+          <span className="text-grey-500">{t('certificates.asset', 'Asset')}</span>
+          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? t('certificates.unknown', 'Unknown')}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Owner</span>
+          <span className="text-grey-500">{t('certificates.owner', 'Owner')}</span>
           <span className="text-ink">{owner?.name ?? '—'}</span>
         </div>
         {muc.payload.renter && (
           <div className="flex justify-between">
-            <span className="text-grey-500">Renter</span>
+            <span className="text-grey-500">{t('certificates.renter', 'Renter')}</span>
             <span className="text-ink">{muc.payload.renter.name}</span>
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-grey-500">Period</span>
+          <span className="text-grey-500">{t('certificates.period', 'Period')}</span>
           <span className="text-ink text-xs font-mono">
             {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Opening ECU hours</span>
+          <span className="text-grey-500">{t('certificates.openingHours', 'Opening ECU hours')}</span>
           <span className="text-ink font-mono">{muc.payload.openingHoursEcu.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Closing ECU hours</span>
+          <span className="text-grey-500">{t('certificates.closingHours', 'Closing ECU hours')}</span>
           <span className="text-ink font-mono">{muc.payload.closingHoursEcu.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Billable hours</span>
+          <span className="text-grey-500">{t('certificates.billableHours', 'Billable hours')}</span>
           <span className="text-ink font-mono font-medium">{muc.payload.billableHours.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Source</span>
+          <span className="text-grey-500">{t('certificates.source', 'Source')}</span>
           <span className="text-ink text-xs">{muc.payload.source}</span>
         </div>
       </div>
 
       {muc.payload.gaps.length > 0 && (
         <div className="bg-paper-2 rounded-lg p-3 border border-line text-xs text-grey-700">
-          <div className="text-grey-500 mb-1">Data gaps ({muc.payload.gaps.length})</div>
+          <div className="text-grey-500 mb-1">{t('certificates.dataGaps', `Data gaps (${muc.payload.gaps.length})`, { count: muc.payload.gaps.length })}</div>
           <ul className="space-y-0.5 font-mono">
             {muc.payload.gaps.map((g, i) => (
               <li key={i}>{formatTs(g.from)} → {formatTs(g.to)}</li>
@@ -172,41 +177,45 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 
       <div className="text-xs space-y-1 pt-2 border-t border-line">
         <div className="flex justify-between">
-          <span className="text-grey-500">Status</span>
+          <span className="text-grey-500">{t('certificates.status', 'Status')}</span>
           <span className="text-ink">
-            {muc.status === 'sealed' ? <Badge variant="green">Sealed</Badge> : <Badge variant="yellow">Voided</Badge>}
+            {muc.status === 'sealed'
+              ? <Badge variant="green">{t('certificates.sealed', 'Sealed')}</Badge>
+              : <Badge variant="yellow">{t('certificates.voided', 'Voided')}</Badge>}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Issued</span>
+          <span className="text-grey-500">{t('certificates.issuedAt', 'Issued')}</span>
           <span className="text-ink">{formatTs(muc.issuedAt)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Issued by</span>
+          <span className="text-grey-500">{t('certificates.issuedBy', 'Issued by')}</span>
           <span className="text-ink">{seed.users.find(u => u.id === muc.issuedBy)?.name ?? '—'}</span>
         </div>
         {muc.status === 'voided' && (
           <>
             <div className="flex justify-between">
-              <span className="text-grey-500">Voided</span>
+              <span className="text-grey-500">{t('certificates.voidedAt', 'Voided')}</span>
               <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt) : '—'}</span>
             </div>
             <div className="flex justify-between gap-3">
-              <span className="text-grey-500">Void reason</span>
+              <span className="text-grey-500">{t('certificates.voidReason', 'Void reason')}</span>
               <span className="text-ink text-xs text-right">{muc.voidReason}</span>
             </div>
           </>
         )}
         {isReplaced && (
           <div className="flex justify-between">
-            <span className="text-grey-500">{muc.status === 'voided' ? 'Replaced by' : 'Replaces'}</span>
+            <span className="text-grey-500">{muc.status === 'voided'
+              ? t('certificates.replacedBy', 'Replaced by')
+              : t('certificates.replaces', 'Replaces')}</span>
             <span className="text-ink font-mono text-xs">{replacement?.number ?? '—'}</span>
           </div>
         )}
       </div>
 
       <div className="pt-2 border-t border-line">
-        <div className="text-xs text-grey-500 mb-1">SHA-256 seal</div>
+        <div className="text-xs text-grey-500 mb-1">{t('certificates.shaSeal', 'SHA-256 seal')}</div>
         <div className="bg-ink text-paper px-2 py-1 rounded text-xs font-mono break-all">
           {muc.sealSha256}
         </div>
@@ -214,15 +223,15 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 
       {status === 'tampered' && (
         <div className="bg-red/10 border border-red/30 text-red text-sm px-3 py-2 rounded-lg">
-          Does not match its seal — contact Kasper.
+          {t('certificates.tamperedWarning', 'Does not match its seal — contact Kasper.')}
         </div>
       )}
 
       {muc.status === 'voided' && (
         <div className="bg-yellow/5 border border-yellow/20 text-yellow-dark text-sm px-3 py-2 rounded-lg">
           {replacement
-            ? <>This certificate was voided and replaced. See <strong>{replacement.number}</strong>.</>
-            : <>This certificate was voided. No replacement has been issued.</>}
+            ? <>{t('certificates.voidedReplaced', 'This certificate was voided and replaced. See')} <strong>{replacement.number}</strong>.</>
+            : <>{t('certificates.voidedNoReplacement', 'This certificate was voided. No replacement has been issued.')}</>}
         </div>
       )}
 
@@ -232,11 +241,11 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         target="_blank"
         rel="noreferrer"
       >
-        Open the public verify page
+        {t('certificates.verifyOpen', 'Open the public verify page')}
       </a>
 
       <div className="flex justify-end">
-        <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
+        <Button variant="secondary" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>
       </div>
     </div>
   );
@@ -244,6 +253,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 
 export default function CertificatesPage() {
   const store = useStore;
+  const { t } = useT();
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
   const [selectedMuc, setSelectedMuc] = useState<string | null>(null);
@@ -310,8 +320,11 @@ export default function CertificatesPage() {
   if (phase === 'day_one') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Monthly Utilisation Certificates</h1>
-        <EmptyState title="Not available" description="Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only." />
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('certificates.title', 'Monthly Utilisation Certificates')}</h1>
+        <EmptyState
+          title={t('certificates.notAvailable', 'Not available')}
+          description={t('certificates.phase2', 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.')}
+        />
       </div>
     );
   }
@@ -376,9 +389,9 @@ export default function CertificatesPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Monthly Utilisation Certificates</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('certificates.title', 'Monthly Utilisation Certificates')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.
+          {t('certificates.pageSubtitle', 'Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.')}
         </p>
       </div>
 
@@ -396,10 +409,10 @@ export default function CertificatesPage() {
 
       {showIssue && canIssue && myTier3.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <h2 className="text-sm font-medium text-ink mb-3">Issue a certificate</h2>
+          <h2 className="text-sm font-medium text-ink mb-3">{t('certificates.issueTitle', 'Issue a certificate')}</h2>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-grey-500 font-medium">Asset (Tier 3 with ECU)</label>
+              <label className="text-xs text-grey-500 font-medium">{t('certificates.tier3Asset', 'Asset (Tier 3 with ECU)')}</label>
               <select
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 value={selectedAsset?.id ?? ''}
@@ -411,35 +424,39 @@ export default function CertificatesPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-grey-500 font-medium">Period</label>
+              <label className="text-xs text-grey-500 font-medium">{t('certificates.periodLabel', 'Period')}</label>
               <select
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 value={issuePeriod}
                 onChange={e => setIssuePeriod(e.target.value as 'last-month' | 'booking')}
               >
-                <option value="last-month">Last month ({lastMonth.label})</option>
+                <option value="last-month">{t('certificates.lastMonth', `Last month (${lastMonth.label})`, { month: lastMonth.label })}</option>
                 {selectedAssetBookings.map(b => (
                   <option key={b.id} value="booking">
-                    Booking {b.reference} ({formatDateOnly(b.start)} – {formatDateOnly(b.end)})
+                    {t('certificates.bookingOption', `Booking ${b.reference} (${formatDateOnly(b.start)} – ${formatDateOnly(b.end)})`, {
+                      ref: b.reference,
+                      from: formatDateOnly(b.start),
+                      to: formatDateOnly(b.end),
+                    })}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">
-                Data-gap override reason {isKasperAdmin ? '(Kasper Admin only)' : ''}
+                {t('certificates.gapOverrideLabel', 'Data-gap override reason')}{isKasperAdmin ? ` ${t('certificates.kasperOnly', '(Kasper Admin only)')}` : ''}
               </label>
               <input
                 type="text"
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                placeholder="Only needed when the period has a gap longer than 24 hours"
+                placeholder={t('certificates.gapOverridePlaceholder', 'Only needed when the period has a gap longer than 24 hours')}
                 value={gapOverride}
                 onChange={e => setGapOverride(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleIssue}>Issue and seal</Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowIssue(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleIssue}>{t('certificates.issueAndSeal', 'Issue and seal')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowIssue(false)}>{t('common.cancel', 'Cancel')}</Button>
             </div>
           </div>
         </div>
@@ -448,17 +465,19 @@ export default function CertificatesPage() {
       {actionNumber && actionKind && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <h2 className="text-sm font-medium text-ink mb-2">
-            {actionKind === 'void' ? `Void ${actionNumber}` : `Reissue ${actionNumber}`}
+            {actionKind === 'void'
+              ? t('certificates.voidTitle', `Void ${actionNumber}`, { number: actionNumber })
+              : t('certificates.reissueTitle', `Reissue ${actionNumber}`, { number: actionNumber })}
           </h2>
           <p className="text-xs text-grey-500 mb-2">
             {actionKind === 'void'
-              ? 'A void needs a reason of at least 10 characters. The certificate stays listed as Voided.'
-              : 'Reissue copies the period into a new -02 certificate with a fresh seal and audit entry.'}
+              ? t('certificates.voidHint', 'A void needs a reason of at least 10 characters. The certificate stays listed as Voided.')
+              : t('certificates.reissueHint', 'Reissue copies the period into a new -02 certificate with a fresh seal and audit entry.')}
           </p>
           <input
             type="text"
             className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-            placeholder="Reason (at least 10 characters)"
+            placeholder={t('certificates.reasonPlaceholder', 'Reason (at least 10 characters)')}
             value={actionReason}
             onChange={e => setActionReason(e.target.value)}
           />
@@ -468,10 +487,12 @@ export default function CertificatesPage() {
               variant={actionKind === 'void' ? 'danger' : 'primary'}
               onClick={actionKind === 'void' ? handleVoid : handleReissue}
             >
-              {actionKind === 'void' ? 'Void certificate' : 'Reissue certificate'}
+              {actionKind === 'void'
+                ? t('certificates.voidAction', 'Void certificate')
+                : t('certificates.reissueAction', 'Reissue certificate')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => { setActionNumber(null); setActionKind(null); setActionReason(''); }}>
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </Button>
           </div>
         </div>
@@ -479,26 +500,26 @@ export default function CertificatesPage() {
 
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <div className="flex items-center justify-between p-3 border-b border-line">
-          <h2 className="text-sm font-medium text-ink">Certificates</h2>
+          <h2 className="text-sm font-medium text-ink">{t('certificates.tableTitle', 'Certificates')}</h2>
           {canIssue && myTier3.length > 0 && (
             <Button variant="secondary" size="sm" onClick={() => setShowIssue(!showIssue)}>
-              {showIssue ? 'Cancel' : 'Issue certificate'}
+              {showIssue ? t('common.cancel', 'Cancel') : t('certificates.issue', 'Issue certificate')}
             </Button>
           )}
         </div>
         {myMucs.length === 0 ? (
-          <div className="p-6 text-center text-sm text-grey-500">No certificates yet.</div>
+          <div className="p-6 text-center text-sm text-grey-500">{t('certificates.empty', 'No certificates yet.')}</div>
         ) : (
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-paper-2 text-grey-500">
-                <th className="px-3 py-2 text-left font-medium">Certificate</th>
-                <th className="px-3 py-2 text-left font-medium">Asset</th>
-                <th className="px-3 py-2 text-left font-medium">Owner</th>
-                <th className="px-3 py-2 text-left font-medium">Period</th>
-                <th className="px-3 py-2 text-right font-medium">Hours</th>
-                <th className="px-3 py-2 text-center font-medium">Status</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.certificateColumn', 'Certificate')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.asset', 'Asset')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.owner', 'Owner')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.period', 'Period')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('certificates.hoursColumn', 'Hours')}</th>
+                <th className="px-3 py-2 text-center font-medium">{t('certificates.status', 'Status')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('common.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -519,7 +540,7 @@ export default function CertificatesPage() {
                               className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
                               onClick={() => { setActionNumber(muc.number); setActionKind('void'); setActionReason(''); }}
                             >
-                              Void
+                              {t('certificates.voidButton', 'Void')}
                             </button>
                           )}
                           {muc.status === 'voided' && (
@@ -527,7 +548,7 @@ export default function CertificatesPage() {
                               className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
                               onClick={() => { setActionNumber(muc.number); setActionKind('reissue'); setActionReason(''); }}
                             >
-                              Reissue
+                              {t('certificates.reissueButton', 'Reissue')}
                             </button>
                           )}
                           <a
@@ -536,7 +557,7 @@ export default function CertificatesPage() {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Verify
+                            {t('certificates.verify', 'Verify')}
                           </a>
                         </div>
                       </td>

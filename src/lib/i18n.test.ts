@@ -215,8 +215,20 @@ describe('lookup behaviour', () => {
     expect(translate('ar', 'not.a.real.key', 'Map')).toBe('Map');
   });
 
-  it('leaves unknown placeholders alone', () => {
-    expect(translate('ar', 'publicTracking.updated', 'Updated 10:00', {})).toContain('{time}');
+  it('never shows a raw placeholder — it falls back to English instead', () => {
+    // asset.rental.until is "حتى {time}" in Arabic; a screen that forgets to
+    // pass the time must not print the braces.
+    expect(translate('ar', 'asset.rental.until', 'until 11 Oct 18:00')).toBe('until 11 Oct 18:00');
+    expect(translate('ar', 'asset.rental.until', 'until 11 Oct 18:00', { time: '11 Oct 18:00' }))
+      .toBe('حتى 11 Oct 18:00');
+  });
+
+  it('never invents a value for a placeholder the caller did not pass', () => {
+    // Arabic has "{time}" here; with no value the English sentence is shown
+    // rather than a sentence with braces in it.
+    const out = translate('ar', 'publicTracking.updated', 'Updated 10:00', {});
+    expect(out).toBe('Updated 10:00');
+    expect(out).not.toContain('{');
   });
 
   it('keeps the values the screens inject (a translated sentence without the placeholder loses data)', () => {
@@ -253,6 +265,18 @@ describe('lookup behaviour', () => {
       { key: 'publicTracking.updated', vars: { time: '14:32' } },
       { key: 'publicTracking.linkCreated', vars: { date: '6 Oct 2026', time: '08:00' } },
       { key: 'publicTracking.expires', vars: { date: '7 Oct 2026', time: '00:00' } },
+      { key: 'asset.noTracker.requestedOn', vars: { date: '6 Oct 2026' } },
+      { key: 'map.assetCount', vars: { count: '12' } },
+      { key: 'certificates.dataGaps', vars: { count: '2' } },
+      { key: 'certificates.voidTitle', vars: { number: 'MUC-2026-0001' } },
+      { key: 'certificates.reissueTitle', vars: { number: 'MUC-2026-0001' } },
+      { key: 'certificates.bookingOption', vars: { ref: 'BK-1011', from: '1 Oct', to: '5 Oct' } },
+      { key: 'playback.noData', vars: { from: '13:05', to: '15:40' } },
+      { key: 'playback.title', vars: { code: 'EX-04' } },
+      { key: 'playback.tripTitle', vars: { code: 'EX-04' } },
+      { key: 'playback.tripOf', vars: { index: '2', total: '5' } },
+      { key: 'playback.tripStarts', vars: { time: '11:01' } },
+      { key: 'playback.periodStartsInYourRental', vars: { time: '7 Oct 08:00' } },
     ];
 
     const missing = cases
