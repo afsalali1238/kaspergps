@@ -6,6 +6,7 @@ import {
 } from '@/components/ui';
 import { useStore } from '@/store';
 import { isAssetVisible } from '@/server/access';
+import { useT } from '@/i18n';
 
 interface Download {
   id: string;
@@ -56,6 +57,7 @@ const DOWNLOADS: Download[] = [
 ];
 
 export default function DownloadsPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
 
@@ -74,9 +76,9 @@ export default function DownloadsPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Downloads</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('downloads.title', 'Downloads')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Your generated reports and downloads.
+          {t('downloads.subtitle', 'Your generated reports and downloads.')}
         </p>
       </div>
 
@@ -90,21 +92,21 @@ export default function DownloadsPage() {
                   <Badge variant={download.format === 'pdf' ? 'green' : 'default'}>
                     {download.format.toUpperCase()}
                   </Badge>
-                  {download.bySchedule && <Badge variant="grey">By schedule</Badge>}
+                  {download.bySchedule && <Badge variant="grey">{t('downloads.by_schedule', 'By schedule')}</Badge>}
                 </div>
                 <div className="text-sm text-grey-700 mt-1">
                   {download.scope} · {download.period.from} to {download.period.to}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  Generated at {download.generatedAt} · {download.size}
+                  {t('downloads.generated_at', 'Generated at {at} · {size}', { at: download.generatedAt, size: download.size })}
                 </div>
               </div>
               <div className="flex gap-1">
                 <Button variant="secondary" size="sm" onClick={() => {}}>
-                  Download again
+                  {t('common.download_again', 'Download again')}
                 </Button>
                 <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
-                  Delete
+                  {t('common.delete', 'Delete')}
                 </button>
               </div>
             </div>
@@ -112,8 +114,8 @@ export default function DownloadsPage() {
         ))}
         {visibleDownloads.length === 0 && (
           <EmptyState
-            title="No downloads"
-            description="Your generated reports will appear here."
+            title={t('downloads.none', 'No downloads')}
+            description={t('downloads.none_hint', 'Your generated reports will appear here.')}
           />
         )}
       </div>

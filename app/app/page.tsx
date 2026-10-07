@@ -16,6 +16,8 @@ import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship } from '@/server/access';
 import { getReadingForAsset } from '@/server/telemetry/simulator';
 import type { Asset, LatLng } from '@/domain/types';
+import { useT, useHref, useLocale } from '@/i18n';
+import { translate, type Locale } from '@/i18n/dictionary';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,18 +87,34 @@ function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 
   return 'live';
 }
 
-function lastUpdatedStr(asset: Asset): string {
+function lastUpdatedStr(asset: Asset, locale: Locale): string {
   const reading = getReadingForAsset(asset);
-  if (!reading) return 'No data';
+  if (!reading) return translate(locale, 'common.no_data', 'No data');
   const ms = new Date(reading.deviceTime).getTime();
   const ageMin = clock.minutesSinceDubai(ms);
   const ageH = clock.hoursSinceDubai(ms);
-  if (ageMin < 60) return `${clock.formatDubaiTime(ms)} · ${Math.round(ageMin)} min ago`;
-  return `${clock.formatDubaiTime(ms)} · ${Math.round(ageH)} h ago`;
+  if (ageMin < 60) {
+    return translate(locale, 'map.updated_ago', '{time} · {minutes} min ago', {
+      time: clock.formatDubaiTime(ms), minutes: Math.round(ageMin),
+    });
+  }
+  return translate(locale, 'map.updated_ago', '{time} · {hours} h ago', {
+    time: clock.formatDubaiTime(ms), hours: Math.round(ageH),
+  });
 }
 
 const STATUS_KEYS = ['live', 'idle', 'stale', 'offline', 'unknown', 'no_tracker'] as const;
 type StatusKey = typeof STATUS_KEYS[number];
+
+/** English fallbacks for the status words in ar.json (common.status.*). */
+const STATUS_LABELS: Record<StatusKey, string> = {
+  live: 'Live',
+  idle: 'Idle',
+  stale: 'Stale',
+  offline: 'Offline',
+  unknown: 'Unknown',
+  no_tracker: 'No tracker',
+};
 
 function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
   const map = useMap();
@@ -113,6 +131,9 @@ function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
 }
 
 export default function MapPage() {
+  const t = useT();
+  const href = useHref();
+  const locale = useLocale();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -169,7 +190,7 @@ export default function MapPage() {
         code: a.code,
         name: a.name,
         status,
-        lastUpdated: lastUpdatedStr(a),
+        lastUpdated: lastUpdatedStr(a, locale),
         siteName: site?.name ?? '',
         tier,
         isRentedIn: isRented,
@@ -179,7 +200,7 @@ export default function MapPage() {
         lastReadingMs: reading ? new Date(reading.deviceTime).getTime() : clock.now(),
       };
     });
-  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView]);
+  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView, locale]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { live: 0, idle: 0, stale: 0, offline: 0, unknown: 0, no_tracker: 0 };
@@ -225,12 +246,12 @@ export default function MapPage() {
               key === 'offline' ? 'bg-offline' :
               'bg-grey-500'
             )} />
-            {key === 'no_tracker' ? 'No tracker' : key.charAt(0).toUpperCase() + key.slice(1)}
+            {t(`common.status.${key}`, STATUS_LABELS[key])}
             <span className="font-mono text-grey-500 ml-1">{statusCounts[key]}</span>
           </button>
         ))}
         <div className="flex-1" />
-        <span className="text-xs text-grey-500 font-mono">{totalVisible} assets</span>
+        <span className="text-xs text-grey-500 font-mono">{t('common.assets_count', '{count} assets', { count: totalVisible })}</span>
       </div>
 
       {loading ? (
@@ -250,9 +271,9 @@ export default function MapPage() {
         </div>
       ) : visibleAssets.length === 0 ? (
         <EmptyState
-          title="No assets match these filters"
-          description="Try clearing some filters to see your assets."
-          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); }}>Clear filters</Button>}
+          title={t('map.no_assets_match', 'No assets match these filters')}
+          description={t('map.no_assets_match_hint', 'Try clearing some filters to see your assets.')}
+          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); }}>{t('common.clear_filters', 'Clear filters')}</Button>}
         />
       ) : (
         <>
@@ -280,19 +301,19 @@ export default function MapPage() {
                         <span className="text-sm font-semibold text-ink">{a.code}</span>
                         <span className="text-xs text-grey-500">— {a.name}</span>
                       </div>
-                      <div className="text-xs text-grey-700 mb-1">{a.status}</div>
+                      <div className="text-xs text-grey-700 mb-1">{t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status)}</div>
                       <div className="text-xs text-grey-500 mb-2">{a.lastUpdated}</div>
                       <div className="flex items-center justify-between">
                         <TierChip tier={a.tier} />
                         <Link
-                          href={`/app/assets/${a.id}`}
+                          href={href(`/app/assets/${a.id}`)}
                           className="text-xs text-yellow hover:text-ink font-medium"
                         >
-                          Open →
+                          {t('map.open', 'Open')} <span className="arrow-forward">→</span>
                         </Link>
                       </div>
                       {a.isRentedIn && (
-                        <div className="mt-1 text-xs text-yellow font-medium">Rented</div>
+                        <div className="mt-1 text-xs text-yellow font-medium">{t('common.status.rented', 'Rented')}</div>
                       )}
                     </div>
                   </Popup>
@@ -305,7 +326,7 @@ export default function MapPage() {
           {/* Filters */}
           {siteOptions.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Site:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.site', 'Site:')}</span>
               {siteOptions.map(s => (
                 <button
                   key={s.id}
@@ -322,7 +343,7 @@ export default function MapPage() {
           )}
           {classOptions.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Type:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.type', 'Type:')}</span>
               {classOptions.map(cls => (
                 <button
                   key={cls}
@@ -339,8 +360,8 @@ export default function MapPage() {
           )}
           {hasTierFilter && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Tier:</span>
-              <TierFilterButton label="All" selected={selectedTier === 'all'} onClick={() => setSelectedTier('all')} />
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.tier', 'Tier:')}</span>
+              <TierFilterButton label={t('common.all', 'All')} selected={selectedTier === 'all'} onClick={() => setSelectedTier('all')} />
               <TierFilterButton label="T1" selected={selectedTier === 1} onClick={() => setSelectedTier(1)} tier={1} />
               <TierFilterButton label="T2" selected={selectedTier === 2} onClick={() => setSelectedTier(2)} tier={2} />
               <TierFilterButton label="T3" selected={selectedTier === 3} onClick={() => setSelectedTier(3)} tier={3} />
@@ -348,7 +369,7 @@ export default function MapPage() {
           )}
           {hasRented && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">Show:</span>
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.show', 'Show:')}</span>
               {(['all', 'owned', 'rented'] as const).map(r => (
                 <button
                   key={r}
@@ -358,13 +379,17 @@ export default function MapPage() {
                     rentedFilter === r ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                   )}
                 >
-                  {r === 'all' ? 'All' : r === 'owned' ? 'Owned' : 'Rented in'}
+                  {r === 'all'
+                    ? t('map.filters.rented_all', 'All')
+                    : r === 'owned'
+                      ? t('map.filters.rented_owned', 'Owned')
+                      : t('map.filters.rented_in', 'Rented in')}
                 </button>
               ))}
             </div>
           )}
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-xs text-grey-500 hover:text-ink">Clear search</button>
+            <button onClick={() => setSearchQuery('')} className="text-xs text-grey-500 hover:text-ink">{t('common.clear_search', 'Clear search')}</button>
           )}
 
           {/* List panel */}
@@ -373,7 +398,7 @@ export default function MapPage() {
               {visibleAssets.map(a => (
                 <Link
                   key={a.id}
-                  href={`/app/assets/${a.id}`}
+                  href={href(`/app/assets/${a.id}`)}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-paper-2/50 transition-colors"
                 >
                   <div className={clsx(
@@ -389,7 +414,7 @@ export default function MapPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-ink truncate">{a.code} — {a.name}</span>
-                      {a.isRentedIn && <Badge variant="yellow">Rented</Badge>}
+                      {a.isRentedIn && <Badge variant="yellow">{t('common.status.rented', 'Rented')}</Badge>}
                     </div>
                     <div className="text-xs text-grey-500 mt-0.5">
                       {a.siteName} · {a.lastUpdated}
@@ -405,7 +430,7 @@ export default function MapPage() {
                       a.status === 'stale' ? 'text-stale' :
                       'text-grey-500'
                     )}>
-                      {a.status}
+                      {t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status)}
                     </span>
                   </div>
                 </Link>

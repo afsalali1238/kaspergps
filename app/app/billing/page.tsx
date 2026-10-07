@@ -20,23 +20,38 @@ import {
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
 import { downloadBoth, downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
+import { useT } from '@/i18n';
 
 type TabId = 'issued' | 'received' | 'gps' | 'reports';
 
-function statusBadge(status: string): React.ReactNode {
+function statusBadge(
+  status: string,
+  t: (key: string, fallback: string) => string
+): React.ReactNode {
   const variants: Record<string, 'green' | 'yellow' | 'red' | 'grey'> = {
     paid: 'green', part_paid: 'yellow', unpaid: 'grey', overdue: 'red', void: 'grey',
   };
-  return <Badge variant={variants[status] ?? 'grey'}>{invoiceStatusLabel(status as InvoiceView['status'])}</Badge>;
+  const english = invoiceStatusLabel(status as InvoiceView['status']);
+  return (
+    <Badge variant={variants[status] ?? 'grey'}>
+      {t(`billing.status.${status}`, english)}
+    </Badge>
+  );
 }
 
 function formatDay(ts: string | number): string {
   return clock.formatDubaiDate(typeof ts === 'number' ? ts : new Date(ts).getTime());
 }
 
-function basisLabel(invoice: InvoiceView): string {
+const BASIS_KEYS: Record<string, string> = {
+  'Days on hire': 'billing.basis.days_on_hire',
+  'ECU': 'billing.basis.ecu',
+  'Estimated': 'billing.basis.estimated',
+};
+
+function basisLabel(invoice: InvoiceView, t: (key: string, fallback: string) => string): string {
   const bases = [...new Set(invoice.lines.map(l => l.basis))];
-  return bases.join(' + ');
+  return bases.map(basis => (BASIS_KEYS[basis] ? t(BASIS_KEYS[basis], basis) : basis)).join(' + ');
 }
 
 const PAYMENT_METHODS = [
@@ -46,6 +61,7 @@ const PAYMENT_METHODS = [
 ] as const;
 
 export default function BillingPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -95,8 +111,8 @@ export default function BillingPage() {
   if (phase === 'day_one') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Billing</h1>
-        <EmptyState title="Not available" description="Billing is available in Phase 2." />
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('billing.title', 'Billing')}</h1>
+        <EmptyState title={t('common.not_available', 'Not available')} description={t('billing.phase_gate', 'Billing is available in Phase 2.')} />
       </div>
     );
   }
@@ -104,17 +120,17 @@ export default function BillingPage() {
   if (!hasCapability(session, 'billing.view')) {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Billing</h1>
-        <EmptyState title="Not available" description="Your role doesn’t include billing." />
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('billing.title', 'Billing')}</h1>
+        <EmptyState title={t('common.not_available', 'Not available')} description={t('billing.no_capability', 'Your role doesn’t include billing.')} />
       </div>
     );
   }
 
-  const tabs: { id: TabId; label: string }[] = [
-    ...(issued.length > 0 || session.isKasper ? [{ id: 'issued' as TabId, label: 'Issued' }] : []),
-    ...(received.length > 0 || !session.isKasper ? [{ id: 'received' as TabId, label: 'Received' }] : []),
-    { id: 'gps' as TabId, label: 'GPS subscription' },
-    ...(!session.isKasper ? [{ id: 'reports' as TabId, label: 'Reports' }] : []),
+  const tabs: { id: TabId; key: string; label: string }[] = [
+    ...(issued.length > 0 || session.isKasper ? [{ id: 'issued' as TabId, key: 'billing.tabs.issued', label: 'Issued' }] : []),
+    ...(received.length > 0 || !session.isKasper ? [{ id: 'received' as TabId, key: 'billing.tabs.received', label: 'Received' }] : []),
+    { id: 'gps' as TabId, key: 'billing.tabs.gps', label: 'GPS subscription' },
+    ...(!session.isKasper ? [{ id: 'reports' as TabId, key: 'billing.tabs.reports', label: 'Reports' }] : []),
   ];
   const activeTab: TabId = tabs.some(t => t.id === tab) ? tab : tabs[0].id;
 
@@ -145,7 +161,7 @@ export default function BillingPage() {
     rows: filteredIssued.map(inv => {
       const asset = seed.assets.find(a => a.id === seed.bookings.find(b => b.id === inv.bookingId)?.assetId);
       return [
-        inv.number, inv.customerName, asset?.code ?? '—', inv.bookingId ?? '—', basisLabel(inv),
+        inv.number, inv.customerName, asset?.code ?? '—', inv.bookingId ?? '—', basisLabel(inv, t),
         formatDay(inv.issuedAt), formatDay(inv.dueAt), inv.totalAed.toFixed(2), inv.paidAed.toFixed(2),
         invoiceStatusLabel(inv.displayStatus),
       ];
@@ -229,14 +245,14 @@ export default function BillingPage() {
     <div className="space-y-4 p-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-semibold text-ink">Billing</h1>
+          <h1 className="text-lg font-semibold text-ink">{t('billing.title', 'Billing')}</h1>
           <p className="text-sm text-grey-500 mt-1">
-            Rental invoices and GPS subscription statements. All amounts in AED — Dummy rates.
+            {t('billing.subtitle', 'Rental invoices and GPS subscription statements. All amounts in AED — Dummy rates.')}
           </p>
         </div>
         {received.length > 0 && (
           <div className="text-xs text-grey-500 bg-paper-2 border border-line rounded-lg px-3 py-2">
-            Customer: {seed.tenants.find(t => t.id === tenantId)?.name ?? '—'}
+            {t('billing.customer_label', 'Customer: {name}', { name: seed.tenants.find(x => x.id === tenantId)?.name ?? '—' })}
           </div>
         )}
       </div>
@@ -252,17 +268,17 @@ export default function BillingPage() {
       )}
 
       <div className="flex gap-1 border-b border-line overflow-x-auto">
-        {tabs.map(t => (
+        {tabs.map(tabItem => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+            key={tabItem.id}
+            onClick={() => setTab(tabItem.id)}
             className={
-              activeTab === t.id
+              activeTab === tabItem.id
                 ? 'px-3 py-2 text-sm text-ink border-b-2 border-yellow -mb-[1px] whitespace-nowrap'
                 : 'px-3 py-2 text-sm text-grey-500 hover:text-ink whitespace-nowrap'
             }
           >
-            {t.label}
+            {t(tabItem.key, tabItem.label)}
           </button>
         ))}
       </div>
@@ -276,7 +292,7 @@ export default function BillingPage() {
               onChange={e => setStatusFilter(e.target.value)}
               className="px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
             >
-              <option value="">All statuses</option>
+              <option value="">{t('billing.all_statuses', 'All statuses')}</option>
               {['unpaid', 'part_paid', 'paid', 'overdue', 'void'].map(s => (
                 <option key={s} value={s}>{invoiceStatusLabel(s as InvoiceView['status'])}</option>
               ))}
@@ -286,22 +302,22 @@ export default function BillingPage() {
               onChange={e => setCustomerFilter(e.target.value)}
               className="px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
             >
-              <option value="">All customers</option>
+              <option value="">{t('billing.all_customers', 'All customers')}</option>
               {customers.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <div className="flex-1" />
             <Button variant="secondary" size="sm" onClick={() => downloadPdf({ fileName: 'kasper-invoices', subtitle: 'Rental invoices issued' }, [invoiceExport()])}>
-              PDF
+              {t('reports.pdf', 'PDF')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => downloadXlsx({ fileName: 'kasper-invoices', subtitle: 'Rental invoices issued' }, [invoiceExport()])}>
-              Excel
+              {t('reports.excel_short', 'Excel')}
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setCreateOpen(!createOpen)}>Create invoice</Button>
+            <Button variant="secondary" size="sm" onClick={() => setCreateOpen(!createOpen)}>{t('billing.actions.create_invoice', 'Create invoice')}</Button>
           </div>
 
           {createOpen && (
             <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
-              <h2 className="text-sm font-medium text-ink">Create an invoice from a booking</h2>
+              <h2 className="text-sm font-medium text-ink">{t('billing.actions.create_from_booking', 'Create an invoice from a booking')}</h2>
               <div className="grid sm:grid-cols-3 gap-3">
                 <label className="text-xs text-grey-500">
                   Booking
@@ -314,7 +330,7 @@ export default function BillingPage() {
                     }}
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   >
-                    <option value="">Pick a booking…</option>
+                    <option value="">{t('billing.actions.pick_booking', 'Pick a booking…')}</option>
                     {billableBookings.map(b => (
                       <option key={b.id} value={b.id}>
                         {b.reference} · {seed.assets.find(a => a.id === b.assetId)?.code} · {b.renterName ?? 'Outside hirer'}
@@ -329,8 +345,8 @@ export default function BillingPage() {
                     onChange={e => setBasis(e.target.value as 'hourly' | 'daily')}
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   >
-                    <option value="daily">Days on hire</option>
-                    <option value="hourly">Hourly (MUC or estimated hours)</option>
+                    <option value="daily">{t('billing.basis.days_on_hire', 'Days on hire')}</option>
+                    <option value="hourly">{t('billing.basis.hourly', 'Hourly (MUC or estimated hours)')}</option>
                   </select>
                 </label>
                 <label className="text-xs text-grey-500">
@@ -350,7 +366,7 @@ export default function BillingPage() {
                 </label>
               )}
               <div className="flex gap-2">
-                <Button size="sm" onClick={submitCreate} disabled={!bookingId}>Create invoice</Button>
+                <Button size="sm" onClick={submitCreate} disabled={!bookingId}>{t('billing.actions.create_invoice', 'Create invoice')}</Button>
                 <Button size="sm" variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
               </div>
               <p className="text-xs text-grey-500">
@@ -361,14 +377,24 @@ export default function BillingPage() {
           )}
 
           {filteredIssued.length === 0 ? (
-            <EmptyState title="No invoices" description="Nothing matches those filters yet." />
+            <EmptyState title={t('billing.no_invoices', 'No invoices')} description={t('billing.nothing_matches', 'Nothing matches those filters yet.')} />
           ) : (
             <div className="bg-surface border border-line rounded-lg overflow-x-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    {['Invoice', 'Customer', 'Asset', 'Booking', 'Basis', 'Total', 'Due', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
+                    {[
+                      ['billing.columns.number', 'Invoice'],
+                      ['billing.columns.customer', 'Customer'],
+                      ['billing.columns.asset', 'Asset'],
+                      ['billing.columns.booking', 'Booking'],
+                      ['billing.columns.basis', 'Basis'],
+                      ['billing.columns.total', 'Total'],
+                      ['billing.columns.due', 'Due'],
+                      ['billing.columns.status', 'Status'],
+                      ['billing.columns.actions', 'Actions'],
+                    ].map(([key, label]) => (
+                      <th key={key} className="px-3 py-2 text-left font-medium whitespace-nowrap">{t(key, label)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -387,15 +413,15 @@ export default function BillingPage() {
                             <a className="underline" href={`/app/bookings`}>{booking?.reference ?? inv.bookingId}</a>
                           ) : '—'}
                         </td>
-                        <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv)}</td>
+                        <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv, t)}</td>
                         <td className="px-3 py-2 border-b border-line font-mono text-ink">
                           {aed(inv.totalAed)}
                           {inv.paidAed > 0 && inv.balanceAed > 0 && (
-                            <div className="text-grey-500">{aed(inv.balanceAed)} outstanding</div>
+                            <div className="text-grey-500">{t('billing.outstanding_line', '{amount} outstanding', { amount: aed(inv.balanceAed) })}</div>
                           )}
                         </td>
                         <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">{formatDay(inv.dueAt)}</td>
-                        <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus)}</td>
+                        <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus, t)}</td>
                         <td className="px-3 py-2 border-b border-line">
                           <div className="flex flex-col gap-1">
                             {isOpen && canRecordPayment(session, inv) && (
@@ -408,7 +434,7 @@ export default function BillingPage() {
                                   setReference('');
                                 }}
                               >
-                                Record payment
+                                {t('billing.actions.record_payment', 'Record payment')}
                               </Button>
                             )}
                             {isOpen && (
@@ -422,10 +448,10 @@ export default function BillingPage() {
                                   submitVoid(inv.id);
                                 }}
                               >
-                                Void
+                                {t('billing.actions.void_invoice', 'Void')}
                               </Button>
                             )}
-                            {inv.status === 'paid' && <span className="text-grey-400">Settled</span>}
+                            {inv.status === 'paid' && <span className="text-grey-400">{t('billing.settled', 'Settled')}</span>}
                           </div>
                         </td>
                       </tr>
@@ -438,33 +464,33 @@ export default function BillingPage() {
 
           {paymentInvoice && (
             <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
-              <h2 className="text-sm font-medium text-ink">Record a payment on {paymentInvoice.number}</h2>
+              <h2 className="text-sm font-medium text-ink">{t('billing.record_on', 'Record a payment on {number}', { number: paymentInvoice.number })}</h2>
               <p className="text-xs text-grey-500">
-                {aed(paymentInvoice.balanceAed)} still owed. A payment over the balance is refused.
+                {t('billing.still_owed', '{amount} still owed. A payment over the balance is refused.', { amount: aed(paymentInvoice.balanceAed) })}
               </p>
               <div className="grid sm:grid-cols-4 gap-3">
                 <label className="text-xs text-grey-500">
-                  Amount (AED)
+                  {t('billing.payment.amount', 'Amount (AED)')}
                   <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
                 </label>
                 <label className="text-xs text-grey-500">
-                  Date
+                  {t('billing.payment.date', 'Date')}
                   <input type="date" defaultValue={clock.dubaiToIso(clock.now()).slice(0, 10)} className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
                 </label>
                 <label className="text-xs text-grey-500">
-                  Method
+                  {t('billing.payment.method', 'Method')}
                   <select value={method} onChange={e => setMethod(e.target.value as typeof method)} className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </label>
                 <label className="text-xs text-grey-500">
-                  Reference
+                  {t('billing.payment.reference', 'Reference')}
                   <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="BT-2026-…" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
                 </label>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={submitPayment}>Save payment</Button>
-                <Button size="sm" variant="secondary" onClick={() => setPaymentFor(null)}>Cancel</Button>
+                <Button size="sm" onClick={submitPayment}>{t('billing.actions.save_payment', 'Save payment')}</Button>
+                <Button size="sm" variant="secondary" onClick={() => setPaymentFor(null)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
             </div>
           )}
@@ -478,14 +504,23 @@ export default function BillingPage() {
             <div className="text-sm text-ink bg-green/10 border border-green/30 rounded-lg px-3 py-2">{payResult}</div>
           )}
           {received.length === 0 ? (
-            <EmptyState title="Nothing received" description="No invoices are addressed to your company." />
+            <EmptyState title={t('billing.nothing_received', 'Nothing received')} description={t('billing.nothing_received_hint', 'No invoices are addressed to your company.')} />
           ) : (
             <div className="bg-surface border border-line rounded-lg overflow-x-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    {['Invoice', 'From', 'Asset', 'Basis', 'Total', 'Due', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
+                    {[
+                      ['billing.columns.number', 'Invoice'],
+                      ['billing.columns.from', 'From'],
+                      ['billing.columns.asset', 'Asset'],
+                      ['billing.columns.basis', 'Basis'],
+                      ['billing.columns.total', 'Total'],
+                      ['billing.columns.due', 'Due'],
+                      ['billing.columns.status', 'Status'],
+                      ['billing.columns.actions', 'Actions'],
+                    ].map(([key, label]) => (
+                      <th key={key} className="px-3 py-2 text-left font-medium whitespace-nowrap">{t(key, label)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -503,25 +538,25 @@ export default function BillingPage() {
                         <td className="px-3 py-2 border-b border-line font-mono text-grey-500">
                           {asset?.code ?? '—'}
                           {muc && (
-                            <a href={`/verify/${muc.number}`} className="block text-grey-500 underline" title="Check the hours on the certificate">
+                            <a href={`/verify/${muc.number}`} className="block text-grey-500 underline" title={t('billing.actions.check_muc', 'Check the hours on the certificate')}>
                               {muc.number}
                             </a>
                           )}
                         </td>
-                        <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv)}</td>
+                        <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv, t)}</td>
                         <td className="px-3 py-2 border-b border-line font-mono text-ink">{aed(inv.totalAed)}</td>
                         <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">
                           {formatDay(inv.dueAt)}
-                          {inv.displayStatus === 'overdue' && <span className="text-red ml-1">overdue</span>}
+                          {inv.displayStatus === 'overdue' && <span className="text-red ml-1">{t('billing.status.overdue', 'Overdue')}</span>}
                         </td>
-                        <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus)}</td>
+                        <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus, t)}</td>
                         <td className="px-3 py-2 border-b border-line">
                           {isOpen && canPay(session, inv) ? (
                             <Button size="sm" variant="yellow" onClick={() => setPayTarget(inv.id)}>
-                              Pay {aed(inv.balanceAed)}
+                              {t('billing.actions.pay', 'Pay {amount}', { amount: aed(inv.balanceAed) })}
                             </Button>
                           ) : inv.status === 'paid' ? (
-                            <span className="text-grey-400">Paid</span>
+                            <span className="text-grey-400">{t('billing.status.paid', 'Paid')}</span>
                           ) : (
                             <span className="text-grey-400">—</span>
                           )}
@@ -541,7 +576,7 @@ export default function BillingPage() {
         <div className="space-y-3">
           {statements.length > 0 && (
             <div className="bg-surface border border-line rounded-lg overflow-x-auto">
-              <div className="px-3 py-2 border-b border-line text-xs text-grey-500">Statements from Kasper</div>
+              <div className="px-3 py-2 border-b border-line text-xs text-grey-500">{t('billing.statements_from_kasper', 'Statements from Kasper')}</div>
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
@@ -559,7 +594,7 @@ export default function BillingPage() {
                       </td>
                       <td className="px-3 py-2 border-b border-line font-mono text-ink">{aed(inv.totalAed)}</td>
                       <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">{formatDay(inv.dueAt)}</td>
-                      <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus)}</td>
+                      <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus, t)}</td>
                       <td className="px-3 py-2 border-b border-line">
                         {inv.displayStatus !== 'paid' && inv.displayStatus !== 'void' ? (
                           <Button size="sm" variant="yellow" onClick={() => setPayTarget(inv.id)}>Pay {aed(inv.balanceAed)}</Button>
@@ -575,7 +610,7 @@ export default function BillingPage() {
           )}
 
           <div className="bg-surface border border-line rounded-lg p-4">
-            <h2 className="text-sm font-medium text-ink mb-1">This month’s subscription (not issued yet)</h2>
+            <h2 className="text-sm font-medium text-ink mb-1">{t('billing.subscription_title', 'This month’s subscription (not issued yet)')}</h2>
             <p className="text-xs text-grey-500 mb-3">
               Dummy rates: AED {GPS_SUBSCRIPTION_PER_MONTH.tier1}/T1 · {GPS_SUBSCRIPTION_PER_MONTH.tier2}/T2 · {GPS_SUBSCRIPTION_PER_MONTH.tier3}/T3 per tracker-month, plus 5 % VAT.
               Kasper issues the statement at the end of the month.
@@ -590,7 +625,7 @@ export default function BillingPage() {
                 </div>
               ))}
               <div>
-                <div className="text-xs text-grey-500">Total (excl. VAT)</div>
+                <div className="text-xs text-grey-500">{t('billing.total_excl_vat', 'Total (excl. VAT)')}</div>
                 <div className="text-ink font-medium">{aed(previewTotal)}</div>
               </div>
             </div>
@@ -603,9 +638,9 @@ export default function BillingPage() {
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg p-4">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-              <h2 className="text-sm font-medium text-ink">Billing summary — last 30 days</h2>
+              <h2 className="text-sm font-medium text-ink">{t('billing.summary_title', 'Billing summary — last 30 days')}</h2>
               <Button size="sm" variant="secondary" onClick={() => downloadBoth({ fileName: 'kasper-billing-summary', subtitle: 'Billing summary and aged receivables' }, reportsExport())}>
-                Download PDF + Excel
+                {t('billing.actions.download_both', 'Download PDF + Excel')}
               </Button>
             </div>
             <div className="grid sm:grid-cols-4 gap-3 text-sm">
@@ -622,9 +657,9 @@ export default function BillingPage() {
           </div>
 
           <div className="bg-surface border border-line rounded-lg p-4">
-            <h2 className="text-sm font-medium text-ink mb-3">By customer</h2>
+            <h2 className="text-sm font-medium text-ink mb-3">{t('billing.by_customer', 'By customer')}</h2>
             {summary.byCustomer.length === 0 ? (
-              <p className="text-sm text-grey-500">Nothing issued in this period.</p>
+              <p className="text-sm text-grey-500">{t('billing.nothing_issued', 'Nothing issued in this period.')}</p>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
@@ -648,7 +683,7 @@ export default function BillingPage() {
           </div>
 
           <div className="bg-surface border border-line rounded-lg p-4">
-            <h2 className="text-sm font-medium text-ink mb-3">Aged receivables</h2>
+            <h2 className="text-sm font-medium text-ink mb-3">{t('billing.aged_receivables', 'Aged receivables')}</h2>
             <div className="grid sm:grid-cols-4 gap-3 text-sm">
               {ageing.map(b => (
                 <div key={b.label}>
@@ -665,21 +700,21 @@ export default function BillingPage() {
       {payInvoiceRow && (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/50 z-50">
           <div className="bg-surface border border-line rounded-lg p-4 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-medium text-ink mb-2">Pay this invoice?</h3>
+            <h3 className="text-sm font-medium text-ink mb-2">{t('billing.pay.title', 'Pay this invoice?')}</h3>
             <p className="text-xs text-grey-500 mb-4">
               Pay {aed(payInvoiceRow.balanceAed)} to {payInvoiceRow.issuerTenantId === 'kasper' ? 'Kasper' : (seed.tenants.find(t => t.id === payInvoiceRow.issuerTenantId)?.name ?? payInvoiceRow.issuerTenantId)}?
               This is a demo; no money moves.
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="secondary" size="sm" onClick={() => setPayTarget(null)}>Cancel</Button>
-              <Button size="sm" variant="yellow" onClick={confirmPay}>Confirm payment</Button>
+              <Button size="sm" variant="yellow" onClick={confirmPay}>{t('billing.pay.confirm', 'Confirm payment')}</Button>
             </div>
           </div>
         </div>
       )}
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">
-        <strong className="text-ink">Dummy rates:</strong> GPS subscription AED {GPS_SUBSCRIPTION_PER_MONTH.tier1}/{GPS_SUBSCRIPTION_PER_MONTH.tier2}/{GPS_SUBSCRIPTION_PER_MONTH.tier3} per tracker-month by tier.
+        <strong className="text-ink">{t('billing.dummy_rates', 'Dummy rates:')}</strong> GPS subscription AED {GPS_SUBSCRIPTION_PER_MONTH.tier1}/{GPS_SUBSCRIPTION_PER_MONTH.tier2}/{GPS_SUBSCRIPTION_PER_MONTH.tier3} per tracker-month by tier.
         VAT {5} %. Payments are simulated — no money moves.
       </div>
     </div>

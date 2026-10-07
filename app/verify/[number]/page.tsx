@@ -6,6 +6,8 @@ import { getMucByNumber, getMucVerifyStatus, getReplacementMuc } from '@/server/
 import type { MucVerifyStatus } from '@/server/muc';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
+import { useT, useLocale } from '@/i18n';
+import { translate, type Locale } from '@/i18n/dictionary';
 
 // Public certificate verification (spec 11.16).
 // Shows the number, asset code, period, billable hours and whether the stored
@@ -25,6 +27,25 @@ function periodLabel(from: string | number, to: string | number): string {
   return `${formatDate(from)} – ${formatDate(to)}`;
 }
 
+/** The seal line is locale-aware; the status words themselves come from ar.json. */
+function sealLine(
+  status: MucVerifyStatus,
+  muc: { voidedAt?: string | number; issuedAt: string | number },
+  replacementNumber: string | undefined,
+  locale: Locale
+): string {
+  if (status === 'tampered') {
+    return translate(locale, 'verify.tampered', 'Does not match its seal — contact Kasper.');
+  }
+  if (status === 'voided') {
+    const on = muc.voidedAt ? formatDate(muc.voidedAt) : '—';
+    return replacementNumber
+      ? translate(locale, 'verify.voided_replaced', 'Voided on {at} — replaced by {number}', { at: on, number: replacementNumber })
+      : translate(locale, 'verify.voided', 'Voided on {at}', { at: on });
+  }
+  return translate(locale, 'verify.valid', 'Valid — sealed {at}', { at: formatDateTime(muc.issuedAt) });
+}
+
 interface VerifyData {
   status: MucVerifyStatus | 'loading';
   number: string;
@@ -35,6 +56,8 @@ interface VerifyData {
 }
 
 export default function VerifyMucPage() {
+  const t = useT();
+  const locale = useLocale();
   const params = useParams<{ number: string }>();
   const number = decodeURIComponent(params.number ?? '');
   const [data, setData] = useState<VerifyData>({ status: 'loading', number });
@@ -50,33 +73,25 @@ export default function VerifyMucPage() {
       if (cancelled) return;
       const asset = seed.assets.find(a => a.id === muc.assetId);
       const replacement = getReplacementMuc(muc);
-      let sealLine: string;
-      if (status === 'tampered') {
-        sealLine = 'Does not match its seal — contact Kasper.';
-      } else if (status === 'voided') {
-        const on = muc.voidedAt ? formatDate(muc.voidedAt) : '—';
-        sealLine = replacement ? `Voided on ${on} — replaced by ${replacement.number}` : `Voided on ${on}`;
-      } else {
-        sealLine = `Valid — sealed ${formatDateTime(muc.issuedAt)}`;
-      }
+      const line = sealLine(status, muc, replacement?.number, locale);
       setData({
         status,
         number: muc.number,
         assetCode: asset?.code,
         period: periodLabel(muc.periodFrom, muc.periodTo),
         billableHours: muc.payload.billableHours,
-        sealLine,
+        sealLine: line,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [number]);
+  }, [number, locale]);
 
   if (data.status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-grey-500">Checking…</div>
+        <div className="text-sm text-grey-500">{t('verify.checking', 'Checking…')}</div>
       </div>
     );
   }
@@ -94,27 +109,27 @@ export default function VerifyMucPage() {
 
         {data.status === 'not_found' ? (
           <div>
-            <h1 className="text-base font-semibold text-ink">Not found</h1>
+            <h1 className="text-base font-semibold text-ink">{t('verify.not_found', 'Not found')}</h1>
             <p className="text-sm text-grey-500 mt-1 font-mono break-all">{number}</p>
           </div>
         ) : (
           <>
             <div>
-              <div className="text-xs text-grey-500">Certificate</div>
+              <div className="text-xs text-grey-500">{t('verify.certificate', 'Certificate')}</div>
               <h1 className="text-base font-semibold text-ink font-mono break-all">{data.number}</h1>
             </div>
 
             <div className="bg-paper-2 rounded-lg p-3 border border-line text-sm space-y-2">
               <div className="flex justify-between gap-3">
-                <span className="text-grey-500">Asset</span>
+                <span className="text-grey-500">{t('verify.asset', 'Asset')}</span>
                 <span className="text-ink font-medium font-mono">{data.assetCode ?? '—'}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-grey-500">Period</span>
+                <span className="text-grey-500">{t('verify.period', 'Period')}</span>
                 <span className="text-ink font-mono text-xs">{data.period}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-grey-500">Billable hours</span>
+                <span className="text-grey-500">{t('verify.billable_hours', 'Billable hours')}</span>
                 <span className="text-ink font-mono font-medium">{data.billableHours?.toFixed(1)} h</span>
               </div>
             </div>

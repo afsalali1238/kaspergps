@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { headers } from 'next/headers';
 import { DemoBar } from '@/components/demo/DemoBar';
+import { LocaleProvider, type Locale } from '@/i18n';
 
 export const metadata: Metadata = {
   title: 'Kasper GPS',
@@ -15,12 +17,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The proxy tags /ar/... requests with x-kasper-locale (see proxy.ts), so the
+  // very first paint is already in the right language and direction.
+  const requestHeaders = await headers();
+  const locale: Locale = requestHeaders.get('x-kasper-locale') === 'ar' ? 'ar' : 'en';
+
   return (
-    <html lang="en">
+    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <body className="min-h-screen bg-bg antialiased">
-        <DemoBar />
-        {children}
+        <LocaleProvider locale={locale}>
+          <DemoBar />
+          {children}
+        </LocaleProvider>
       </body>
     </html>
   );

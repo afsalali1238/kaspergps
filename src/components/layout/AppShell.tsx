@@ -10,9 +10,12 @@ import { seed } from '@/server/seed/data';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
+import { useT, useHref, useLocaleSwitch } from '@/i18n';
 
 interface NavItem {
   href: string;
+  /** ar.json key; `label` is the English fallback. */
+  labelKey: string;
   label: string;
   capability: string;
   phase: 'day_one' | 'phase2' | 'later';
@@ -23,6 +26,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     href: '/app',
+    labelKey: 'nav.map',
     label: 'Map',
     capability: 'asset.view',
     phase: 'day_one',
@@ -30,6 +34,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/alerts',
+    labelKey: 'nav.alerts',
     label: 'Alerts',
     capability: 'alert.view',
     phase: 'day_one',
@@ -37,6 +42,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/reports',
+    labelKey: 'nav.reports',
     label: 'Reports',
     capability: 'report.run',
     phase: 'day_one',
@@ -44,6 +50,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/downloads',
+    labelKey: 'nav.downloads',
     label: 'Downloads',
     capability: 'report.run',
     phase: 'day_one',
@@ -51,6 +58,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/geofences',
+    labelKey: 'nav.geofences',
     label: 'Geofences',
     capability: 'geofence.view',
     phase: 'phase2',
@@ -58,6 +66,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/certificates',
+    labelKey: 'nav.certificates',
     label: 'Certificates',
     capability: 'muc.view',
     phase: 'phase2',
@@ -65,6 +74,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/billing',
+    labelKey: 'nav.billing',
     label: 'Billing',
     capability: 'billing.view',
     phase: 'phase2',
@@ -72,6 +82,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/maintenance',
+    labelKey: 'nav.maintenance',
     label: 'Maintenance',
     capability: 'maintenance.view',
     phase: 'later',
@@ -79,6 +90,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/app/cost',
+    labelKey: 'nav.cost',
     label: 'Cost & ROI',
     capability: 'cost.view',
     phase: 'later',
@@ -97,6 +109,9 @@ function formatNotificationTime(at: string | number): string {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const href = useHref();
+  const language = useLocaleSwitch();
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const store = useStore;
@@ -106,6 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [, setBellVersion] = useState(0);
 
+  const locale = language.locale;
   const notifications = bellNotifications(session);
   const unread = bellUnreadCount(session);
 
@@ -133,19 +149,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="bg-surface border-b border-line px-4 lg:px-6 h-14 flex items-center justify-between sticky top-0 z-40" style={{ marginTop: '36px' }}>
         <div className="flex items-center gap-3">
           {/* Kasper wordmark */}
-          <Link href={session?.isKasper ? '/console' : '/app'} className="flex items-center gap-2 flex-shrink-0">
+          <Link href={session?.isKasper ? '/console' : href('/app')} className="flex items-center gap-2 flex-shrink-0">
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
               <rect width="22" height="22" rx="5" fill="#141518" />
               <text x="0" y="16" fontSize="14" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
             </svg>
-            <span className="text-sm font-semibold text-ink hidden sm:block">Kasper</span>
+            <span className="text-sm font-semibold text-ink hidden sm:block">{t('shell.brand', 'Kasper')}</span>
           </Link>
 
           {/* Company name (customer) or Viewing (Kasper) */}
           {session && (
             <span className="text-sm text-grey-700 hidden md:block">
               {session.isKasper
-                ? 'All tenants'
+                ? t('shell.all_tenants', 'All tenants')
                 : session.user.tenantId
                   ? seedTenants().find(t => t.id === session.user.tenantId)?.name ?? ''
                   : ''}
@@ -157,7 +173,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Search */}
           <div className="hidden sm:flex items-center gap-1.5 bg-paper border border-line rounded-lg px-2.5 py-1.5 text-sm text-grey-500 w-48">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1"/><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>
-            Type to search assets…
+            {t('shell.search_placeholder', 'Type to search assets…')}
           </div>
 
           {/* Notifications bell */}
@@ -166,7 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setIsBellOpen(!isBellOpen)}
                 className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700 transition-colors"
-                aria-label="Notifications"
+                aria-label={t('shell.notifications', 'Notifications')}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M8 1a4 4 0 00-4 4v4.5a1 1 0 001 1h6.5a1 1 0 001-1V5a4 4 0 00-4-4zm0 1.5a2.5 2.5 0 012.5 2.5v3.5a1 1 0 01-1 1H6a1 1 0 01-1-1V5a2.5 2.5 0 012.5-2.5zm1.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -181,18 +197,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {isBellOpen && (
                 <div className="absolute right-0 top-full mt-1 w-80 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
                   <div className="px-3 py-2 border-b border-line flex items-center justify-between">
-                    <span className="text-sm font-medium text-ink">Notifications</span>
+                    <span className="text-sm font-medium text-ink">{t('shell.notifications', 'Notifications')}</span>
                     {unread > 0 && (
                       <button
                         className="text-xs text-yellow-600 hover:text-yellow font-medium"
                         onClick={() => { markAllRead(session.userId); setBellVersion(v => v + 1); }}
                       >
-                        Mark all read
+                        {t('shell.mark_all_read', 'Mark all read')}
                       </button>
                     )}
                   </div>
                   {notifications.length === 0 ? (
-                    <div className="px-3 py-4 text-xs text-grey-500">Nothing yet.</div>
+                    <div className="px-3 py-4 text-xs text-grey-500">{t('shell.nothing_yet', 'Nothing yet.')}</div>
                   ) : (
                     <div className="max-h-80 overflow-y-auto divide-y divide-line">
                       {notifications.map(n => (
@@ -235,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
                 <span className="hidden lg:inline">{session.user.name}</span>
                 <span className="text-grey-500">·</span>
-                <span className="text-grey-500 text-xs">{roleLabel(session.user.role)}</span>
+                <span className="text-grey-500 text-xs">{roleLabel(session.user.role, t)}</span>
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ml-1 text-grey-500">
                   <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -246,19 +262,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {/* User info */}
                   <div className="px-3 py-2 border-b border-line">
                     <div className="text-sm font-medium text-ink">{session.user.name}</div>
-                    <div className="text-xs text-grey-500">{roleLabel(session.user.role)}</div>
+                    <div className="text-xs text-grey-500">{roleLabel(session.user.role, t)}</div>
                   </div>
 
                   {/* Menu items */}
                   <div className="py-1">
                     {/* Language */}
-                    <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors">
+                    <button
+                      onClick={() => router.push(language.href)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors"
+                    >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1"/>
                         <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3.5 3.5l1.5 1.5M9.5 9.5l1.5 1.5M3.5 10.5l1.5-1.5M9.5 4.5l1.5-1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
                       </svg>
-                      Language
-                      <span className="ml-auto text-xs text-grey-500">EN / عربي</span>
+                      {t('shell.language', 'Language')}
+                      <span className="ml-auto text-xs text-grey-500">{locale === 'ar' ? 'عربي / EN' : 'EN / عربي'}</span>
                     </button>
 
                     {/* Users & sites (Kasper only) */}
@@ -268,7 +287,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           <path d="M1 1h12v12H1z" stroke="currentColor" strokeWidth="1"/>
                           <path d="M4 1v12M7 1v12M10 1v12" stroke="currentColor" strokeWidth="1"/>
                         </svg>
-                        Users & sites
+                        {t('shell.users_and_sites', 'Users & sites')}
                       </button>
                     )}
 
@@ -279,7 +298,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1"/>
                           <path d="M5 7l2 2 2-2M7 5v4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
                         </svg>
-                        Console
+                        {t('shell.console', 'Console')}
                       </Link>
                     )}
 
@@ -288,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
-                      Sign out
+                      {t('shell.sign_out', 'Sign out')}
                     </Link>
                   </div>
                 </div>
@@ -320,7 +339,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={href(item.href)}
                     className={clsx(
                       'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       isActive
@@ -339,7 +358,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {session && (
               <div className="mt-auto border-t border-line p-2">
                 <Link
-                  href="/app/settings"
+                  href={href('/app/settings')}
                   className={clsx(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                     pathname === '/app/settings'
@@ -351,7 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Settings
+                  {t('shell.settings', 'Settings')}
                 </Link>
               </div>
             )}
@@ -367,7 +386,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={href(item.href)}
                     className={clsx(
                       'flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors min-w-[60px]',
                       isActive
@@ -376,7 +395,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     {item.icon}
-                    {item.label}
+                    {t(item.labelKey, item.label)}
                     {isActive && <span className="h-0.5 w-5 bg-yellow rounded-full" />}
                   </Link>
                 );
@@ -394,12 +413,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function roleLabel(role: string): string {
+function roleLabel(role: string, t: (key: string, fallback: string) => string): string {
   const labels: Record<string, string> = {
-    kasper_admin: 'Kasper Admin',
-    kasper_ops: 'Kasper Ops',
-    tenant_admin: 'Tenant Admin',
-    site_user: 'Site User',
+    kasper_admin: t('common.roles.kasper_admin', 'Kasper Admin'),
+    kasper_ops: t('common.roles.kasper_ops', 'Kasper Ops'),
+    tenant_admin: t('common.roles.tenant_admin', 'Tenant Admin'),
+    site_user: t('common.roles.site_user', 'Site User'),
   };
   return labels[role] ?? role;
 }

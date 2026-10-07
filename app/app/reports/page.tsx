@@ -10,6 +10,7 @@ import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, hasCapability } from '@/server/access';
 import { FEATURES } from '@/domain/features';
+import { useT } from '@/i18n';
 
 type ReportType = 'trip_mileage' | 'location_history' | 'operating_hours' | 'fuel' | 'utilisation' | 'driving_events';
 type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
@@ -66,13 +67,14 @@ const REPORT_TYPES: {
   },
 ];
 
-const DATE_PRESETS = [
-  { label: 'Last 24 hours', days: 1 },
-  { label: 'Last 7 days', days: 7 },
-  { label: 'Last 30 days', days: 30 },
+const DATE_PRESETS: { key: string; label: string; days: number }[] = [
+  { key: 'last_24h', label: 'Last 24 hours', days: 1 },
+  { key: 'last_7d', label: 'Last 7 days', days: 7 },
+  { key: 'last_30d', label: 'Last 30 days', days: 30 },
 ];
 
 export default function ReportsPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -129,15 +131,15 @@ export default function ReportsPage() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold text-ink">Reports</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('reports.title', 'Reports')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Run reports on your assets. Choose a report type, scope, and date range.
+          {t('reports.subtitle', 'Run reports on your assets. Choose a report type, scope, and date range.')}
         </p>
       </div>
 
       {/* Report selection */}
       <div>
-        <div className="text-sm font-medium text-ink mb-2">Report type</div>
+        <div className="text-sm font-medium text-ink mb-2">{t('reports.type', 'Report type')}</div>
         <div className="grid gap-2">
           {availableReports.map(report => (
             <button
@@ -150,8 +152,8 @@ export default function ReportsPage() {
                   : 'bg-paper border-line hover:border-grey-500'
               )}
             >
-              <div className="font-medium text-ink">{report.label}</div>
-              <div className="text-xs text-grey-500 mt-0.5">{report.description}</div>
+              <div className="font-medium text-ink">{t(`reports.types.${report.id}`, report.label)}</div>
+              <div className="text-xs text-grey-500 mt-0.5">{t(`reports.types.${report.id}_desc`, report.description)}</div>
               <div className="text-xs text-grey-500 mt-1">
                 {report.phase === 'day_one' ? 'Day one' : report.phase === 'phase2' ? 'Phase 2' : 'Later'}
               </div>
@@ -159,7 +161,7 @@ export default function ReportsPage() {
           ))}
           {availableReports.length === 0 && (
             <div className="text-sm text-grey-500 p-4 bg-paper rounded-lg border border-line">
-              No reports available for the current phase.
+              {t('reports.none_available', 'No reports available for the current phase.')}
             </div>
           )}
         </div>
@@ -168,7 +170,7 @@ export default function ReportsPage() {
       {/* Scope selection */}
       {selectedReport && (
         <div className="space-y-4">
-          <div className="text-sm font-medium text-ink mb-2">Scope</div>
+          <div className="text-sm font-medium text-ink mb-2">{t('reports.scope', 'Scope')}</div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setScope('single_asset')}
@@ -177,7 +179,7 @@ export default function ReportsPage() {
                 scope === 'single_asset' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
               )}
             >
-              Single asset
+              {t('reports.scope_single', 'Single asset')}
             </button>
             <button
               onClick={() => setScope('multiple_assets')}
@@ -186,7 +188,7 @@ export default function ReportsPage() {
                 scope === 'multiple_assets' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
               )}
             >
-              Multiple assets
+              {t('reports.scope_multiple', 'Multiple assets')}
             </button>
             <button
               onClick={() => setScope('site')}
@@ -195,7 +197,7 @@ export default function ReportsPage() {
                 scope === 'site' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
               )}
             >
-              Site
+              {t('reports.scope_site', 'Site')}
             </button>
           </div>
 
@@ -203,7 +205,9 @@ export default function ReportsPage() {
           {(scope === 'single_asset' || scope === 'multiple_assets') && (
             <div className="space-y-2">
               <div className="text-xs text-grey-500 font-medium">
-                {scope === 'single_asset' ? 'Select an asset' : 'Select assets (hold Ctrl/Cmd to multi-select)'}
+                {scope === 'single_asset'
+                  ? t('reports.select_asset', 'Select an asset')
+                  : t('reports.select_assets', 'Select assets (hold Ctrl/Cmd to multi-select)')}
               </div>
               <div className="flex flex-wrap gap-2">
                 {visibleAssets.map(asset => (
@@ -224,7 +228,7 @@ export default function ReportsPage() {
 
           {/* Date presets */}
           <div className="space-y-2">
-            <div className="text-xs text-grey-500 font-medium">Date range</div>
+            <div className="text-xs text-grey-500 font-medium">{t('reports.date_range', 'Date range')}</div>
             <div className="flex flex-wrap gap-2">
               {DATE_PRESETS.map(preset => (
                 <button
@@ -235,7 +239,7 @@ export default function ReportsPage() {
                     presetDays === preset.days ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                   )}
                 >
-                  {preset.label}
+                  {t(`reports.presets.${preset.key}`, preset.label)}
                 </button>
               ))}
               <button
@@ -245,7 +249,7 @@ export default function ReportsPage() {
                   presetDays === null ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                 )}
               >
-                Custom
+                {t('reports.presets.custom', 'Custom')}
               </button>
             </div>
             {presetDays === null && (
@@ -269,7 +273,7 @@ export default function ReportsPage() {
 
           {/* Format selection */}
           <div className="space-y-2">
-            <div className="text-xs text-grey-500 font-medium">Format</div>
+            <div className="text-xs text-grey-500 font-medium">{t('reports.format', 'Format')}</div>
             <div className="flex gap-2">
               <button
                 onClick={() => setFormat('excel')}
@@ -278,7 +282,7 @@ export default function ReportsPage() {
                   format === 'excel' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                 )}
               >
-                Excel (.xlsx)
+                {t('reports.excel', 'Excel (.xlsx)')}
               </button>
               <button
                 onClick={() => setFormat('pdf')}
@@ -287,7 +291,7 @@ export default function ReportsPage() {
                   format === 'pdf' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                 )}
               >
-                PDF
+                {t('reports.pdf', 'PDF')}
               </button>
             </div>
           </div>
@@ -297,13 +301,13 @@ export default function ReportsPage() {
             <div className="text-xs text-grey-500">
               {effectiveDateFrom && effectiveDateTo && (
                 <span>
-                  From {effectiveDateFrom} to {effectiveDateTo}
+                  {t('reports.range_line', 'From {from} to {to}', { from: effectiveDateFrom, to: effectiveDateTo })}
                 </span>
               )}
             </div>
             {canRunReport && (
               <Button onClick={() => {}}>
-                Run report
+                {t('reports.run', 'Run report')}
               </Button>
             )}
           </div>
@@ -314,8 +318,8 @@ export default function ReportsPage() {
       {selectedReport && effectiveDateFrom && effectiveDateTo && (
         <div className="text-center py-8">
           <EmptyState
-            title="Nothing to report for this period"
-            description="There is no data available for the selected date range."
+            title={t('reports.nothing', 'Nothing to report for this period')}
+            description={t('reports.nothing_hint', 'There is no data available for the selected date range.')}
           />
         </div>
       )}
