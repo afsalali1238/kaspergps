@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Button, Badge, EmptyState, Tabs, Panel,
+  Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
@@ -183,7 +183,6 @@ function TenantSites({ tenantId }: { tenantId: string }) {
 
 function TenantUsers({ tenantId }: { tenantId: string }) {
   const users = seed.users.filter(u => u.tenantId === tenantId);
-  const sites = seed.sites.filter(s => s.tenantId === tenantId);
   const activeAdmins = users.filter(u => u.role === 'tenant_admin' && u.status === 'active');
 
   return (
@@ -255,7 +254,6 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
 
 function TenantAssets({ tenantId }: { tenantId: string }) {
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
-  const sites = seed.sites.filter(s => s.tenantId === tenantId);
 
   return (
     <div className="space-y-4">

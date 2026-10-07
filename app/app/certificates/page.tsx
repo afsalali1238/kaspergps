@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Button, Badge, EmptyState, Tabs,
+  Button, Badge, EmptyState,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
@@ -13,10 +13,6 @@ function formatTs(ts: string | number): string {
     day: '2-digit', month: 'short', year: 'numeric',
     timeZone: 'Asia/Dubai',
   });
-}
-
-function fmtAed(amount: number): string {
-  return `AED ${amount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}`;
 }
 
 function MucRow({ muc, canView, onView }: {
@@ -54,7 +50,7 @@ function MucRow({ muc, canView, onView }: {
   );
 }
 
-function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
+function CertificateVerify({ number }: { number: string }) {
   const muc = seed.mucs.find(m => m.number === number);
   if (!muc) return null;
 
@@ -289,7 +285,7 @@ export default function CertificatesPage() {
               <h2 className="text-sm font-medium text-ink">Certificate details</h2>
               <Button variant="ghost" size="sm" onClick={() => setSelectedMuc(null)}>Close</Button>
             </div>
-            <CertificateVerify number={selectedMuc} onClose={() => setSelectedMuc(null)} />
+            <CertificateVerify number={selectedMuc} />
           </div>
         </div>
       )}

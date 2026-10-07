@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Button, Badge, EmptyState } from '@/components/ui';
+import React, { useMemo } from 'react';
+import { Button, EmptyState } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {
   const d = new Date(typeof ts === 'number' ? ts : ts);
@@ -31,11 +30,6 @@ export default function RequestsPage() {
     // no tracker and a flaggedForSupport note.
     return seed.assets
       .filter(a => !a.canProfile.adapter || a.canProfile.adapter === 'none')
-      .filter(a => {
-        // Assets with a requested tracker show "Tracker requested …" in the UI.
-        // In the prototype we show any no-tracker asset as a potential request.
-        return true;
-      })
       .map(a => ({
         id: `req-${a.id}`,
         asset: a,

@@ -140,15 +140,9 @@ export const adapters: { id: string; serial: string; model: 'LVCAN200' | 'ALL-CA
 
 // IMEI = 35209310 + 6 digits + Luhn check digit
 function makeImei(last6: string): string {
-  // Generates a 15-digit IMEI that passes a Luhn validator doubling even indices
-  // (0,2,4,...,14). The base (14 digits) is doubled at odd indices (1,3,5,...,13).
-  // validatorSum = baseSum + 2*check  (check digit at pos 14 is doubled).
-  // Need: baseSum + 2*check ≡ 0 (mod 10) → 2*check ≡ (10 - baseSum%10) % 10 (mod 10).
-  // Since baseSum%10 may be odd or even, we solve: check such that 2*check ≡ target (mod 10).
-  // For target = (10 - baseSum%10) % 10:
-  //   - If target is even: check = target/2 (always an integer 0–4).
-  //   - If target is odd: check = (target+10)/2 (which is integer 5–9).
-  //   Both give 2*check ≡ target (mod 10). We always choose the smaller (even case).
+  // Standard IMEI Luhn: for a 15-digit IMEI the check digit (last) is not doubled,
+  // every second digit to its left is (0-based indices 1, 3, 5, … 13). We build the
+  // 14-digit base, then pick the check digit that makes the whole sum ≡ 0 (mod 10).
   const base = '35209310' + last6;
   const digits = base.split('').map(Number);
   let baseSum = 0;
@@ -157,12 +151,7 @@ function makeImei(last6: string): string {
     if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
     baseSum += d;
   }
-  const twoBaseSumMod10 = (2 * baseSum) % 10;
-  // Need 2*check ≡ (10 - twoBaseSumMod10) (mod 10). Let t = (10 - twoBaseSumMod10) % 10.
-  // t is always even (0,2,4,6,8). For t=0,2,4 (t<5): check=(t+10)/2. For t=6,8 (t≥5): check=t/2.
-  // Check: 2*((t+10)/2)=t+10≡t ✓ (t<5); 2*(t/2)=t≡t ✓ (t≥5).
-  const t = (10 - twoBaseSumMod10) % 10;
-  const check = t < 5 ? (t + 10) / 2 : t / 2;
+  const check = (10 - (baseSum % 10)) % 10;
   return base + check;
 }
 
@@ -453,7 +442,7 @@ export const alerts: Alert[] = [
   // Phase 2 alerts
   { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: daysAgo(1) + 10.167*3600000, detail: 'Power cut at 12:10 — running on tracker battery' },
   { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: new Date(daysAgo(3)).toISOString(), detail: 'Tracker battery low (3.5 V)' },
-  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: daysAgo(1) + 15*3600000, closedAt: daysAgo(1) + 15.5*3600000, detail: 'Over speed: 104 km/h' },
+  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: hoursAgo(21), closedAt: hoursAgo(21) + 0.5*3600000, detail: 'Over speed: 104 km/h' },
   { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: new Date(daysAgo(2)).toISOString(), detail: 'Harsh driving — 3 events in last 2 days' },
   { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: daysAgo(1) + 26.167*3600000, detail: 'Fuel dropped 18% at 02:10 with engine off' },
   { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: daysAgo(0) + 5.667*3600000, detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },

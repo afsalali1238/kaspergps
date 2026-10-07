@@ -121,13 +121,13 @@ describe('seed data', () => {
   });
 });
 
-/** Luhn check for 15-digit IMEIs */
+/** Standard Luhn check for 15-digit IMEIs: the check digit is not doubled. */
 function luhnCheck(imei: string): boolean {
   const digits = imei.split('').map(d => parseInt(d, 10));
   let sum = 0;
   for (let i = 0; i < digits.length; i++) {
     let d = digits[i];
-    if (i % 2 === 0) {
+    if (i % 2 === 1) {
       d *= 2;
       if (d > 9) d -= 9;
     }

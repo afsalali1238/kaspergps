@@ -9,11 +9,15 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge,
 } from '@/components/ui';
+import { Player } from '@/components/playback/Player';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
-import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
-import { getReadingForAsset, computeStatus } from '@/server/telemetry/simulator';
+import { isAssetVisible, getRelationship, hasCapability, rentalWindow } from '@/server/access';
+import { getReadingForAsset, computeStatus, getReadingsForAsset } from '@/server/telemetry/simulator';
+import { buildPlaybackData, clippedPeriod, gapLabel } from '@/domain/trips';
+import { formatEtaLine } from '@/domain/eta';
+import { etaForLink } from '@/server/links';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +66,9 @@ export default function AssetDetailPage() {
   const phase = store.getState().demoSwitches.phase;
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [period, setPeriod] = useState<'24h' | '7d'>('24h');
+  // Playback opens inline over the tab content: { from, to, tripId }
+  const [playback, setPlayback] = useState<{ fromMs: number; toMs: number; tripId?: string } | null>(null);
 
   const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
@@ -93,6 +100,73 @@ export default function AssetDetailPage() {
   const renterBooking = useMemo(() => {
     if (!asset || !session) return null;
     return seed.bookings.find(b => b.assetId === asset.id && b.renterTenantId === session.tenantId);
+  }, [asset, session]);
+
+  // ── Playback inputs ───────────────────────────────────────────────────────
+  // Renters can't look before their window, so both the period and the scrubber
+  // start at the window start.
+  const window = asset && session ? rentalWindow(session, asset.id) : null;
+  const requestedPeriod = clippedPeriod(
+    clock.now() - (period === '7d' ? 7 : 1) * 24 * 3600 * 1000,
+    clock.now(),
+    window,
+  );
+  const periodFromMs = requestedPeriod.fromMs;
+  const periodEndMs = requestedPeriod.toMs;
+
+  const playbackData = useMemo(() => {
+    if (!asset) return null;
+    const readings = getReadingsForAsset(asset, periodFromMs, periodEndMs);
+    const ownGeofences = session ? seed.geofences.filter(g => g.tenantId === session.tenantId) : [];
+    const ownFenceIds = new Set(ownGeofences.map(g => g.id));
+    return buildPlaybackData(readings, {
+      assetId: asset.id,
+      fromMs: periodFromMs,
+      toMs: periodEndMs,
+      alerts: seed.alerts,
+      geofences: ownGeofences,
+      geofenceEvents: seed.geofenceEvents.filter(e => ownFenceIds.has(e.geofenceId)),
+      tier: (asset.canProfile.adapter === 'ALL-CAN300' ? 3 : asset.canProfile.adapter === 'LVCAN200' ? 2 : 1) as 1 | 2 | 3,
+      canSupported: asset.canProfile.supported,
+    });
+  }, [asset, period, periodFromMs, periodEndMs, session]);
+
+  // Positions table: at most 60 rows, with the gap rows kept in place.
+  const historyRows = useMemo(() => {
+    const track = playbackData?.track ?? [];
+    const gaps = playbackData?.gaps ?? [];
+    if (track.length <= 60) return { track, gaps };
+    const stride = Math.ceil(track.length / 60);
+    return { track: track.filter((_, i) => i % stride === 0 || i === track.length - 1), gaps };
+  }, [playbackData]);
+
+  const playbackReadings = useMemo(() => {
+    if (!asset || !playback) return [];
+    return getReadingsForAsset(asset, playback.fromMs, playback.toMs);
+  }, [asset, playback]);
+
+  // Owner's active tracking links for this asset, with the hirer's ETA line
+  const trackingLinkRows = useMemo(() => {
+    if (!asset || !session) return [];
+    const ownsAsset = getRelationship(session, asset.id) === 'owner' || session.isKasper;
+    if (!ownsAsset) return [];
+    return seed.trackingLinks
+      .filter(l => l.assetId === asset.id)
+      .map(l => {
+        const eta = etaForLink(l);
+        const booking = l.bookingId ? seed.bookings.find(b => b.id === l.bookingId) : null;
+        return {
+          id: l.id,
+          token: l.token,
+          createdAt: typeof l.createdAt === 'number' ? l.createdAt : new Date(l.createdAt).getTime(),
+          expiresAt: typeof l.expiresAt === 'number' ? l.expiresAt : new Date(l.expiresAt).getTime(),
+          revoked: !!l.revokedAt,
+          showEta: l.showEta,
+          job: booking?.reference ?? 'No job — 24 hour link',
+          destinationName: booking?.destination?.name,
+          etaLine: eta ? formatEtaLine(eta, clock.now()) : null,
+        };
+      });
   }, [asset, session]);
 
   if (!session) return null;
@@ -229,6 +303,39 @@ export default function AssetDetailPage() {
         </div>
       )}
 
+      {/* Tracking links — the owner sees the same ETA line the hirer sees (11.6/11.14) */}
+      {trackingLinkRows.length > 0 && (
+        <div className="bg-surface border border-line rounded-lg p-4">
+          <div className="text-sm font-medium text-ink mb-2">Tracking links</div>
+          <div className="space-y-2">
+            {trackingLinkRows.map(row => (
+              <div key={row.id} className="text-sm border border-line rounded p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-grey-700">/t/{row.token.slice(0, 10)}…</span>
+                  <Badge variant={row.revoked ? 'grey' : 'green'}>{row.revoked ? 'Revoked' : 'Active'}</Badge>
+                  <span className="text-xs text-grey-500">{row.job}</span>
+                  <span className="text-xs text-grey-500 ml-auto font-mono">
+                    expires {clock.formatDubaiDate(row.expiresAt)} {clock.formatDubaiTime(row.expiresAt)}
+                  </span>
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {row.showEta && row.destinationName ? (
+                    <>
+                      Destination: <span className="text-grey-700">{row.destinationName}</span>
+                      {row.etaLine && <span className="text-ink"> · {row.etaLine}</span>}
+                    </>
+                  ) : row.destinationName ? (
+                    <>Destination: <span className="text-grey-700">{row.destinationName}</span> · arrival time hidden from the hirer</>
+                  ) : (
+                    'No destination on this job — no arrival time'
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-line">
         <div className="flex gap-4">
@@ -252,8 +359,27 @@ export default function AssetDetailPage() {
         </div>
       </div>
 
+      {/* Trip playback (11.15) — opens over the tab content */}
+      {playback && playbackData && (
+        <Player
+          assetId={asset.id}
+          assetCode={asset.code}
+          assetName={asset.name}
+          tier={(tier as 1 | 2 | 3)}
+          canSupported={asset.canProfile.supported}
+          readings={playbackReadings}
+          alerts={seed.alerts}
+          geofences={session ? seed.geofences.filter(g => g.tenantId === session.tenantId) : []}
+          geofenceEvents={seed.geofenceEvents}
+          clipStartMs={window ? window.start : undefined}
+          focusTripId={playback.tripId}
+          title={playback.tripId ? `Trip playback · ${asset.code}` : `Playback · ${asset.code}`}
+          onClose={() => setPlayback(null)}
+        />
+      )}
+
       {/* Tab content */}
-      {activeTab === 'overview' && (
+      {!playback && activeTab === 'overview' && (
         <div className="space-y-4">
           {/* Mini map */}
           <div className="rounded-xl border border-line bg-paper h-[240px]">
@@ -365,10 +491,42 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'history' && (
+      {!playback && activeTab === 'history' && (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-grey-500 font-medium">Period:</span>
+            {(['24h', '7d'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={clsx(
+                  'text-xs px-2 py-1 rounded border',
+                  period === p ? 'bg-ink text-white border-ink' : 'bg-surface text-grey-700 border-line hover:text-ink',
+                )}
+              >
+                {p === '24h' ? 'Last 24 hours' : 'Last 7 days'}
+              </button>
+            ))}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setPlayback({ fromMs: periodFromMs, toMs: periodEndMs })}
+            >
+              Play this period
+            </Button>
+          </div>
+
+          {window && window.start > periodEndMs - 7 * 24 * 3600 * 1000 && (
+            <div className="text-xs text-amber-dark bg-amber/10 border border-amber/30 rounded px-3 py-2">
+              Your rental history starts {clock.formatDubaiDateTime(window.start)} — nothing before that is shown.
+            </div>
+          )}
+
           <div className="bg-surface border border-line rounded-lg p-4">
-            <div className="text-sm font-medium text-ink mb-3">Positions</div>
+            <div className="text-sm font-medium text-ink mb-3">
+              Positions · {clock.formatDubaiDateTime(periodFromMs)} — {clock.formatDubaiDateTime(periodEndMs)}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -380,45 +538,124 @@ export default function AssetDetailPage() {
                     {asset.canProfile.supported.includes('fuelLevel') && (
                       <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Fuel %</th>
                     )}
+                    {asset.canProfile.supported.includes('rpm') && (
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">RPM</th>
+                    )}
+                    {asset.canProfile.supported.includes('coolantTemp') && (
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Coolant</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {reading ? (
-                    <tr className="border-b border-line">
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
-                      </td>
-                      <td className="px-3 py-2 font-mono">{reading.speedKmh} km/h</td>
-                      <td className="px-3 py-2">{reading.ignition ? 'On' : 'Off'}</td>
-                      <td className="px-3 py-2 font-mono">{reading.heading}°</td>
-                      {asset.canProfile.supported.includes('fuelLevel') && (
-                        <td className="px-3 py-2 font-mono">
-                          {reading.fuelLevelPct !== undefined ? `${reading.fuelLevelPct.toFixed(0)}%` : '—'}
-                        </td>
-                      )}
-                    </tr>
-                  ) : (
+                  {historyRows.track.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">No data</td>
+                      <td colSpan={6} className="px-3 py-4 text-center text-grey-500">No data in this period</td>
                     </tr>
                   )}
+                  {historyRows.track.map((p, i) => (
+                    <React.Fragment key={p.t}>
+                      {historyRows.gaps
+                        .filter(g => g.from === historyRows.track[i - 1]?.t && g.to === p.t)
+                        .map(g => (
+                          <tr key={`gap-${g.from}`} className="bg-paper-2">
+                            <td colSpan={6} className="px-3 py-2 text-xs text-grey-500 italic">{gapLabel(g)}</td>
+                          </tr>
+                        ))}
+                      <tr className="border-b border-line">
+                        <td className="px-3 py-2 font-mono text-xs">{clock.formatDubaiTime(p.t)}</td>
+                        <td className="px-3 py-2 font-mono">{p.speedKmh.toFixed(1)} km/h</td>
+                        <td className="px-3 py-2">{p.ignition ? 'On' : 'Off'}</td>
+                        <td className="px-3 py-2 font-mono">{Math.round(p.heading)}°</td>
+                        {asset.canProfile.supported.includes('fuelLevel') && (
+                          <td className="px-3 py-2 font-mono">{p.fuelLevelPct !== undefined ? `${p.fuelLevelPct.toFixed(0)}%` : 'Not measured'}</td>
+                        )}
+                        {asset.canProfile.supported.includes('rpm') && (
+                          <td className="px-3 py-2 font-mono">{p.rpm !== undefined ? Math.round(p.rpm) : 'Not measured'}</td>
+                        )}
+                        {asset.canProfile.supported.includes('coolantTemp') && (
+                          <td className="px-3 py-2 font-mono">{p.coolantC !== undefined ? `${p.coolantC.toFixed(0)}°C` : 'Not measured'}</td>
+                        )}
+                      </tr>
+                    </React.Fragment>
+                  ))}
                 </tbody>
               </table>
+            </div>
+            <div className="text-xs text-grey-500 mt-2">
+              GPS distance in this period: <span className="font-mono text-grey-700">{playbackData ? playbackData.totalDistanceKm.toFixed(1) : '0'} km</span>
             </div>
           </div>
         </div>
       )}
 
-      {activeTab === 'trips' && (
+      {!playback && activeTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Trips</div>
-          <div className="text-sm text-grey-500">
-            No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-medium text-ink">Trips</div>
+            <span className="text-xs text-grey-500">
+              {period === '24h' ? 'Last 24 hours' : 'Last 7 days'} · Trips start at ignition on with speed above 3 km/h
+            </span>
           </div>
+          {!playbackData || playbackData.trips.length === 0 ? (
+            <div className="text-sm text-grey-500">
+              No trips recorded in this period. Trips start when ignition is on and speed exceeds 3 km/h.
+            </div>
+          ) : (
+            <>
+              <div className="text-xs text-grey-500 mb-2">
+                {playbackData.trips.length} trip{playbackData.trips.length === 1 ? '' : 's'} ·{' '}
+                <span className="font-mono text-grey-700">{playbackData.totalDistanceKm.toFixed(1)} km</span> total
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-line">
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Trip</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Start</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">End</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">From</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">To</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Distance</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Duration</th>
+                      <th className="text-right text-xs text-grey-500 font-medium px-3 py-2">Max speed</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {playbackData.trips.map(trip => (
+                      <tr key={trip.id} className="border-b border-line">
+                        <td className="px-3 py-2 font-mono text-xs">{trip.index + 1}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{clock.formatDubaiTime(trip.startMs)}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{clock.formatDubaiTime(trip.endMs)}</td>
+                        <td className="px-3 py-2 font-mono text-[11px] text-grey-500">
+                          {trip.start.lat.toFixed(4)}, {trip.start.lng.toFixed(4)}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[11px] text-grey-500">
+                          {trip.end.lat.toFixed(4)}, {trip.end.lng.toFixed(4)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">{trip.distanceKm.toFixed(1)} km</td>
+                        <td className="px-3 py-2 text-right font-mono">{trip.durationMin} min</td>
+                        <td className="px-3 py-2 text-right font-mono">{trip.maxSpeedKmh.toFixed(0)} km/h</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setPlayback({ fromMs: Math.max(trip.startMs - 5 * 60000, periodFromMs), toMs: Math.min(trip.endMs + 5 * 60000, periodEndMs), tripId: trip.id })}
+                          >
+                            Play
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {activeTab === 'engine' && (
+      {!playback && activeTab === 'engine' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="text-sm font-medium text-ink mb-3">Engine & fuel</div>
           {isTier1 ? (
@@ -433,7 +670,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'driving' && (
+      {!playback && activeTab === 'driving' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="text-sm font-medium text-ink mb-3">Driving events</div>
           <div className="text-sm text-grey-500">
@@ -442,7 +679,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'utilisation' && (
+      {!playback && activeTab === 'utilisation' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="text-sm font-medium text-ink mb-3">Utilisation</div>
           <div className="text-sm text-grey-500">
@@ -451,7 +688,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'alerts' && (
+      {!playback && activeTab === 'alerts' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="text-sm font-medium text-ink mb-3">Alerts</div>
           <div className="text-sm text-grey-500">

@@ -6,8 +6,6 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
 
 interface Label {
   id: string;
@@ -57,7 +55,16 @@ export default function LabelsPage() {
             Organize assets with custom labels.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create label</Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search labels…"
+            className="px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+          />
+          <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create label</Button>
+        </div>
       </div>
 
       {toast && (

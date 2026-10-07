@@ -74,22 +74,27 @@ function startScenario(id: number, router: ReturnType<typeof useRouter>, session
 function makePreset(label: string, targetMs: number) {
   return {
     label,
-    jump: () => clocklib.setAnchor(targetMs),
+    jump: () => {
+      // Absolute target, applied through the store so every screen re-renders
+      // with the new simulated time (spec 9: one clock for the whole app).
+      useStore.getState().setClockOffsetMs(targetMs - clocklib.getAnchor());
+    },
   };
 }
 
 function jumpToPresets(): { label: string; jump: () => void }[] {
   const now = clocklib.now();
+  const thisMonthStart = clocklib.startOfDubaiMonth(now);
   return [
     makePreset('Now', now),
     makePreset('−1 hour', now - 3600000),
     makePreset('−1 day', now - 86400000),
     makePreset('+1 hour', now + 3600000),
     makePreset('+1 day', now + 86400000),
-    makePreset('Start of last month', ANCHOR_MS - 30 * 86400000),
-    makePreset('End of last month', ANCHOR_MS - 1 * 86400000),
-    makePreset('FB-12 link expires (today 20:00)', ANCHOR_MS + 14 * 3600000),
-    makePreset('EX-07 rental starts (tomorrow 08:00)', ANCHOR_MS + 1 * 86400000 + 8 * 3600000),
+    makePreset('Start of last month', clocklib.startOfDubaiMonth(thisMonthStart - 1)),
+    makePreset('End of last month', thisMonthStart - 60000),
+    makePreset('FB-12 link expires (7 Oct 00:00)', ANCHOR_MS + 14 * 3600000),
+    makePreset('EX-07 rental starts (7 Oct 08:00)', ANCHOR_MS + 22 * 3600000),
   ];
 }
 
@@ -347,6 +352,56 @@ export function DemoBar() {
         )}
       </div>
 
+      {/* Clock dropdown */}
+      <div className="flex-shrink-0 relative">
+        <button
+          onClick={() => setClockOpen(!clockOpen)}
+          className="flex items-center gap-1.5 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors whitespace-nowrap border border-[#2a2c30]"
+          title="Simulated clock (Dubai)"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-paper/60">
+            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M5 3v2.2l1.6 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          {currentTimeStr} · {currentDateStr}
+        </button>
+        {clockOpen && (
+          <div className="absolute top-full right-0 mt-1 w-72 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <div className="p-2 border-b border-[#2a2c30]">
+              <div className="text-[10px] text-paper/50 font-mono">Simulated clock · Dubai</div>
+            </div>
+            <div className="max-h-72 overflow-y-auto p-2 space-y-0.5">
+              {jumpToPresets().map(preset => (
+                <button
+                  key={preset.label}
+                  onClick={() => {
+                    preset.jump();
+                    setClockOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-paper/80 hover:bg-white/5 transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-[#2a2c30] p-2 flex flex-wrap gap-1">
+              <ClockButton label="−1h" onClick={() => useStore.getState().setClockOffsetMs(clocklib.getOffsetMs() - 3600000)} />
+              <ClockButton label="−1d" onClick={() => useStore.getState().setClockOffsetMs(clocklib.getOffsetMs() - 86400000)} />
+              <ClockButton label="+1h" onClick={() => useStore.getState().setClockOffsetMs(clocklib.getOffsetMs() + 3600000)} />
+              <ClockButton label="+1d" onClick={() => useStore.getState().setClockOffsetMs(clocklib.getOffsetMs() + 86400000)} />
+              <ClockButton
+                label="Reset"
+                isReset
+                onClick={() => {
+                  clocklib.resetOffset();
+                  useStore.getState().resetClock();
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Tools dropdown */}
       <div className="flex-shrink-0 relative">
         <button
@@ -401,7 +456,7 @@ export function DemoBar() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'kasper-demo-state-' + new Date().toISOString().slice(0,10) + '.json';
+                    a.download = `kasper-demo-state-${clocklib.formatDubaiDate(clocklib.now()).replace(/ /g, '-')}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                     setToolsOpen(false);

@@ -6,8 +6,6 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
 
 interface Geofence {
   id: string;
@@ -110,7 +108,16 @@ export default function GeofencesPage() {
             Define areas on the map to track asset entry and exit.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create geofence</Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search geofences…"
+            className="px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+          />
+          <Button onClick={() => setShowCreateForm(!showCreateForm)}>Create geofence</Button>
+        </div>
       </div>
 
       {toast && (

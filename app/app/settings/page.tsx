@@ -1,25 +1,16 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
-import type { User } from '@/domain/types';
 
-function formatTs(ts: string | number): string {
-  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  return new Date(t).toLocaleString('en-AE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    timeZone: 'Asia/Dubai',
-  });
-}
-
-function roleBadge(role: string): React.ReactNode {
-  return <Badge variant={role === 'tenant_admin' ? 'default' : 'grey'}>
-    {role === 'tenant_admin' ? 'Tenant Admin' : 'Site User'}
+function roleBadge(userRole: string): React.ReactNode {
+  return <Badge variant={userRole === 'tenant_admin' ? 'default' : 'grey'}>
+    {userRole === 'tenant_admin' ? 'Tenant Admin' : 'Site User'}
   </Badge>;
 }
 
@@ -56,11 +47,9 @@ export default function SettingsPage() {
   }
 
   const myTenantId = session.tenantId;
-  const myTenant = seed.tenants.find(t => t.id === myTenantId);
   const myUsers = seed.users.filter(u => u.tenantId === myTenantId);
   const mySites = seed.sites.filter(s => s.tenantId === myTenantId);
   const myAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
-  const otherTenants = seed.tenants.filter(t => t.id !== myTenantId);
 
   // Sites with asset counts
   const sitesWithCounts = mySites.map(s => ({

@@ -79,23 +79,16 @@ export function dubaiMsToDate(ms: number): Date {
   return toZonedTime(new Date(ms), DUBAI_TZ);
 }
 
+// toZonedTime already moves the wall clock to Dubai, so these read the shifted
+// Date's local fields — passing `timeZone: DUBAI_TZ` as well would shift twice (+4h).
 export function formatDubaiTime(ms: number): string {
   const d = toZonedTime(new Date(ms), DUBAI_TZ);
-  return d.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: DUBAI_TZ,
-  });
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 export function formatDubaiDate(ms: number): string {
   const d = toZonedTime(new Date(ms), DUBAI_TZ);
-  return d.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: DUBAI_TZ,
-  });
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 export function formatDubaiDateTime(ms: number): string {
@@ -108,6 +101,13 @@ export function dubaiToIso(ms: number): string {
 
 export function isoFromDubai(iso: string): number {
   return fromZonedTime(new Date(iso), DUBAI_TZ).getTime();
+}
+
+export function startOfDubaiMonth(ms: number): number {
+  const d = toZonedTime(new Date(ms), DUBAI_TZ);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return fromZonedTime(d, DUBAI_TZ).getTime();
 }
 
 export function startOfDubaiDay(ms: number): number {

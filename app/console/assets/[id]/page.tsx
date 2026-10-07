@@ -10,7 +10,6 @@ import {
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
-import type { Asset } from '@/domain/types';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 

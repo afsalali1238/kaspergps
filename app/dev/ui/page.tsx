@@ -10,7 +10,48 @@ import {
   Sheet,
   InlineConfirm,
 } from '@/components/ui';
-import type { AssetStatus } from '@/domain/types';
+import type { AssetStatus, Reading } from '@/domain/types';
+import { Player } from '@/components/playback/Player';
+
+/** A synthetic day for the playback preview: a trip, a gap, an over-speed and a refuel. */
+function demoReadings(): Reading[] {
+  const out: Reading[] = [];
+  const base = new Date('2026-10-05T03:00:00Z').getTime(); // 07:00 Dubai
+  const push = (minute: number, overrides: Partial<Reading> = {}) => {
+    const t = base + minute * 60000;
+    out.push({
+      trackerId: 'tr-demo',
+      deviceTime: new Date(t).toISOString(),
+      receivedAt: new Date(t + 5000).toISOString(),
+      lat: 25.09 + minute * 0.0004,
+      lng: 55.14 + minute * 0.0006,
+      speedKmh: 42,
+      heading: 60,
+      satellites: 10,
+      ignition: true,
+      moving: true,
+      extVoltage: 26,
+      intBattery: 4,
+      gsm: 4,
+      gnssOdometerKm: 100 + minute * 0.5,
+      ...overrides,
+    });
+  };
+  for (let m = 0; m < 45; m += 0.5) {
+    const fuel = 40 + m * 0.2 + (m > 20 ? 35 : 0); // refuel jump at 08:20
+    push(m, {
+      speedKmh: m > 26 && m < 27 ? 96 : 42,
+      rpm: m > 30 ? 1500 : 800,
+      engineLoadPct: m > 30 ? 55 : 15,
+      coolantC: 88,
+      fuelLevelPct: Math.min(95, fuel),
+      event: m > 26 && m < 27 ? 'overspeed' : undefined,
+    });
+  }
+  // 13:05 – 15:40 has no data, then a second trip
+  for (let m = 200; m < 230; m += 0.5) push(m, { speedKmh: 35, fuelLevelPct: 62 });
+  return out;
+}
 
 export default function DevUiPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -203,6 +244,22 @@ export default function DevUiPage() {
               { id: '3', code: 'BD-02', name: 'Bulldozer CAT D6', status: 'idle' as AssetStatus, tier: 3, last: '14:20 · 3h ago' },
               { id: '4', code: 'SL-02', name: 'Scissor lift Genie GS', status: 'offline' as AssetStatus, tier: 1, last: '09:15 · 2d ago' },
             ]}
+          />
+        </section>
+
+        {/* Trip playback (spec 11.15) */}
+        <section className="mb-8">
+          <PanelHeader title="Trip playback" subtitle="Player bar, state-coloured scrubber with event pins, gap banner, Tier 3 readout" />
+          <Player
+            assetId="a-demo"
+            assetCode="DM-01"
+            assetName="Demo excavator"
+            tier={3}
+            canSupported={['fuelLevel', 'rpm', 'engineLoad', 'coolantTemp', 'engineHours']}
+            readings={demoReadings()}
+            alerts={[]}
+            geofences={[]}
+            geofenceEvents={[]}
           />
         </section>
 

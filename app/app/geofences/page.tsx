@@ -7,7 +7,6 @@ import {
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import { isAssetVisible } from '@/server/access';
-import type { Session } from '@/domain/types';
 
 interface Geofence {
   id: string;

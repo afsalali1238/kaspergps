@@ -1,0 +1,396 @@
+{
+  "_meta": {
+    "language": "ar",
+    "direction": "rtl",
+    "status": "Draft — needs native review",
+    "scope": "Customer screens (/sign-in, /app/*) and the public tracking page (/t/[token]) only. The Kasper console (/console/*) stays English.",
+    "digits": "Latin digits (0-9) are used for codes, plate numbers, times, distances, money and quantities — never Arabic-Indic numerals.",
+    "notes": [
+      "Draft — needs native review before any customer sees it.",
+      "Brand names (Kasper GPS, asset codes such as FB-12, INV-EE-0412, MUC numbers, AED) stay in Latin script.",
+      "Keys mirror the existing English screens; no screen reads this file yet."
+    ]
+  },
+
+  "common": {
+    "kasperGps": "Kasper GPS",
+    "demo": "عرض توضيحي",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "actions": "إجراءات",
+    "status": "الحالة",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "role": "الدور",
+    "site": "الموقع",
+    "all": "الكل",
+    "search": "بحث",
+    "clearSearch": "مسح البحث",
+    "clearFilters": "مسح عوامل التصفية",
+    "notMeasured": "غير مُقاس",
+    "estimated": "تقديري",
+    "loading": "جارٍ التحميل…",
+    "noData": "لا توجد بيانات",
+    "apply": "تطبيق",
+    "back": "رجوع"
+  },
+
+  "nav": {
+    "map": "الخريطة",
+    "alerts": "التنبيهات",
+    "reports": "التقارير",
+    "downloads": "التنزيلات",
+    "geofences": "الأسوار الجغرافية",
+    "certificates": "الشهادات",
+    "billing": "الفواتير",
+    "maintenance": "الصيانة",
+    "costAndRoi": "التكلفة والعائد",
+    "settings": "الإعدادات",
+    "signOut": "تسجيل الخروج"
+  },
+
+  "signIn": {
+    "title": "تسجيل الدخول",
+    "subtitle": "أدخل بريدك الإلكتروني للمتابعة.",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "تسجيل الدخول",
+    "forgot": "هل نسيت كلمة المرور؟",
+    "errorNoAccount": "ليس لديك حساب. يرجى التواصل مع المسؤول.",
+    "errorDeactivated": "حسابك لم يعد نشطًا. تواصل مع مسؤول شركتك.",
+    "errorSuspended": "حساب شركتك موقوف. تواصل مع كاسبر.",
+    "errorFailed": "تعذّر تسجيل الدخول."
+  },
+
+  "statuses": {
+    "live": "مباشر",
+    "idle": "متوقف مع تشغيل المحرك",
+    "stale": "بيانات قديمة",
+    "offline": "غير متصل",
+    "unknown": "غير معروف",
+    "noTracker": "بدون جهاز تتبع"
+  },
+
+  "map": {
+    "title": "الخريطة",
+    "assetCount": "{count} أصل",
+    "kpi": {
+      "live": "مباشر",
+      "idle": "متوقف مع تشغيل المحرك",
+      "stale": "بيانات قديمة",
+      "offline": "غير متصل",
+      "unknown": "غير معروف",
+      "noTracker": "بدون جهاز تتبع"
+    },
+    "filters": {
+      "site": "الموقع",
+      "allSites": "كل المواقع",
+      "type": "النوع",
+      "tier": "الفئة",
+      "show": "عرض",
+      "owned": "مملوك",
+      "rented": "مستأجر",
+      "labels": "الملصقات",
+      "clearFilters": "مسح عوامل التصفية"
+    },
+    "emptyTitle": "لا توجد أصول مطابقة لعوامل التصفية",
+    "emptyDescription": "جرّب مسح بعض عوامل التصفية لعرض أصولك.",
+    "rentedBadge": "مستأجر",
+    "updated": "آخر تحديث"
+  },
+
+  "asset": {
+    "lastUpdated": "آخر تحديث",
+    "noLocationYet": "لا توجد بيانات موقع بعد",
+    "noTrackerFitted": "لا يوجد جهاز تتبع مركّب",
+    "noTrackerHelp": "لا يوجد جهاز تتبع على هذا الأصل. تواصل مع كاسبر لتركيب واحد.",
+    "offlineSince": "غير متصل منذ {time}",
+    "rental": {
+      "current": "الإيجار الحالي",
+      "rentedTo": "مؤجَّر إلى",
+      "noDestination": "بدون وجهة",
+      "until": "حتى",
+      "upcoming": "الإيجار القادم",
+      "from": "من",
+      "none": "لا توجد إيجارات حالية أو قادمة",
+      "recent": "الإيجارات السابقة",
+      "yours": "إيجارك",
+      "rentedFrom": "مؤجَّر من",
+      "historyStarts": "يبدأ السجل"
+    },
+    "actions": {
+      "runReport": "تشغيل تقرير",
+      "editAsset": "تعديل الأصل",
+      "shareTrackingLink": "مشاركة رابط التتبع",
+      "endAccessNow": "إنهاء الوصول الآن"
+    },
+    "tabs": {
+      "overview": "نظرة عامة",
+      "history": "السجل",
+      "trips": "الرحلات",
+      "engineAndFuel": "المحرك والوقود",
+      "driving": "القيادة",
+      "utilisation": "الاستخدام",
+      "alerts": "التنبيهات"
+    },
+    "tiles": {
+      "status": "الحالة",
+      "speed": "السرعة",
+      "ignition": "الإشعال",
+      "battery": "البطارية",
+      "heading": "الاتجاه",
+      "gpsDistance": "مسافة GPS",
+      "engineHours": "ساعات المحرك",
+      "fuelLevel": "مستوى الوقود",
+      "engineRpm": "دورات المحرك",
+      "coolant": "سائل التبريد",
+      "engineLoad": "حمل المحرك",
+      "adBlue": "أدبلو",
+      "sourceEcu": "ECU",
+      "sourceEstimated": "تقديري"
+    },
+    "trackingLinks": {
+      "title": "روابط التتبع",
+      "active": "نشط",
+      "revoked": "ملغى",
+      "expires": "ينتهي",
+      "destination": "الوجهة",
+      "noDestination": "لا توجد وجهة لهذه المهمة — لا وقت وصول",
+      "etaHidden": "وقت الوصول مخفي عن المستأجر"
+    }
+  },
+
+  "playback": {
+    "play": "تشغيل",
+    "pause": "إيقاف مؤقت",
+    "restart": "إعادة من البداية",
+    "speed": "السرعة",
+    "readout": "القراءات",
+    "events": "الأحداث",
+    "playThisPeriod": "تشغيل هذه الفترة",
+    "last24Hours": "آخر 24 ساعة",
+    "last7Days": "آخر 7 أيام",
+    "noReadings": "لا توجد قراءات في هذه الفترة.",
+    "noData": "لا توجد بيانات {from} – {to}",
+    "reducedMotion": "تقليل الحركة: خطوة بخطوة",
+    "trip": "رحلة",
+    "tripOf": "الرحلة {index} من {total}",
+    "periodStartsInYourRental": "يبدأ سجل إيجارك في {time}",
+    "tripStart": "بداية الرحلة",
+    "tripStop": "نهاية الرحلة",
+    "harshBraking": "كبح مفاجئ",
+    "harshAcceleration": "تسارع مفاجئ",
+    "harshCornering": "انعطاف مفاجئ",
+    "harshDriving": "قيادة عنيفة",
+    "overSpeed": "تجاوز السرعة",
+    "geofenceEnter": "دخول السور",
+    "geofenceExit": "الخروج من السور",
+    "refuel": "تعبئة وقود",
+    "fuelDrop": "انخفاض الوقود",
+    "powerCut": "انقطاع التيار",
+    "towing": "سحب"
+  },
+
+  "alerts": {
+    "title": "التنبيهات",
+    "filters": {
+      "type": "النوع",
+      "site": "الموقع",
+      "status": "الحالة",
+      "allTypes": "كل الأنواع",
+      "allSites": "كل المواقع"
+    },
+    "open": "مفتوح",
+    "closed": "مغلق",
+    "acknowledge": "تأكيد",
+    "acknowledgedBy": "أكّده {name} في {time}",
+    "empty": "لا توجد تنبيهات",
+    "offline": "غير متصل",
+    "powerCut": "انقطاع التيار",
+    "lowBattery": "بطارية منخفضة",
+    "towing": "سحب",
+    "overSpeed": "تجاوز السرعة",
+    "harshDriving": "قيادة عنيفة",
+    "fuelDrop": "انخفاض الوقود",
+    "faultCode": "رمز عطل",
+    "geofenceEnter": "دخول سور جغرافي",
+    "geofenceExit": "الخروج من سور جغرافي",
+    "afterHoursMove": "حركة بعد ساعات العمل",
+    "lowFuel": "وقود منخفض",
+    "idle": "تشغيل بدون حركة"
+  },
+
+  "reports": {
+    "title": "التقارير",
+    "reportType": "نوع التقرير",
+    "scope": "النطاق",
+    "dateRange": "الفترة الزمنية",
+    "format": "الصيغة",
+    "runReport": "تشغيل التقرير",
+    "scheduleThisReport": "جدولة هذا التقرير",
+    "frequency": "التكرار",
+    "daily": "يوميًا",
+    "weekly": "أسبوعيًا",
+    "monthly": "شهريًا",
+    "deliverTo": "الإرسال إلى: بريدي الإلكتروني (محاكاة)",
+    "types": {
+      "tripAndMileage": "الرحلات والمسافة المقطوعة",
+      "locationHistory": "سجل المواقع",
+      "operatingHours": "ساعات التشغيل",
+      "utilisation": "الاستخدام",
+      "drivingEvents": "أحداث القيادة",
+      "fuel": "الوقود",
+      "geofence": "الأسوار الجغرافية"
+    }
+  },
+
+  "downloads": {
+    "title": "التنزيلات",
+    "empty": "تظهر التقارير التي تُنشئها هنا.",
+    "downloadAgain": "تنزيل مرة أخرى",
+    "deleteFromList": "حذف من القائمة",
+    "bySchedule": "حسب الجدولة",
+    "byYou": "بواسطتك",
+    "skipped": "تم التخطي — لم يعد لديك وصول إلى {code} (انتهى الإيجار في {date})",
+    "noAccess": "لم يعد لديك وصول إلى أصول هذا التقرير."
+  },
+
+  "billing": {
+    "title": "الفواتير",
+    "subtitle": "فواتير الإيجار وكشوف اشتراك GPS. جميع المبالغ بالدرهم الإماراتي. الأسعار افتراضية.",
+    "tabs": {
+      "issued": "الصادرة",
+      "received": "الواردة",
+      "gpsSubscription": "اشتراك GPS"
+    },
+    "issuedInvoices": "فواتير الإيجار الصادرة",
+    "receivedInvoices": "الفواتير الواردة إليك",
+    "columns": {
+      "invoice": "الفاتورة",
+      "customer": "العميل",
+      "total": "الإجمالي",
+      "issued": "تاريخ الإصدار",
+      "due": "تاريخ الاستحقاق",
+      "status": "الحالة",
+      "actions": "إجراءات"
+    },
+    "statuses": {
+      "paid": "مدفوعة",
+      "partPaid": "مدفوعة جزئيًا",
+      "unpaid": "غير مدفوعة",
+      "overdue": "متأخرة",
+      "void": "ملغاة"
+    },
+    "pay": "دفع (محاكاة)",
+    "recordPayment": "تسجيل دفعة",
+    "subtotal": "المجموع الفرعي",
+    "vat": "ضريبة القيمة المضافة 5%",
+    "total": "الإجمالي",
+    "daysOnHire": "أيام الإيجار",
+    "basis": "الأساس",
+    "emptyIssued": "لا توجد فواتير صادرة بعد.",
+    "emptyReceived": "لا توجد فواتير واردة بعد.",
+    "createInvoice": "إنشاء فاتورة"
+  },
+
+  "certificates": {
+    "title": "الشهادات",
+    "subtitle": "شهادات الاستخدام الشهرية",
+    "issue": "إصدار شهادة",
+    "issueAndSeal": "إصدار وختم",
+    "asset": "الأصل",
+    "period": "الفترة",
+    "month": "الشهر",
+    "bookingPeriod": "فترة الإيجار",
+    "openingHours": "ساعات ECU الافتتاحية",
+    "closingHours": "ساعات ECU الختامية",
+    "billableHours": "الساعات القابلة للفوترة",
+    "owner": "المالك",
+    "renter": "المستأجر",
+    "status": "الحالة",
+    "sealed": "مختومة",
+    "voided": "ملغاة",
+    "shaSeal": "ختم SHA-256",
+    "issuedBy": "أصدرها",
+    "issuedAt": "تاريخ الإصدار",
+    "source": "المصدر",
+    "replacedBy": "استُبدلت بـ",
+    "view": "عرض",
+    "empty": "لا توجد شهادات بعد.",
+    "tier3Only": "تحتاج الشهادات إلى ALL-CAN300 (الفئة 3) لساعات المحرك من ECU",
+    "mustBePastPeriod": "يمكن إصدار الشهادات لفترات منتهية فقط.",
+    "gapBlocksIssue": "تحتوي هذه الفترة على فجوة بيانات مدتها {hours} ساعة. لا يمكن إصدار الشهادات حتى تتم مراجعتها."
+  },
+
+  "settings": {
+    "title": "الإعدادات",
+    "tabs": {
+      "users": "المستخدمون",
+      "sites": "المواقع",
+      "assets": "الأصول",
+      "labels": "الملصقات"
+    },
+    "users": {
+      "invite": "دعوة مستخدم",
+      "columns": { "name": "الاسم", "email": "البريد الإلكتروني", "role": "الدور", "site": "الموقع", "status": "الحالة", "actions": "إجراءات" },
+      "roles": { "tenantAdmin": "مسؤول الشركة", "siteUser": "مستخدم موقع" },
+      "statuses": { "active": "نشط", "invited": "مدعو", "deactivated": "معطَّل" },
+      "deactivate": "تعطيل",
+      "reactivate": "إعادة التنشيط",
+      "empty": "لا يوجد مستخدمون بعد."
+    },
+    "sites": {
+      "add": "إضافة موقع",
+      "columns": { "name": "الاسم", "location": "الموقع الجغرافي", "radius": "نصف القطر", "assets": "الأصول", "actions": "إجراءات" },
+      "save": "حفظ الموقع",
+      "selectSite": "اختر موقعًا",
+      "empty": "لا توجد مواقع بعد."
+    },
+    "assets": {
+      "add": "إضافة أصل",
+      "columns": { "code": "الرمز", "name": "الاسم", "class": "الفئة", "make": "الصانع", "model": "الطراز", "homeSite": "الموقع الأساسي", "status": "الحالة", "actions": "إجراءات" },
+      "save": "حفظ الأصل",
+      "retire": "إخراج من الخدمة",
+      "requestTracker": "طلب جهاز تتبع",
+      "behaviour": "السلوك",
+      "behaviours": {
+        "parked": "متوقف في الموقع",
+        "worksAtSite": "يعمل في الموقع",
+        "drivesBetweenSites": "يتنقل بين المواقع",
+        "stationary24h": "ثابت 24 ساعة",
+        "lightVehicleDay": "مركبة خفيفة يوميًا"
+      },
+      "empty": "لا توجد أصول بعد."
+    },
+    "labels": {
+      "title": "الملصقات",
+      "empty": "لا توجد ملصقات بعد."
+    }
+  },
+
+  "publicTracking": {
+    "wordmark": "Kasper GPS",
+    "live": "مباشر",
+    "updated": "آخر تحديث {time}",
+    "waitingForUpdate": "في انتظار التحديث",
+    "arrivingAbout": "الوصول نحو {time} (خلال {minutes} دقيقة)",
+    "arrived": "وصل {time}",
+    "etaUnavailable": "وقت الوصول غير متاح — في انتظار التحديث",
+    "destination": "الوجهة",
+    "lastPosition": "آخر موقع",
+    "owner": "المالك",
+    "linkCreated": "أُنشئ الرابط {date} الساعة {time}",
+    "expires": "ينتهي {date} الساعة {time}",
+    "forBooking": "للحجز {reference}",
+    "inactiveTitle": "رابط التتبع هذا لم يعد نشطًا",
+    "inactiveExpired": "انتهت صلاحية هذا الرابط.",
+    "inactiveRevoked": "تم إلغاء هذا الرابط.",
+    "inactiveCancelled": "تم إلغاء هذا الحجز.",
+    "inactiveJobClosed": "تم إغلاق هذه المهمة.",
+    "inactiveAccessEnded": "انتهى الوصول إلى هذا الأصل.",
+    "inactiveNotFound": "لم يتم العثور على هذا الرابط."
+  }
+}
