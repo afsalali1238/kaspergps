@@ -881,7 +881,14 @@
     "created": "تم إنشاء النطاق الجغرافي",
     "circle_line": "دائرة · نصف قطر {radius} م",
     "polygon_line": "مضلع · {points} نقطة",
-    "events_7d": "الأحداث (7 أيام): {count}"
+    "events_7d": "الأحداث (7 أيام): {count}",
+    "center_lat": "خط العرض المركزي",
+    "center_lng": "خط الطول المركزي",
+    "deleted": "تم حذف السياج الجغرافي",
+    "event_enter": "دخل",
+    "event_exit": "خرج",
+    "events_title": "الأحداث الأخيرة",
+    "radius": "نصف القطر (م)"
   },
   "downloads": {
     "title": "التنزيلات",
