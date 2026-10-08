@@ -1,71 +1,24 @@
 'use client';
 
+// Reports (spec §11.5): pick a report type (gated by the selected assets'
+// hardware and the demo phase), a scope and a date range; run it to get a PDF or
+// Excel file, recorded in Downloads. Renters' ranges are clipped to their rental
+// windows with a header line. "Schedule this report" creates a §11.13 schedule.
+
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
-import {
-  Button, EmptyState,
-} from '@/components/ui';
+import { Button, EmptyState } from '@/components/ui';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
-import { isAssetVisible, hasCapability } from '@/server/access';
-import { FEATURES } from '@/domain/features';
+import { hasCapability } from '@/server/access';
+import {
+  availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES,
+  type ReportTypeId,
+} from '@/server/reports';
+import { createSchedule, type ScheduleFrequency } from '@/server/schedules';
+import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
-
-type ReportType = 'trip_mileage' | 'location_history' | 'operating_hours' | 'fuel' | 'utilisation' | 'driving_events';
-type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
-type FormatType = 'pdf' | 'excel';
-
-const REPORT_TYPES: {
-  id: ReportType;
-  label: string;
-  description: string;
-  phase: 'day_one' | 'phase2' | 'later';
-  needs: string;
-}[] = [
-  {
-    id: 'trip_mileage',
-    label: 'Trip & Mileage',
-    description: 'Trips, distances, and mileage',
-    phase: 'day_one',
-    needs: 'trips',
-  },
-  {
-    id: 'location_history',
-    label: 'Location history',
-    description: 'Position history over time',
-    phase: 'day_one',
-    needs: 'history.track',
-  },
-  {
-    id: 'operating_hours',
-    label: 'Operating hours',
-    description: 'Ignition hours (estimated) and ECU engine hours',
-    phase: 'phase2',
-    needs: 'hours.ignition',
-  },
-  {
-    id: 'fuel',
-    label: 'Fuel',
-    description: 'Fuel used, refuels, drops, and L/h',
-    phase: 'phase2',
-    needs: 'fuel.used',
-  },
-  {
-    id: 'utilisation',
-    label: 'Utilisation',
-    description: 'Working, idling, and off time',
-    phase: 'phase2',
-    needs: 'utilisation',
-  },
-  {
-    id: 'driving_events',
-    label: 'Driving events',
-    description: 'Harsh events and over-speed incidents',
-    phase: 'phase2',
-    needs: 'driving.events',
-  },
-];
 
 const DATE_PRESETS: { key: string; label: string; days: number }[] = [
   { key: 'last_24h', label: 'Last 24 hours', days: 1 },
@@ -73,63 +26,125 @@ const DATE_PRESETS: { key: string; label: string; days: number }[] = [
   { key: 'last_30d', label: 'Last 30 days', days: 30 },
 ];
 
+type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
+
 export default function ReportsPage() {
   const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
 
-  const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(null);
   const [scope, setScope] = useState<ScopeType>('multiple_assets');
-  const [format, setFormat] = useState<FormatType>('excel');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [siteId, setSiteId] = useState<string>('');
+  const [format, setFormat] = useState<'xlsx' | 'pdf'>('xlsx');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
-  const [presetDays, setPresetDays] = useState<number | null>(null);
+  const [presetDays, setPresetDays] = useState<number | null>(7);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [clipNotes, setClipNotes] = useState<string[]>([]);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [schedFreq, setSchedFreq] = useState<ScheduleFrequency>('daily');
+  const [schedTime, setSchedTime] = useState('18:00');
+  const [schedWeekday, setSchedWeekday] = useState(1);
+  const [schedMessage, setSchedMessage] = useState<string | null>(null);
 
-  // Visible assets for the current user
-  const visibleAssets = useMemo(() => {
-    if (!session) return [];
-    return seed.assets.filter(a => isAssetVisible(session, a.id));
-  }, [session]);
+  const assets = useMemo(() => (session ? reportableAssets(session) : []), [session]);
 
-  // Available report types based on phase and visible assets
+  const scopeAssetIds = useMemo(() => {
+    if (scope === 'site') return assets.filter(a => a.homeSiteId === siteId).map(a => a.id);
+    return selectedAssetIds;
+  }, [scope, siteId, selectedAssetIds, assets]);
+
+  // §11.5: a report type is listed only if at least one selected (or visible)
+  // asset supports it, and the phase allows it.
   const availableReports = useMemo(() => {
-    return REPORT_TYPES.filter(report => {
-      // Check phase
-      if (report.phase === 'phase2' && phase === 'day_one') return false;
-      if (report.phase === 'later' && phase !== 'later') return false;
+    if (!session) return [];
+    const ids = scopeAssetIds.length ? scopeAssetIds : assets.map(a => a.id);
+    return availableReportTypes(session, ids, phase);
+  }, [session, scopeAssetIds, assets, phase]);
 
-      // Check if any visible asset supports this report
-      return visibleAssets.some(() => {
-        const featureKey = report.needs;
-        return FEATURES.some(f => f.key === featureKey);
-      });
-    });
-  }, [visibleAssets, phase]);
-
-  // Date handling
-  const effectiveDateFrom = useMemo(() => {
+  const effectiveFrom = useMemo(() => {
     if (dateFrom) return dateFrom;
     if (presetDays !== null) {
-      const from = new Date(clock.dubaiNow());
-      from.setDate(from.getDate() - presetDays);
-      return from.toISOString().split('T')[0];
+      return clock.dubaiDateKey(clock.now() - presetDays * 86_400_000);
     }
     return '';
   }, [dateFrom, presetDays]);
 
-  const effectiveDateTo = useMemo(() => {
+  const effectiveTo = useMemo(() => {
     if (dateTo) return dateTo;
-    return new Date(clock.dubaiNow()).toISOString().split('T')[0];
+    return clock.dubaiDateKey(clock.now());
   }, [dateTo]);
 
-  const canRunReport = hasCapability(session!, 'report.run');
+  const canRunReport = session ? hasCapability(session, 'report.run') : false;
+  const canSchedule = session ? hasCapability(session, 'report.schedule') : false;
 
   if (!session) return null;
 
+  const siteOptions = Array.from(new Set(assets.map(a => a.homeSiteId))).map(id => ({
+    id,
+    name: seed.sites.find(s => s.id === id)?.name ?? id,
+  }));
+
+  const toggleAsset = (id: string) => {
+    if (scope === 'single_asset') {
+      setSelectedAssetIds([id]);
+      return;
+    }
+    setSelectedAssetIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
+  const handleRun = () => {
+    setMessage(null);
+    setError(null);
+    setClipNotes([]);
+    if (!selectedReport || scopeAssetIds.length === 0) {
+      setError(t('reports.pick_scope', 'Pick a report type and at least one asset.'));
+      return;
+    }
+    const result = runReport(session, {
+      reportType: selectedReport,
+      assetIds: scopeAssetIds,
+      from: effectiveFrom,
+      to: effectiveTo,
+      format,
+    });
+    if (!result.ok || !result.data) {
+      setError(result.error ?? t('reports.failed', 'The report could not be run.'));
+      return;
+    }
+    const { meta, tables, run, clipNotes: notes } = result.data;
+    if (format === 'pdf') downloadPdf(meta, tables as ExportTable[]);
+    else downloadXlsx(meta, tables as ExportTable[]);
+    setClipNotes(notes);
+    setMessage(`${run.fileName} — saved to Downloads.`);
+  };
+
+  const handleSchedule = () => {
+    setSchedMessage(null);
+    if (!selectedReport || scopeAssetIds.length === 0) return;
+    const label = scopeAssetIds.length === 1
+      ? (assets.find(a => a.id === scopeAssetIds[0])?.code ?? '')
+      : `${scopeAssetIds.length} assets`;
+    const result = createSchedule(session, {
+      reportType: selectedReport,
+      scope: label,
+      assetIds: scopeAssetIds,
+      frequency: schedFreq,
+      runAt: schedTime,
+      weekday: schedFreq === 'weekly' ? schedWeekday : undefined,
+      format,
+    });
+    setSchedMessage(result.ok
+      ? (result.message ?? t('reports.schedule_saved', 'Schedule saved.'))
+      : (result.error ?? t('reports.failed', 'The report could not be run.')));
+  };
+
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div>
         <h1 className="text-lg font-semibold text-ink">{t('reports.title', 'Reports')}</h1>
         <p className="text-sm text-grey-500 mt-1">
@@ -172,57 +187,56 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="text-sm font-medium text-ink mb-2">{t('reports.scope', 'Scope')}</div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setScope('single_asset')}
-              className={clsx(
-                'px-3 py-2 text-xs rounded-lg border transition-colors',
-                scope === 'single_asset' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-              )}
-            >
-              {t('reports.scope_single', 'Single asset')}
-            </button>
-            <button
-              onClick={() => setScope('multiple_assets')}
-              className={clsx(
-                'px-3 py-2 text-xs rounded-lg border transition-colors',
-                scope === 'multiple_assets' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-              )}
-            >
-              {t('reports.scope_multiple', 'Multiple assets')}
-            </button>
-            <button
-              onClick={() => setScope('site')}
-              className={clsx(
-                'px-3 py-2 text-xs rounded-lg border transition-colors',
-                scope === 'site' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-              )}
-            >
-              {t('reports.scope_site', 'Site')}
-            </button>
+            {(['single_asset', 'multiple_assets', 'site'] as ScopeType[]).map(s => (
+              <button
+                key={s}
+                onClick={() => setScope(s)}
+                className={clsx(
+                  'px-3 py-2 text-xs rounded-lg border transition-colors',
+                  scope === s ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                )}
+              >
+                {s === 'single_asset' ? t('reports.scope_single', 'Single asset')
+                  : s === 'multiple_assets' ? t('reports.scope_multiple', 'Multiple assets')
+                  : t('reports.scope_site', 'Site')}
+              </button>
+            ))}
           </div>
 
-          {/* Asset selection for single/multiple scope */}
-          {(scope === 'single_asset' || scope === 'multiple_assets') && (
-            <div className="space-y-2">
-              <div className="text-xs text-grey-500 font-medium">
-                {scope === 'single_asset'
-                  ? t('reports.select_asset', 'Select an asset')
-                  : t('reports.select_assets', 'Select assets (hold Ctrl/Cmd to multi-select)')}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {visibleAssets.map(asset => (
+          {scope === 'site' ? (
+            <select
+              value={siteId}
+              onChange={e => setSiteId(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-ink"
+            >
+              <option value="">{t('reports.pick_site', 'Pick a site')}</option>
+              {siteOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {assets.map(asset => {
+                const selected = selectedAssetIds.includes(asset.id);
+                const past = pastRentalLabel(session, asset.id);
+                return (
                   <button
                     key={asset.id}
+                    onClick={() => toggleAsset(asset.id)}
+                    title={past ?? undefined}
                     className={clsx(
                       'px-3 py-2 text-xs rounded-lg border transition-colors flex items-center gap-1',
-                      'bg-paper border-line text-grey-700 hover:border-grey-500'
+                      selected ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                     )}
                   >
                     <span className="font-mono font-medium">{asset.code}</span>
-                    <span className="text-grey-500">{asset.name}</span>
+                    <span className={selected ? 'text-white/80' : 'text-grey-500'}>{asset.name}</span>
+                    {past && (
+                      <span className={clsx('px-1.5 py-0.5 rounded border text-[10px]', selected ? 'border-white/40 text-white/90' : 'border-yellow-dark/40 text-yellow-dark')}>
+                        {past}
+                      </span>
+                    )}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
 
@@ -233,7 +247,7 @@ export default function ReportsPage() {
               {DATE_PRESETS.map(preset => (
                 <button
                   key={preset.label}
-                  onClick={() => setPresetDays(preset.days)}
+                  onClick={() => { setPresetDays(preset.days); setDateFrom(''); setDateTo(''); }}
                   className={clsx(
                     'px-3 py-2 text-xs rounded-lg border transition-colors',
                     presetDays === preset.days ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
@@ -253,7 +267,7 @@ export default function ReportsPage() {
               </button>
             </div>
             {presetDays === null && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <input
                   type="date"
                   value={dateFrom}
@@ -276,10 +290,10 @@ export default function ReportsPage() {
             <div className="text-xs text-grey-500 font-medium">{t('reports.format', 'Format')}</div>
             <div className="flex gap-2">
               <button
-                onClick={() => setFormat('excel')}
+                onClick={() => setFormat('xlsx')}
                 className={clsx(
                   'px-3 py-2 text-xs rounded-lg border transition-colors',
-                  format === 'excel' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                  format === 'xlsx' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
                 )}
               >
                 {t('reports.excel', 'Excel (.xlsx)')}
@@ -297,32 +311,87 @@ export default function ReportsPage() {
           </div>
 
           {/* Run button */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-2 gap-2 flex-wrap">
             <div className="text-xs text-grey-500">
-              {effectiveDateFrom && effectiveDateTo && (
-                <span>
-                  {t('reports.range_line', 'From {from} to {to}', { from: effectiveDateFrom, to: effectiveDateTo })}
-                </span>
+              {effectiveFrom && effectiveTo && (
+                <span>{t('reports.range_line', 'From {from} to {to}', { from: effectiveFrom, to: effectiveTo })}</span>
               )}
             </div>
-            {canRunReport && (
-              <Button onClick={() => {}}>
-                {t('reports.run', 'Run report')}
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {canSchedule && (
+                <Button variant="secondary" onClick={() => setScheduleOpen(v => !v)}>
+                  {t('reports.schedule_this', 'Schedule this report')}
+                </Button>
+              )}
+              {canRunReport && (
+                <Button onClick={handleRun}>{t('reports.run', 'Run report')}</Button>
+              )}
+            </div>
           </div>
+
+          {/* Schedule form */}
+          {scheduleOpen && canSchedule && (
+            <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
+              <div className="text-sm font-medium text-ink">{t('reports.schedule_this', 'Schedule this report')}</div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <select value={schedFreq} onChange={e => setSchedFreq(e.target.value as ScheduleFrequency)} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper">
+                  <option value="daily">{t('reports.schedule_daily', 'Daily')}</option>
+                  <option value="weekly">{t('reports.schedule_weekly', 'Weekly')}</option>
+                  <option value="monthly">{t('reports.schedule_monthly', 'Monthly (1st)')}</option>
+                </select>
+                {schedFreq === 'weekly' && (
+                  <select value={schedWeekday} onChange={e => setSchedWeekday(Number(e.target.value))} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => (
+                      <option key={d} value={i}>{d}</option>
+                    ))}
+                  </select>
+                )}
+                <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper" />
+                <Button size="sm" onClick={handleSchedule}>{t('reports.schedule_save', 'Save schedule')}</Button>
+              </div>
+              <div className="text-xs text-grey-500">{t('reports.schedule_note', 'Deliver to: my email (simulated). Runs appear in Downloads and the email outbox.')}</div>
+              {schedMessage && <div className="text-sm text-ink">{schedMessage}</div>}
+            </div>
+          )}
+
+          {/* Result / error states */}
+          {clipNotes.length > 0 && (
+            <div className="bg-yellow/10 border border-yellow-dark/30 rounded-lg px-4 py-3 text-sm text-ink">
+              {clipNotes.map(n => <div key={n}>{n}</div>)}
+            </div>
+          )}
+          {message && (
+            <div className="bg-green/10 border border-green/30 rounded-lg px-4 py-3 text-sm text-green">{message}</div>
+          )}
+          {error && (
+            error === 'Nothing to report for this period' ? (
+              <EmptyState
+                title={t('reports.nothing', 'Nothing to report for this period')}
+                description={t('reports.nothing_hint', 'There is no data available for the selected date range.')}
+              />
+            ) : (
+              <div className="bg-red/10 border border-red/30 rounded-lg px-4 py-3 text-sm text-red">
+                {error}
+                <button onClick={handleRun} className="ms-2 underline">{t('common.retry', 'Retry')}</button>
+              </div>
+            )
+          )}
         </div>
       )}
 
-      {/* Nothing to report state */}
-      {selectedReport && effectiveDateFrom && effectiveDateTo && (
-        <div className="text-center py-8">
-          <EmptyState
-            title={t('reports.nothing', 'Nothing to report for this period')}
-            description={t('reports.nothing_hint', 'There is no data available for the selected date range.')}
-          />
-        </div>
+      {/* What this picker offers */}
+      {!selectedReport && assets.length === 0 && (
+        <EmptyState
+          title={t('reports.no_assets', 'No assets yet')}
+          description={t('reports.no_assets_hint', 'Assets appear here when you own them or hold a rental on them.')}
+        />
       )}
+      <div className="text-xs text-grey-500">
+        {t('reports.types_hint', 'Report types appear here only when your assets can measure them.')}
+        {' '}
+        ({REPORT_TYPES.length} {t('reports.types_total', 'types defined')} —{' '}
+        {availableReports.length} {t('reports.types_available', 'available to you')})
+      </div>
     </div>
   );
 }

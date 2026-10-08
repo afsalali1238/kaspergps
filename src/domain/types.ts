@@ -302,6 +302,8 @@ export interface ReportRun {
   status: 'ready' | 'skipped';
   skipReason?: string;
   fileName?: string;
+  /** Scope's asset ids, kept so "Download again" can rebuild the file (spec §11.13). */
+  assetIds?: string[];
 }
 
 export interface ReportSchedule {

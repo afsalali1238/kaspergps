@@ -9,6 +9,7 @@ import * as clocklib from '@/lib/clock';
 
 import { ANCHOR_MS } from '@/server/seed/data';
 import { tamperWithMuc } from '@/server/muc';
+import { runDueSchedules } from '@/server/schedules';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { resolveEtaForLink } from '@/server/links';
 import { OFFLINE_AFTER_SEC } from '@/config/thresholds';
@@ -318,6 +319,8 @@ export function DemoBar() {
   const jumpTo = (targetMs: number) => {
     useStore.getState().setClockOffsetMs(targetMs - ANCHOR_MS);
     clocklib.setOffsetMs(targetMs - ANCHOR_MS);
+    // Spec §11.13: schedules whose time passed while the clock moved create runs.
+    runDueSchedules();
     window.dispatchEvent(new CustomEvent('kasper:clock-changed'));
     router.refresh();
   };
