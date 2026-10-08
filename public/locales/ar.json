@@ -109,7 +109,8 @@
     "min_ago": "قبل {count} دقيقة",
     "hours_ago": "قبل {count} ساعة",
     "just_now": "الآن",
-    "view_all": "عرض كل التنبيهات"
+    "view_all": "عرض كل التنبيهات",
+    "search_none": "لا توجد نتائج."
   },
   "nav": {
     "map": "الخريطة",

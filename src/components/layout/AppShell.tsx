@@ -10,6 +10,7 @@ import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import { bellAlerts } from '@/server/alerts';
+import { SearchCommand } from '@/components/layout/SearchCommand';
 import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
 import { useT, useHref, stripLocale } from '@/i18n';
@@ -178,10 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-2">
           {/* Search */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-paper border border-line rounded-lg px-2.5 py-1.5 text-sm text-grey-500 w-48">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1"/><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>
-            {t('shell.search_placeholder', 'Type to search assets…')}
-          </div>
+          <SearchCommand session={session} />
 
           {/* Notifications bell */}
           {session && (
