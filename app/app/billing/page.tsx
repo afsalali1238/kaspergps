@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  Button, Badge, EmptyState, Tabs,
+  Button, Badge, EmptyState, Tabs, TabContent,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
@@ -36,6 +36,7 @@ export default function BillingPage() {
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
   const [payConfirm, setPayConfirm] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('issued');
 
   if (!session) return null;
 
@@ -75,14 +76,15 @@ export default function BillingPage() {
           { id: 'received', label: 'Received' },
           { id: 'gps', label: 'GPS subscription' },
         ]}
-        activeId="issued"
-        onChange={() => {}}
+        activeId={activeTab}
+        onChange={setActiveTab}
       />
 
       {/* Issued invoices */}
-      <div className="bg-surface border border-line rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-ink">Rental invoices issued</h2>
+      <TabContent activeId={activeTab} id="issued">
+        <div className="bg-surface border border-line rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-ink">Rental invoices issued</h2>
           <Button variant="secondary" size="sm">Create invoice</Button>
         </div>
         {issuedInvoices.length === 0 ? (
@@ -135,7 +137,9 @@ export default function BillingPage() {
           </div>
         )}
       </div>
+      </TabContent>
 
+      <TabContent activeId={activeTab} id="received">
       {/* Received invoices */}
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
@@ -201,6 +205,7 @@ export default function BillingPage() {
           </div>
         )}
       </div>
+      </TabContent>
 
       {/* Pay confirmation modal */}
       {payConfirm && (
@@ -221,6 +226,7 @@ export default function BillingPage() {
       )}
 
       {/* GPS subscription */}
+      <TabContent activeId={activeTab} id="gps">
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-ink">GPS subscription statements</h2>
@@ -270,6 +276,7 @@ export default function BillingPage() {
           );
         })()}
       </div>
+      </TabContent>
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">
         <strong className="text-ink">Dummy rates:</strong> GPS subscription AED 75/T1 · 110/T2 · 165/T3 per tracker-month. VAT 5%. All amounts are dummy values for the prototype.
