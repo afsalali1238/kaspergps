@@ -17,13 +17,14 @@ import {
 } from '@/server/maintenance';
 import { tierForAsset } from '@/domain/features';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
+import { useT } from '@/i18n';
 
 type View = 'board' | 'table';
 
-function stateBadge(state: PlanSnapshot['state']): React.ReactNode {
-  if (state === 'overdue') return <Badge variant="red" dot>Overdue</Badge>;
-  if (state === 'due_soon') return <Badge variant="amber" dot>Due soon</Badge>;
-  return <Badge variant="green" dot>Ok</Badge>;
+function stateBadge(state: PlanSnapshot['state'], t: (key: string, fallback: string) => string): React.ReactNode {
+  if (state === 'overdue') return <Badge variant="red" dot>{t('maintenance.overdue', 'Overdue')}</Badge>;
+  if (state === 'due_soon') return <Badge variant="amber" dot>{t('maintenance.due_soon', 'Due soon')}</Badge>;
+  return <Badge variant="green" dot>{t('maintenance.ok', 'Ok')}</Badge>;
 }
 
 /** Basis chips use the same vocabulary as Cost & ROI. */
@@ -36,6 +37,7 @@ function basisChip(snapshot: PlanSnapshot): React.ReactNode {
 }
 
 export default function MaintenancePage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -64,10 +66,10 @@ export default function MaintenancePage() {
   if (phase !== 'later') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Maintenance</h1>
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('maintenance.title', 'Maintenance')}</h1>
         <EmptyState
-          title="Not available"
-          description="Maintenance scheduling arrives in the Later phase. Switch the demo bar to Later to see the board."
+          title={t('maintenance.not_available', 'Not available')}
+          description={t('maintenance.phase_description', 'Maintenance scheduling arrives in the Later phase. Switch the demo bar to Later to see the board.')}
         />
       </div>
     );
@@ -103,19 +105,19 @@ export default function MaintenancePage() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-semibold text-ink">Maintenance</h1>
+          <h1 className="text-lg font-semibold text-ink">{t('maintenance.title', 'Maintenance')}</h1>
           <p className="text-sm text-grey-500 mt-1">
-            Service plans by engine hours, distance or date — with the service history behind them.
+            {t('maintenance.subtitle', 'Service plans by engine hours, distance or date — with the service history behind them.')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={exportBoth}>Excel</Button>
+          <Button variant="secondary" size="sm" onClick={exportBoth}>{t('maintenance.excel', 'Excel')}</Button>
           <Button
             variant="secondary"
             size="sm"
             onClick={() => downloadPdf({ fileName: 'kasper-maintenance', subtitle: 'Service plans and history' }, [planTable, historyTable])}
           >
-            PDF
+            {t('maintenance.pdf', 'PDF')}
           </Button>
           {canManage && <Button size="sm" onClick={() => setPlanForm({})}>New plan</Button>}
         </div>
@@ -196,24 +198,24 @@ export default function MaintenancePage() {
 
       {/* Board / table toggle */}
       <div className="flex items-center gap-2">
-        <Button variant={view === 'board' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('board')}>Board</Button>
-        <Button variant={view === 'table' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('table')}>Table</Button>
-        <span className="text-xs text-grey-500 ml-auto">{plans.length} plan{plans.length === 1 ? '' : 's'}</span>
+        <Button variant={view === 'board' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('board')}>{t('maintenance.board', 'Board')}</Button>
+        <Button variant={view === 'table' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('table')}>{t('maintenance.table', 'Table')}</Button>
+        <span className="text-xs text-grey-500 ms-auto">{t('maintenance.plans_count', '{count} plans', { count: plans.length })}</span>
       </div>
 
       {view === 'board' ? (
         <div className="grid gap-3 md:grid-cols-3">
           {([
-            ['overdue', 'Overdue', 'text-red'],
-            ['dueSoon', 'Due soon', 'text-amber-dark'],
-            ['ok', 'Ok', 'text-green'],
-          ] as const).map(([key, label]) => (
+            ['overdue', 'maintenance.overdue', 'Overdue', 'text-red'],
+            ['dueSoon', 'maintenance.due_soon', 'Due soon', 'text-amber-dark'],
+            ['ok', 'maintenance.ok', 'Ok', 'text-green'],
+          ] as const).map(([key, labelKey, fallback, tone]) => (
             <div key={key} className="space-y-2">
-              <h2 className={clsx('text-sm font-medium', label === 'Overdue' ? 'text-red' : label === 'Due soon' ? 'text-amber-dark' : 'text-green')}>
-                {label} ({board[key].length})
+              <h2 className={clsx('text-sm font-medium', tone)}>
+                {t(labelKey, fallback)} ({board[key].length})
               </h2>
               {board[key].length === 0 && (
-                <div className="text-xs text-grey-500 bg-surface border border-line rounded-lg px-3 py-4">Nothing here.</div>
+                <div className="text-xs text-grey-500 bg-surface border border-line rounded-lg px-3 py-4">{t('maintenance.nothing_here', 'Nothing here.')}</div>
               )}
               {board[key].map(s => (
                 <div key={s.plan.id} className="bg-surface border border-line rounded-lg p-3 space-y-2">
@@ -225,7 +227,7 @@ export default function MaintenancePage() {
                       </div>
                       <div className="text-xs text-grey-500">{s.plan.name}</div>
                     </div>
-                    {stateBadge(s.state)}
+                    {stateBadge(s.state, t)}
                   </div>
                   <div className="text-sm text-grey-700">{s.headline}</div>
                   <div className="flex items-center gap-2">
@@ -248,9 +250,9 @@ export default function MaintenancePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-paper-2 text-grey-500">
-                <th className="px-3 py-2 text-left font-medium">Asset</th>
-                <th className="px-3 py-2 text-left font-medium">Plan</th>
-                <th className="px-3 py-2 text-left font-medium">Basis</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.asset', 'Asset')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.plan', 'Plan')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.basis', 'Basis')}</th>
                 <th className="px-3 py-2 text-right font-medium">Reading</th>
                 <th className="px-3 py-2 text-right font-medium">Due</th>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
@@ -269,7 +271,7 @@ export default function MaintenancePage() {
                   <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-500">
                     {s.unit === 'days' ? `${s.due} d` : `${s.due.toLocaleString('en-US')} ${s.unit}`}
                   </td>
-                  <td className="px-3 py-2 border-b border-line">{stateBadge(s.state)}</td>
+                  <td className="px-3 py-2 border-b border-line">{stateBadge(s.state, t)}</td>
                   <td className="px-3 py-2 border-b border-line text-right">
                     {canManage && (
                       <div className="flex gap-1 justify-end">

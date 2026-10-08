@@ -14,6 +14,7 @@ import { resolveEtaForLink } from '@/server/links';
 import { OFFLINE_AFTER_SEC } from '@/config/thresholds';
 import type { Session } from '@/domain/types';
 import { FeaturesPanel } from './FeaturesPanel';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -659,8 +660,11 @@ export function DemoBar() {
         )}
       </div>
 
+      {/* Language — demo bar stays English, but this flips the product UI. */}
+      <LanguageToggle variant="demo" />
+
       {/* Prototype label */}
-      <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ml-auto hidden lg:inline">
+      <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ms-auto hidden lg:inline">
         Prototype · dummy data
       </span>
     </div>

@@ -12,6 +12,7 @@ import {
   setDieselPrice, type AssetCostRow, type CostPeriod,
 } from '@/server/cost';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
+import { useT } from '@/i18n';
 
 const PERIODS: { id: CostPeriod; label: string }[] = [
   { id: 'this_month', label: 'This month' },
@@ -25,11 +26,13 @@ type SortKey = 'code' | 'revenueAed' | 'fuelAed' | 'idleAed' | 'maintenanceAed' 
 const money = (value: number | null) => (value === null ? null : Math.round(value).toLocaleString('en-US'));
 
 function Amount({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-grey-500 italic text-xs">Not measured</span>;
+  const t = useT();
+  if (value === null) return <span className="text-grey-500 italic text-xs">{t('common.not_measured', 'Not measured')}</span>;
   return <span className="font-mono text-grey-700">{value.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>;
 }
 
 export default function CostPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -82,10 +85,10 @@ export default function CostPage() {
   if (phase !== 'later') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Cost &amp; ROI</h1>
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('cost.title', 'Cost & ROI')}</h1>
         <EmptyState
-          title="Not available"
-          description="Cost & ROI arrives in the Later phase. Switch the demo bar to Later to see it."
+          title={t('cost.not_available', 'Not available')}
+          description={t('cost.phase_description', 'Cost & ROI arrives in the Later phase. Switch the demo bar to Later to see it.')}
         />
       </div>
     );
@@ -96,8 +99,8 @@ export default function CostPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="text-center">
-          <div className="text-sm font-semibold text-ink">Page not found</div>
-          <div className="text-sm text-grey-500 mt-1">This page isn&apos;t available for your role.</div>
+          <div className="text-sm font-semibold text-ink">{t('common.page_not_found', 'Page not found')}</div>
+          <div className="text-sm text-grey-500 mt-1">{t('cost.not_for_role', "This page isn't available for your role.")}</div>
         </div>
       </div>
     );
@@ -136,16 +139,16 @@ export default function CostPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-ink">Cost &amp; ROI</h1>
-            <Badge variant="grey">Draft</Badge>
+            <h1 className="text-lg font-semibold text-ink">{t('cost.title', 'Cost & ROI')}</h1>
+            <Badge variant="grey">{t('cost.draft_tag', 'Draft')}</Badge>
           </div>
           <p className="text-sm text-grey-500 mt-1">
-            What each asset earned and what it cost to run. Rates are dummy; every line says where its number came from.
+            {t('cost.subtitle', 'What each asset earned and what it cost to run. Rates are dummy; every line says where its number came from.')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => downloadXlsx(fleetMeta, [fleetTable])}>Excel</Button>
-          <Button variant="secondary" size="sm" onClick={() => downloadPdf(fleetMeta, [fleetTable])}>PDF</Button>
+          <Button variant="secondary" size="sm" onClick={() => downloadXlsx(fleetMeta, [fleetTable])}>{t('cost.excel', 'Excel')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => downloadPdf(fleetMeta, [fleetTable])}>{t('cost.pdf', 'PDF')}</Button>
         </div>
       </div>
 
@@ -158,10 +161,10 @@ export default function CostPage() {
             variant={period === p.id ? 'primary' : 'secondary'}
             onClick={() => setPeriod(p.id)}
           >
-            {p.label}
+            {t(`cost.${p.id}`, p.label)}
           </Button>
         ))}
-        <span className="text-xs text-grey-500 ml-auto">{range.label} · diesel AED {getDieselPrice().toFixed(2)}/L (dummy)</span>
+        <span className="text-xs text-grey-500 ms-auto">{range.label} · diesel AED {getDieselPrice().toFixed(2)}/L (dummy)</span>
       </div>
 
       {toast && (

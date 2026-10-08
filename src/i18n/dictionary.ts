@@ -3,35 +3,25 @@
 // src/i18n/index.tsx.
 
 import ar from '../../public/locales/ar.json';
+import { type Locale } from './locale';
 
-export type Locale = 'en' | 'ar';
+export {
+  LANG_COOKIE,
+  LOCALES,
+  ENGLISH_ONLY_PREFIXES,
+  localeFromPath,
+  localeFromCookie,
+  localeCookie,
+  localisePath,
+  stripLocale,
+  resolveLocale,
+  isEnglishOnlyPath,
+  isRtl,
+  type Locale,
+} from './locale';
 
-export const LOCALES: Locale[] = ['en', 'ar'];
 export const ARABIC_DICTIONARY = ar as Record<string, unknown>;
 export const ARABIC_META = (ar as { _meta?: Record<string, string> })._meta ?? {};
-
-/** Route prefixes that stay English no matter what (spec §14: console stays English). */
-export const ENGLISH_ONLY_PREFIXES = ['/console', '/dev'];
-
-export function localeFromPath(pathname: string | null | undefined): Locale {
-  if (!pathname) return 'en';
-  return pathname === '/ar' || pathname.startsWith('/ar/') ? 'ar' : 'en';
-}
-
-/** Strip a leading /ar so the rest of the app can work with English route paths. */
-export function stripLocale(pathname: string): string {
-  if (pathname === '/ar') return '/';
-  return pathname.startsWith('/ar/') ? pathname.slice(3) : pathname;
-}
-
-/** Add the locale prefix to a route path (console and dev tools stay English). */
-export function localisePath(locale: Locale, path: string): string {
-  if (!path.startsWith('/')) return path;
-  if (locale === 'en') return stripLocale(path);
-  if (ENGLISH_ONLY_PREFIXES.some(prefix => path.startsWith(prefix))) return path;
-  const raw = stripLocale(path);
-  return raw === '/' ? '/ar' : `/ar${raw}`;
-}
 
 function lookup(dictionary: unknown, key: string): unknown {
   return key.split('.').reduce<unknown>((node, part) => {
@@ -57,9 +47,4 @@ export function translate(locale: Locale, key: string, fallback: string, vars?: 
   const value = lookup(ARABIC_DICTIONARY, key);
   if (typeof value !== 'string' || value.length === 0) return interpolate(fallback, vars);
   return interpolate(value, vars);
-}
-
-/** True when the screen should render right-to-left. */
-export function isRtl(locale: Locale): boolean {
-  return locale === 'ar';
 }
