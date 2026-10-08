@@ -5,6 +5,62 @@ Reviewed against: `BUILD_PROMPT.md` (14 phases, §1–§17), repo at `7e0d709`.
 
 ---
 
+## Revision R1 — post-implementation status (2026-10-08, later the same day)
+
+After the review, the §6 remediation order A–E was executed on this branch.
+**Current completion: ≈ 82 %** (click-through estimate ≈ 78 %). The sections
+below (2–7) remain the as-reviewed record; defects marked **FIXED** there have
+been resolved. This revision supersedes §1 and the defect list where noted.
+
+### What was built since the review (commits `cbecb90` → `b35b106`)
+
+| Area | Delivered |
+| --- | --- |
+| **A — architecture** | Single permission gate restored in `src/server/api.ts` (React Query mutations replace direct `seed` writes in Settings/team/maintenance/cost pages); `grep "role ===" src/` clean outside `capabilities.ts` + session builder; brand-word rule confined to `src/` (app may say "device time"); `src/architecture.test.ts` runs **real greps** for rules 1–4 + a components ratchet (`KNOWN_DIRECT_DATA_IMPORTS` must only shrink) |
+| **B — reports engine** | `src/server/trips.ts` (§11.5 trip rule, gaps, distance), `src/server/reports.ts` (6 types gated by hardware + phase; renter windows clipped with note; `runReport`/`regenerateReport` with permission re-check; xlsx/pdf filenames per §11.5), `src/server/schedules.ts` (daily/weekly/monthly; clock-driven `runDueSchedules`; skip rows + pause-after-2; Dubai day keys via `clock.dubaiDateKey`) |
+| **B — screens** | Reports/Downloads/Schedules pages fully wired (Run produces a real file + run row; schedule form; Download again/Delete; skip reasons). Demo-bar clock jumps materialise due schedule runs (S30) |
+| **C — alerts** | `src/server/alerts.ts`: tenant/site-scoped visibility, day-one offline-only, hardware-gated types, real Acknowledge (Kasper + owner Tenant Admin, name + time). Alerts page + bell dropdown fed by the 22 seeded alerts (S9). `tenant_admin` gained `alert.acknowledge` per §5 |
+| **C — asset detail** | Overview tiles fixed (engine hours was showing GNSS odometer; RPM was `Math.random()` — now `reading.rpm` or "Not measured"); Trips tab = real `detectTrips`; History = 24 h of readings; Engine & fuel = real CAN values with per-value source labels; Driving tab = overspeed/harsh events; Alerts tab = user's alerts + Acknowledge |
+| **C — geofences** | `src/server/geofences.ts` + customer/console pages on real seed geofences (circles/polygons) and enter/exit events; create/delete behind `geofence.manage` (S31) |
+| **D — MUC + shell** | `src/lib/muc-pdf.ts`: certificate PDF with meter summary, day table, gap rule, seal hash, **QR + verify code** to `/verify/<number>` (S36–S39). `kasper.store.v2` rehydrate re-applies the demo clock offset (reload persistence). Ctrl/Cmd+K global search palette over visible assets + pages (S40) |
+| **E — e2e self-check** | `npx playwright test --list` → 200 tests in 15 files ✓. S27 re-pointed at real trips (WT-07 has 7); S30 accepts the real empty-state copy; the alert-acknowledge expectation updated to §5 (Tenant Admin owner **can** acknowledge); geofence forms got label/input association for `getByLabel` |
+
+### Current health
+
+| Command | Result |
+| --- | --- |
+| `npm test` | 26 files, **275 tests**, all green |
+| `npm run test:coverage` | `src/server` **87.6 %** lines · `src/domain` **88.2 %** — ≥ 85 % target met |
+| `npm run typecheck` / `npm run lint` | Clean |
+| `npx playwright test --list` | 200 tests in 15 files parse |
+| Architecture greps | All rules pass, enforced by `src/architecture.test.ts` |
+
+### What is left (ordered)
+
+1. **Walkthroughs** (P13): the five guided first-run tours with dismiss state in `kasper.store.v2` — the largest remaining piece of §13.
+2. **Settings/Time toggles** (S45): 12/24-hour and date-format toggles wired through `clock` formatting.
+3. **e2e execution**: specs are re-pointed at real behaviour but Chromium cannot be downloaded in this sandbox — they must be run in CI (`npm run test:e2e`) and any selector drift fixed.
+4. **Screenshot + self-check artefacts** (P1–P13): the prompt's per-phase self-checks with screenshots were never produced; only `reviews/P14-self-check.md` exists.
+5. **Small polish**: utilisation tab for non-MUC assets still short (no 7-day breakdown without ECU); polygon drawing in the geofence create form (circle create is done, S31's polygon draw is numeric-point based); Overview "distance today / idle today" tiles could be computed from `detectTrips` instead of the daily sample.
+
+### Defect status vs the original review (§5)
+
+| # | Defect | Status |
+| --- | --- | --- |
+| 5.1 | `npm ci` ERESOLVE | **FIXED** (`cbecb90`) |
+| 5.2 | Architecture rules were no-ops | **FIXED** (`cbecb90`) |
+| 5.3 | Reports/Schedules/Downloads non-functional | **FIXED** (`cdc9622`) |
+| 5.4 | Alerts fabricated with `Math.random()` | **FIXED** (`003a1a7`) |
+| 5.5 | Asset-detail tiles/tabs wrong or stubbed | **FIXED** (`d40d0cb`) |
+| 5.6 | Geofence pages mock data | **FIXED** (`ed60562`) |
+| 5.7 | MUC PDF/QR missing | **FIXED** (`3c8e822`) |
+| 5.8 | Reload persistence incomplete (clock offset) | **FIXED** (`3c8e822`) |
+| 5.9 | Search placeholder not functional | **FIXED** (`85c76ff`) |
+| 5.10 | e2e written against stubs | **ADDRESSED** (`b35b106`) — re-pointed, still unexecuted |
+| 5.11 | Capability gap: `alert.acknowledge` for tenant_admin | **FIXED** (`003a1a7`) |
+
+---
+
 ## 1. Headline
 
 **Overall completion: ≈ 68 %** (range 65–72 %).
