@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState, Tabs, TabContent,
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
+import * as XLSX from 'xlsx';
 
 function formatTs(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
@@ -37,6 +38,12 @@ export default function BillingPage() {
   const phase = store.getState().demoSwitches.phase;
   const [payConfirm, setPayConfirm] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('issued');
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   if (!session) return null;
 
@@ -57,6 +64,15 @@ export default function BillingPage() {
   );
 
   const receivedInvoices = seed.invoices.filter(inv => inv.customerTenantId === myTenantId);
+
+  const gpsData = useMemo(() => {
+    const tenantAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
+    const t1 = tenantAssets.filter(a => a.canProfile.adapter === 'none').length;
+    const t2 = tenantAssets.filter(a => a.canProfile.adapter === 'LVCAN200').length;
+    const t3 = tenantAssets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
+    const total = t1 * 75 + t2 * 110 + t3 * 165;
+    return { t1, t2, t3, total };
+  }, [myTenantId]);
 
   const handlePay = (invId: string) => setPayConfirm(invId);
   const confirmPay = () => setPayConfirm(null);
@@ -85,7 +101,7 @@ export default function BillingPage() {
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-ink">Rental invoices issued</h2>
-          <Button variant="secondary" size="sm">Create invoice</Button>
+          <Button variant="secondary" size="sm" onClick={() => showToast('Invoice creation is a Phase 2 feature.')}>Create invoice</Button>
         </div>
         {issuedInvoices.length === 0 ? (
           <div className="text-sm text-grey-500 bg-paper-2 rounded-lg p-4 border border-line">
@@ -230,53 +246,71 @@ export default function BillingPage() {
       <div className="bg-surface border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-ink">GPS subscription statements</h2>
-          <Button variant="secondary" size="sm">Download</Button>
+          <Button variant="secondary" size="sm" onClick={() => {
+            const tenantAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
+            const t1 = tenantAssets.filter(a => a.canProfile.adapter === 'none').length;
+            const t2 = tenantAssets.filter(a => a.canProfile.adapter === 'LVCAN200').length;
+            const t3 = tenantAssets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
+            const total = t1 * 75 + t2 * 110 + t3 * 165;
+            const rows = [
+              { Tier: 'Tier 1', Rate: 'AED 75/tracker-month', Count: t1, Total: t1 * 75 },
+              { Tier: 'Tier 2', Rate: 'AED 110/tracker-month', Count: t2, Total: t2 * 110 },
+              { Tier: 'Tier 3', Rate: 'AED 165/tracker-month', Count: t3, Total: t3 * 165 },
+              { Tier: 'Total', Rate: '', Count: t1 + t2 + t3, Total },
+            ];
+            const wb = XLSX.utils.book_new();
+            const sheet = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, sheet, 'Subscription');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const filename = `Kasper_GPS_subscription_${myTenantId}_${dateStr}.xlsx`;
+            XLSX.writeFile(wb, filename);
+            showToast(`Downloaded ${filename}`);
+          }}>Download statement</Button>
         </div>
         <p className="text-xs text-grey-500 mb-3">
           Monthly GPS tracker subscription from Kasper. Paid by the tenant. Dummy rates: AED 75/T1 · 110/T2 · 165/T3 per tracker-month.
         </p>
-        {(() => {
-          const tenantAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
-          const t1 = tenantAssets.filter(a => a.canProfile.adapter === 'none').length;
-          const t2 = tenantAssets.filter(a => a.canProfile.adapter === 'LVCAN200').length;
-          const t3 = tenantAssets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
-          const total = t1 * 75 + t2 * 110 + t3 * 165;
-          return (
-            <div className="bg-paper-2 rounded-lg p-4 border border-line">
-              <div className="grid grid-cols-3 gap-3 text-sm mb-3">
-                <div>
-                  <div className="text-xs text-grey-500">Tier 1 trackers ({t1})</div>
-                  <div className="text-ink font-medium">{t1 > 0 ? fmtAed(t1 * 75) : '—'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-grey-500">Tier 2 trackers ({t2})</div>
-                  <div className="text-ink font-medium">{t2 > 0 ? fmtAed(t2 * 110) : '—'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-grey-500">Tier 3 trackers ({t3})</div>
-                  <div className="text-ink font-medium">{t3 > 0 ? fmtAed(t3 * 165) : '—'}</div>
-                </div>
+        {gpsData && (
+          <div className="bg-paper-2 rounded-lg p-4 border border-line">
+            <div className="grid grid-cols-3 gap-3 text-sm mb-3">
+              <div>
+                <div className="text-xs text-grey-500">Tier 1 trackers ({gpsData.t1})</div>
+                <div className="text-ink font-medium">{gpsData.t1 > 0 ? fmtAed(gpsData.t1 * 75) : '—'}</div>
               </div>
-              <div className="border-t border-line pt-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-ink">Total</span>
-                <span className="text-sm font-mono text-ink font-medium">{fmtAed(total)}</span>
+              <div>
+                <div className="text-xs text-grey-500">Tier 2 trackers ({gpsData.t2})</div>
+                <div className="text-ink font-medium">{gpsData.t2 > 0 ? fmtAed(gpsData.t2 * 110) : '—'}</div>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Badge variant="yellow">Unpaid</Badge>
-                <span className="text-xs text-grey-500">Due by end of month</span>
+              <div>
+                <div className="text-xs text-grey-500">Tier 3 trackers ({gpsData.t3})</div>
+                <div className="text-ink font-medium">{gpsData.t3 > 0 ? fmtAed(gpsData.t3 * 165) : '—'}</div>
               </div>
-              {total > 0 && (
-                <div className="mt-3">
-                  <Button size="sm" variant="yellow" onClick={() => handlePay('gps')}>
-                    Pay AED {fmtAed(total).replace('AED ', '')}
-                  </Button>
-                </div>
-              )}
             </div>
-          );
-        })()}
+            <div className="border-t border-line pt-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-ink">Total</span>
+              <span className="text-sm font-mono text-ink font-medium">{fmtAed(gpsData.total)}</span>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <Badge variant="yellow">Unpaid</Badge>
+              <span className="text-xs text-grey-500">Due by end of month</span>
+            </div>
+            {gpsData.total > 0 && (
+              <div className="mt-3">
+                <Button size="sm" variant="yellow" onClick={() => handlePay('gps')}>
+                  Pay AED {fmtAed(gpsData.total).replace('AED ', '')}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       </TabContent>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 bg-ink text-paper px-4 py-2 rounded-lg shadow-lg text-sm">
+          {toast}
+        </div>
+      )}
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">
         <strong className="text-ink">Dummy rates:</strong> GPS subscription AED 75/T1 · 110/T2 · 165/T3 per tracker-month. VAT 5%. All amounts are dummy values for the prototype.
