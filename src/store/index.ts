@@ -9,12 +9,19 @@ import * as clock from '@/lib/clock';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface WalkthroughState {
+  scenarioId: number;
+  stepIndex: number;
+}
+
 interface StoreState {
   session: Session | null;
   demoSwitches: DemoSwitches;
   selectedAssetId: string | null;
   currentPath: string;
   clockOffsetMs: number;
+  walkthrough: WalkthroughState | null;
+  walkthroughsDone: number[];
 }
 
 interface StoreActions {
@@ -25,6 +32,8 @@ interface StoreActions {
   setClockOffsetMs: (ms: number) => void;
   resetClock: () => void;
   getClockOffsetMs: () => number;
+  setWalkthrough: (w: WalkthroughState | null) => void;
+  markWalkthroughDone: (id: number) => void;
 }
 
 type Store = StoreState & StoreActions;
@@ -48,6 +57,8 @@ export const useStore = create<Store>()(
       selectedAssetId: null,
       currentPath: '/app',
       clockOffsetMs: 0,
+      walkthrough: null,
+      walkthroughsDone: [],
 
       // Actions
       setSession: (s) => set({ session: s }),
@@ -72,6 +83,16 @@ export const useStore = create<Store>()(
       },
 
       getClockOffsetMs: () => get().clockOffsetMs,
+
+      setWalkthrough: (w) => set({ walkthrough: w }),
+
+      markWalkthroughDone: (id) =>
+        set((state) => ({
+          walkthrough: null,
+          walkthroughsDone: state.walkthroughsDone.includes(id)
+            ? state.walkthroughsDone
+            : [...state.walkthroughsDone, id],
+        })),
     }),
     {
       name: 'kasper.store.v2',
@@ -80,6 +101,8 @@ export const useStore = create<Store>()(
         session: state.session,
         demoSwitches: state.demoSwitches,
         clockOffsetMs: state.clockOffsetMs,
+        // Tour dismissals persist so finished walkthroughs stay finished.
+        walkthroughsDone: state.walkthroughsDone,
       }),
       // Re-apply the persisted demo clock offset to the simulated clock, so a
       // refresh keeps demo time (spec: reload persistence).

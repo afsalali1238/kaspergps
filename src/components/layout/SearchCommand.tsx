@@ -87,7 +87,6 @@ export function SearchCommand({ session }: SearchCommandProps) {
         subtitle: '',
         href: p.href,
       }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, open]);
 
   const results = [...assetResults, ...pageResults];
