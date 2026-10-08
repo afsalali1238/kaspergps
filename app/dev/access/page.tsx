@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { Badge, Table, Panel, PanelHeader } from '@/components/ui';
 import type { Capability } from '@/server/capabilities';
 import { isKasperStaff } from '@/server/capabilities';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
 
 import type { Session } from '@/domain/types';
@@ -83,6 +83,7 @@ function TierChip({ tier }: { tier: number }) {
 }
 
 export default function DevAccessPage() {
+  const seed = useDb(s => s);
   const [selectedUserIdx, setSelectedUserIdx] = useState(0);
   const [capabilityQuery, setCapabilityQuery] = useState('');
 

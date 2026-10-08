@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import {
@@ -33,6 +33,7 @@ function formatDay(ts: string | number): string {
 }
 
 export default function ConsoleBillingPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

@@ -8,8 +8,8 @@
 // Owners and Kasper only: Tenant Admins and their Site Users see their own
 // company's plans (site users read-only), renters never.
 
-import type { Asset, MaintenancePlan, ServiceRecord, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import type { Asset, MaintenancePlan, MaintenanceTask, ServiceRecord, Session } from '@/domain/types';
+import { db, append, touch, nextNumber } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability, visibleAssetIds } from '@/server/access';
@@ -17,21 +17,8 @@ import { BEHAVIOUR_HOURS_PER_DAY, ecuHoursAt } from '@/server/muc';
 import { hoursSourceLabel, tierForAsset } from '@/domain/features';
 import * as clock from '@/lib/clock';
 
-let recordSeq = 100;
-let planSeq = 1000;
 
-export interface MaintenanceTask {
-  id: string;
-  assetId: string;
-  title: string;
-  fromFaultCode: string;
-  createdAt: number;
-  doneAt?: number;
-  doneBy?: string;
-}
-
-/** One-off tasks raised from fault codes (demo state, like the other in-memory edits). */
-export const maintenanceTasks: MaintenanceTask[] = [];
+export type { MaintenanceTask } from '@/domain/types';
 
 // ── Readings ───────────────────────────────────────────────────────────────────
 
@@ -124,12 +111,12 @@ export interface PlanSnapshot {
 }
 
 function hireNote(asset: Asset, atMs: number): string | null {
-  const booking = seed.bookings.find(b =>
+  const booking = db.getState().bookings.find(b =>
     b.assetId === asset.id && b.status === 'active' &&
     Number(b.start) <= atMs && Number(b.end) >= atMs
   );
   if (!booking) return null;
-  const renter = seed.tenants.find(t => t.id === booking.renterTenantId);
+  const renter = db.getState().tenants.find(t => t.id === booking.renterTenantId);
   return `On hire to ${renter?.name ?? booking.renterName} until ${clock.formatDubaiDate(Number(booking.end))}`;
 }
 
@@ -199,8 +186,8 @@ export function planSnapshot(plan: MaintenancePlan, asset: Asset, atMs = clock.n
 /** Kasper sees every plan; a company sees its own assets' plans (never a renter). */
 export function plansVisibleTo(session: Session): MaintenancePlan[] {
   const visible = new Set(visibleAssetIds(session));
-  return seed.maintenancePlans.filter(p => {
-    const asset = seed.assets.find(a => a.id === p.assetId);
+  return db.getState().maintenancePlans.filter(p => {
+    const asset = db.getState().assets.find(a => a.id === p.assetId);
     if (!asset) return false;
     if (!visible.has(asset.id)) return false;
     if (session.isKasper) return true;
@@ -214,7 +201,7 @@ export function plansForAsset(session: Session, assetId: string): MaintenancePla
 
 export function boardFor(session: Session, atMs = clock.now()): { overdue: PlanSnapshot[]; dueSoon: PlanSnapshot[]; ok: PlanSnapshot[] } {
   const snapshots = plansVisibleTo(session).map(plan => {
-    const asset = seed.assets.find(a => a.id === plan.assetId)!;
+    const asset = db.getState().assets.find(a => a.id === plan.assetId)!;
     return planSnapshot(plan, asset, atMs);
   });
   const order = (a: PlanSnapshot, b: PlanSnapshot) => a.remaining - b.remaining;
@@ -247,8 +234,8 @@ export function canManageMaintenance(session: Session): boolean {
 
 export function serviceHistory(session: Session, assetId?: string): ServiceRecord[] {
   const visible = new Set(visibleAssetIds(session));
-  const owned = new Set(seed.assets.filter(a => a.ownerTenantId === session.tenantId).map(a => a.id));
-  return seed.serviceRecords
+  const owned = new Set(db.getState().assets.filter(a => a.ownerTenantId === session.tenantId).map(a => a.id));
+  return db.getState().serviceRecords
     .filter(r => visible.has(r.assetId) && (session.isKasper || owned.has(r.assetId)))
     .filter(r => !assetId || r.assetId === assetId)
     .sort((a, b) => new Date(b.doneAt).getTime() - new Date(a.doneAt).getTime());
@@ -268,9 +255,9 @@ export interface LogServiceInput {
 
 export function logService(session: Session, input: LogServiceInput): OpResult<ServiceRecord> {
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t log services.');
-  const plan = seed.maintenancePlans.find(p => p.id === input.planId);
+  const plan = db.getState().maintenancePlans.find(p => p.id === input.planId);
   if (!plan) return fail('Plan not found.');
-  const asset = seed.assets.find(a => a.id === plan.assetId);
+  const asset = db.getState().assets.find(a => a.id === plan.assetId);
   if (!asset) return fail('Asset not found.');
   if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only log services on your own assets.');
   if (!Number.isFinite(input.value) || input.value < 0) return fail('Enter the meter reading at the service.');
@@ -278,7 +265,7 @@ export function logService(session: Session, input: LogServiceInput): OpResult<S
   if (input.doneAt > clock.now() + 3600000) return fail('The service date can\u2019t be in the future.');
 
   const record: ServiceRecord = {
-    id: `sr-${++recordSeq}`,
+    id: `sr-${nextNumber('sr-', db.getState().serviceRecords, 100)}`,
     planId: plan.id,
     assetId: plan.assetId,
     tenantId: asset.ownerTenantId ?? plan.tenantId,
@@ -288,16 +275,18 @@ export function logService(session: Session, input: LogServiceInput): OpResult<S
     costAed: Math.round(input.costAed * 100) / 100,
     createdBy: session.userId,
   };
-  seed.serviceRecords.push(record);
+  append('serviceRecords', record);
 
   plan.lastDoneAt = record.doneAt;
   plan.lastDoneValue = record.value;
+  touch('maintenancePlans');
 
   if (input.taskId) {
-    const task = maintenanceTasks.find(t => t.id === input.taskId);
+    const task = db.getState().maintenanceTasks.find(t => t.id === input.taskId);
     if (task) {
       task.doneAt = clock.now();
       task.doneBy = session.userId;
+      touch('maintenanceTasks');
     }
   }
 
@@ -326,16 +315,16 @@ export interface SavePlanInput {
 
 export function savePlan(session: Session, input: SavePlanInput): OpResult<MaintenancePlan> {
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t edit service plans.');
-  const asset = seed.assets.find(a => a.id === input.assetId);
+  const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
   if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only plan services on your own assets.');
   const name = input.name.trim();
   if (!name) return fail('Give the plan a name.');
   if (!Number.isFinite(input.interval) || input.interval <= 0) return fail('The interval must be more than zero.');
 
-  const existing = input.id ? seed.maintenancePlans.find(p => p.id === input.id) : undefined;
+  const existing = input.id ? db.getState().maintenancePlans.find(p => p.id === input.id) : undefined;
   const plan: MaintenancePlan = existing ?? {
-    id: `mp-${++planSeq}`,
+    id: `mp-${nextNumber('mp-', db.getState().maintenancePlans, 1000)}`,
     tenantId: asset.ownerTenantId ?? '',
     assetId: asset.id,
     name,
@@ -368,7 +357,8 @@ export function savePlan(session: Session, input: SavePlanInput): OpResult<Maint
     ? input.dueSoonAt
     : Math.round((snapshot.due - plan.interval * 0.2) * 10) / 10;
 
-  if (!existing) seed.maintenancePlans.push(plan);
+  if (existing) touch('maintenancePlans');
+  else append('maintenancePlans', plan);
 
   recordAuditForSession(session, {
     action: 'maintenance.plan',
@@ -382,29 +372,29 @@ export function savePlan(session: Session, input: SavePlanInput): OpResult<Maint
 
 export function openTasks(session: Session): MaintenanceTask[] {
   const visible = new Set(visibleAssetIds(session));
-  return maintenanceTasks.filter(t => visible.has(t.assetId) && !t.doneAt);
+  return db.getState().maintenanceTasks.filter(t => visible.has(t.assetId) && !t.doneAt);
 }
 
 /** Fault codes are Tier 3 only; they raise a one-off service task on the board. */
 export function createTaskFromFault(session: Session, alertId: string): OpResult<MaintenanceTask> {
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t create service tasks.');
-  const alert = seed.alerts.find(a => a.id === alertId && a.type === 'fault_code');
+  const alert = db.getState().alerts.find(a => a.id === alertId && a.type === 'fault_code');
   if (!alert || !alert.assetId) return fail('Fault code not found.');
-  const asset = seed.assets.find(a => a.id === alert.assetId);
+  const asset = db.getState().assets.find(a => a.id === alert.assetId);
   if (!asset) return fail('Asset not found.');
   if (tierForAsset(asset) < 3) return fail(`${asset.code} has no CAN bus, so fault codes aren\u2019t available.`);
-  if (maintenanceTasks.some(t => t.fromFaultCode === alert.detail && !t.doneAt)) {
+  if (db.getState().maintenanceTasks.some(t => t.fromFaultCode === alert.detail && !t.doneAt)) {
     return fail('There is already an open task for this fault.');
   }
 
   const task: MaintenanceTask = {
-    id: `mt-${++recordSeq}`,
+    id: `mt-${nextNumber('mt-', db.getState().maintenanceTasks, 100)}`,
     assetId: asset.id,
     title: alert.detail.replace(/^Fault code /, ''),
     fromFaultCode: alert.detail,
     createdAt: clock.now(),
   };
-  maintenanceTasks.push(task);
+  append('maintenanceTasks', task);
   recordAuditForSession(session, {
     action: 'maintenance.task',
     tenantId: asset.ownerTenantId ?? undefined,

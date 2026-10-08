@@ -7,7 +7,7 @@
 // Used by /app/certificates, the asset detail Certificates tab and /verify/[number].
 
 import type { Asset, Muc, MucPayload, Session, Booking } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, touch, nextNumber } from '@/server/db';
 import { recordAudit } from '@/server/audit';
 import { fail, ok } from '@/server/result';
 import type { OpResult } from '@/server/result';
@@ -39,17 +39,17 @@ export async function getMucVerifyStatus(muc: Muc): Promise<MucVerifyStatus> {
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function getMucByNumber(number: string): Muc | null {
-  return seed.mucs.find(m => m.number === number) ?? null;
+  return db.getState().mucs.find(m => m.number === number) ?? null;
 }
 
 export function getMucsForAsset(assetId: string): Muc[] {
-  return seed.mucs.filter(m => m.assetId === assetId);
+  return db.getState().mucs.filter(m => m.assetId === assetId);
 }
 
 /** Replacement MUC for a voided certificate, if one exists (seed points forwards). */
 export function getReplacementMuc(muc: Muc): Muc | null {
   if (!muc.replacesMucId) return null;
-  return seed.mucs.find(m => m.id === muc.replacesMucId) ?? null;
+  return db.getState().mucs.find(m => m.id === muc.replacesMucId) ?? null;
 }
 
 // ── Simulated ECU engine hours ────────────────────────────────────────────────
@@ -57,10 +57,10 @@ export function getReplacementMuc(muc: Muc): Muc | null {
 // time, anchored to a deterministic per-asset baseline so it never jumps.
 
 function assetImei(asset: Asset): string {
-  const pairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
+  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
   const tracker = pairing
-    ? seed.trackers.find(t => t.id === pairing.trackerId)
-    : seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired');
+    ? db.getState().trackers.find(t => t.id === pairing.trackerId)
+    : db.getState().trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired');
   return tracker?.imei ?? '352093100000000';
 }
 
@@ -191,10 +191,8 @@ function canIssueFor(session: Session, asset: Asset): boolean {
   return asset.ownerTenantId === session.tenantId;
 }
 
-let mucSeq = 0;
-
 export async function issueMuc(session: Session, input: IssueMucInput): Promise<OpResult<Muc>> {
-  const asset = seed.assets.find(a => a.id === input.assetId);
+  const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
 
   if (!canIssueFor(session, asset)) {
@@ -213,7 +211,7 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
     return fail('Only past periods can be certified.');
   }
 
-  const existing = seed.mucs.filter(
+  const existing = db.getState().mucs.filter(
     m => m.assetId === asset.id && m.status === 'sealed' && new Date(m.periodFrom).getTime() === fromMs
   );
   if (existing.length > 0) {
@@ -235,9 +233,9 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
   const opening = ecuHoursAt(asset, fromMs);
   const billable = n1(breakdown.days.reduce((sum, d) => sum + d.engineHours, 0) + breakdown.gapHours);
   const closing = n1(opening + billable);
-  const owner = seed.tenants.find(t => t.id === asset.ownerTenantId);
-  const booking: Booking | null = input.bookingId ? seed.bookings.find(b => b.id === input.bookingId) ?? null : null;
-  const renter = booking?.renterTenantId ? seed.tenants.find(t => t.id === booking.renterTenantId) ?? null : null;
+  const owner = db.getState().tenants.find(t => t.id === asset.ownerTenantId);
+  const booking: Booking | null = input.bookingId ? db.getState().bookings.find(b => b.id === input.bookingId) ?? null : null;
+  const renter = booking?.renterTenantId ? db.getState().tenants.find(t => t.id === booking.renterTenantId) ?? null : null;
 
   const payload: MucPayload = {
     version: 1,
@@ -255,9 +253,10 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
     source: 'ECU',
   };
 
+  const mucPrefix = `muc-${asset.code.toLowerCase()}-${clock.now()}-`;
   const muc: Muc = {
-    id: `muc-${asset.code.toLowerCase()}-${clock.now()}-${++mucSeq}`,
-    number: nextMucNumber(asset.code, fromMs, seed.mucs),
+    id: `${mucPrefix}${nextNumber(mucPrefix, db.getState().mucs)}`,
+    number: nextMucNumber(asset.code, fromMs, db.getState().mucs),
     assetId: asset.id,
     ownerTenantId: asset.ownerTenantId,
     bookingId: booking?.id,
@@ -269,7 +268,7 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
     issuedBy: session.userId,
     status: 'sealed',
   };
-  seed.mucs.push(muc);
+  append('mucs', muc);
 
   recordAudit({
     actorUserId: session.userId,
@@ -300,6 +299,7 @@ export async function voidMuc(session: Session, mucNumber: string, reason: strin
   muc.voidedBy = session.userId;
   muc.voidReason = reason.trim();
   if (reissuedAs) muc.replacesMucId = reissuedAs;
+  touch('mucs');
 
   recordAudit({
     actorUserId: session.userId,
@@ -322,7 +322,7 @@ export async function reissueMuc(session: Session, mucNumber: string, reason: st
   }
   if (reason.trim().length < 10) return fail('Give a reason of at least 10 characters.');
 
-  const asset = seed.assets.find(a => a.id === original.assetId);
+  const asset = db.getState().assets.find(a => a.id === original.assetId);
   if (!asset) return fail('Asset not found.');
 
   const breakdown = buildEcuBreakdown(asset, new Date(original.periodFrom).getTime(), new Date(original.periodTo).getTime());
@@ -337,9 +337,10 @@ export async function reissueMuc(session: Session, mucNumber: string, reason: st
     gaps: breakdown.gaps,
   };
 
+  const reissuePrefix = `muc-${asset.code.toLowerCase()}-reissue-${clock.now()}-`;
   const replacement: Muc = {
-    id: `muc-${asset.code.toLowerCase()}-reissue-${clock.now()}-${++mucSeq}`,
-    number: nextMucNumber(asset.code, new Date(original.periodFrom).getTime(), seed.mucs),
+    id: `${reissuePrefix}${nextNumber(reissuePrefix, db.getState().mucs)}`,
+    number: nextMucNumber(asset.code, new Date(original.periodFrom).getTime(), db.getState().mucs),
     assetId: original.assetId,
     ownerTenantId: original.ownerTenantId,
     bookingId: original.bookingId,
@@ -353,8 +354,9 @@ export async function reissueMuc(session: Session, mucNumber: string, reason: st
     replacesMucId: original.id,
     reissueOf: original.id,
   };
-  seed.mucs.push(replacement);
+  append('mucs', replacement);
   original.replacesMucId = replacement.id;
+  touch('mucs');
 
   recordAudit({
     actorUserId: session.userId,
@@ -373,5 +375,6 @@ export function tamperWithMuc(mucNumber: string): OpResult<Muc> {
   const muc = getMucByNumber(mucNumber);
   if (!muc) return fail('Certificate not found.');
   muc.payload.billableHours = n1(muc.payload.billableHours + 5);
+  touch('mucs');
   return ok(muc, `${muc.number} tampered — the verify page will now flag it.`);
 }

@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 
 interface Label {
@@ -22,6 +22,7 @@ const LABELS: Label[] = [
 ];
 
 export default function LabelsPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

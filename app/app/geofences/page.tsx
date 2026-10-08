@@ -8,7 +8,7 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { isAssetVisible, hasCapability } from '@/server/access';
 import {
   visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence,
@@ -27,6 +27,7 @@ function kindLabel(kind: string, t: (k: string, f: string) => string): string {
 }
 
 export default function GeofencesPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const store = useStore;
   const session = store.getState().session;

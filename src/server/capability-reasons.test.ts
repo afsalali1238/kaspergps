@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { reasonFor } from './capability-reasons';
 import type { Capability } from './capabilities';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import type { Role, Session } from '@/domain/types';
 
 const ROLES: Role[] = ['kasper_admin', 'kasper_ops', 'tenant_admin', 'site_user'];
@@ -25,7 +25,7 @@ const CAPS: Capability[] = [
 ];
 
 function sessionFor(role: Role, userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',

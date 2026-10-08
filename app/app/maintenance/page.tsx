@@ -8,7 +8,7 @@ import {
 } from '@/components/ui';
 import { useStore } from '@/store';
 import type { MaintenancePlan } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { visibleAssetIds } from '@/server/access';
 import {
@@ -37,6 +37,7 @@ function basisChip(snapshot: PlanSnapshot): React.ReactNode {
 }
 
 export default function MaintenancePage() {
+  const seed = useDb(s => s);
   const t = useT();
   const store = useStore;
   const session = store.getState().session;
@@ -467,6 +468,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
   onClose: () => void;
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
+  const seed = useDb(s => s);
   const t = useT();
   const owned = seed.assets.filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
   const [assetId, setAssetId] = useState(snapshot?.asset.id ?? owned[0]?.id ?? '');

@@ -5,11 +5,11 @@ import {
   createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole, updateUserSites,
   userById, usersForTenant,
 } from './team';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
@@ -23,7 +23,7 @@ const ravi = () => sessionFor('u-ravi');       // Kasper Ops (no users.manage)
 const mark = () => sessionFor('u-mark');       // Gulf Lift Site User
 
 const auditFor = (action: string, needle: string) =>
-  seed.auditEntries.find(e => e.action === action && e.detail.includes(needle));
+  db.getState().auditEntries.find(e => e.action === action && e.detail.includes(needle));
 
 describe('team — inviting users', () => {
   it('creates an invited user and audits it', () => {
@@ -71,7 +71,7 @@ describe('team — editing users', () => {
 
   it('keeps at least one active Tenant Admin', () => {
     const tenantId = 't-emirates'; // Khalid is the only active admin
-    const admins = seed.users.filter(u => u.tenantId === tenantId && u.role === 'tenant_admin' && u.status === 'active');
+    const admins = db.getState().users.filter(u => u.tenantId === tenantId && u.role === 'tenant_admin' && u.status === 'active');
     expect(admins).toHaveLength(1);
     // The last-admin rule is checked first, whoever asks.
     expect(deactivateUser(khalid(), 'u-khalid').error).toBe('Every company needs at least one Tenant Admin.');

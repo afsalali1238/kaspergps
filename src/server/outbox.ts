@@ -3,7 +3,7 @@
 // asset's owning tenant admins. Nothing is ever actually sent.
 
 import type { Alert, ReportRun, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { actorName } from '@/server/audit';
 import { hasRole } from '@/server/capabilities';
@@ -21,7 +21,7 @@ export interface OutboxItem {
 const MAIL_DOMAIN = 'kasper.ae';
 
 function emailFor(userId: string): string {
-  return seed.users.find(u => u.id === userId)?.email ?? `no-reply@${MAIL_DOMAIN}`;
+  return db.getState().users.find(u => u.id === userId)?.email ?? `no-reply@${MAIL_DOMAIN}`;
 }
 
 function toMs(v: string | number | null | undefined): number {
@@ -30,7 +30,7 @@ function toMs(v: string | number | null | undefined): number {
 }
 
 function reportItem(run: ReportRun): OutboxItem {
-  const user = seed.users.find(u => u.id === run.userId);
+  const user = db.getState().users.find(u => u.id === run.userId);
   const name = user?.name ?? run.userId;
   return {
     id: `mail-${run.id}`,
@@ -44,10 +44,10 @@ function reportItem(run: ReportRun): OutboxItem {
 }
 
 function alertItem(alert: Alert): OutboxItem | null {
-  const asset = seed.assets.find(a => a.id === alert.assetId);
+  const asset = db.getState().assets.find(a => a.id === alert.assetId);
   if (!asset) return null;
-  const admins = seed.users.filter(u => u.tenantId === asset.ownerTenantId && hasRole(u, 'tenant_admin'));
-  const toAlert = seed.alerts.filter(a => a.id === alert.id);
+  const admins = db.getState().users.filter(u => u.tenantId === asset.ownerTenantId && hasRole(u, 'tenant_admin'));
+  const toAlert = db.getState().alerts.filter(a => a.id === alert.id);
   const owner = admins[0];
   return {
     id: `mail-${alert.id}`,
@@ -62,8 +62,8 @@ function alertItem(alert: Alert): OutboxItem | null {
 
 /** Newest first; the demo runner sees every tenant, not just the current one. */
 export function outboxItems(): OutboxItem[] {
-  const reports = seed.reportRuns.map(reportItem);
-  const alerts = seed.alerts.map(alertItem).filter((a): a is OutboxItem => a !== null);
+  const reports = db.getState().reportRuns.map(reportItem);
+  const alerts = db.getState().alerts.map(alertItem).filter((a): a is OutboxItem => a !== null);
   return [...reports, ...alerts].sort((a, b) => b.at - a.at);
 }
 

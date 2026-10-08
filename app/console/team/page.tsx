@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import { hasRole, isKasperStaff } from '@/server/capabilities';
@@ -16,6 +16,7 @@ function roleLabel(role: string): string {
 }
 
 export default function KasperTeamPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

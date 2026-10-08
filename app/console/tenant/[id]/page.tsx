@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import { hasRole } from '@/server/capabilities';
@@ -40,7 +40,7 @@ function tenantTypeLabel(type: string): string {
 }
 
 function hardwareMix(tenantId: string): string {
-  const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
+  const assets = db.getState().assets.filter(a => a.ownerTenantId === tenantId);
   const t1 = assets.filter(a => a.canProfile.adapter === 'none' || a.canProfile.adapter === 'LVCAN200').length;
   const t3 = assets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
   return `T1 ${t1} · T3 ${t3}`;
@@ -49,6 +49,7 @@ function hardwareMix(tenantId: string): string {
 // ── Tab components ─────────────────────────────────────────────────────────────
 
 function TenantOverview({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const tenant = seed.tenants.find(t => t.id === tenantId);
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
   const trackers = useMemo(() =>
@@ -140,6 +141,7 @@ function TenantOverview({ tenantId }: { tenantId: string }) {
 }
 
 function TenantSites({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const sites = seed.sites.filter(s => s.tenantId === tenantId);
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
   const users = seed.users.filter(u => u.tenantId === tenantId);
@@ -188,6 +190,7 @@ function TenantSites({ tenantId }: { tenantId: string }) {
 }
 
 function TenantUsers({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
   const users = seed.users.filter(u => u.tenantId === tenantId);
@@ -363,6 +366,7 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
 }
 
 function TenantAssets({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
 
   return (
@@ -437,6 +441,7 @@ function TenantAssets({ tenantId }: { tenantId: string }) {
 }
 
 function TenantBookings({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
   const bookings = seed.bookings.filter(b => b.ownerTenantId === tenantId);
@@ -586,6 +591,7 @@ function TenantBookings({ tenantId }: { tenantId: string }) {
 }
 
 function TenantBillingTab({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const tenant = seed.tenants.find(t => t.id === tenantId);
   const invoices = seed.invoices.filter(inv => inv.customerTenantId === tenantId);
 
@@ -657,6 +663,7 @@ function TenantBillingTab({ tenantId }: { tenantId: string }) {
 }
 
 function TenantAuditTab({ tenantId }: { tenantId: string }) {
+  const seed = useDb(s => s);
   const entries = seed.tenants
     .flatMap(t => [
       { id: `a-${t.id}-create`, person: 'Kasper Admin', action: 'create', at: t.createdAt, detail: `Tenant created: ${t.name}` },
@@ -724,6 +731,7 @@ const tenantTabs = [
 ];
 
 export default function TenantPage() {
+  const seed = useDb(s => s);
   const params = useParams();
   const store = useStore;
   const session = store.getState().session;

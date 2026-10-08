@@ -12,11 +12,12 @@ import {
 import { useStore } from '@/store';
 import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView } from '@/server/alerts';
 import { hasCapability, visibleAssetIds } from '@/server/access';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 
 export default function AlertsPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const store = useStore;
   const session = store.getState().session;

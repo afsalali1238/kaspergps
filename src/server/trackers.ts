@@ -4,7 +4,7 @@
 // stay attributed to whichever asset the tracker was on at the time.
 
 import type { Asset, Pairing, Session, Tracker, TrackerSleepMode } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, touch, nextNumber } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
@@ -13,30 +13,27 @@ import {
   ICCID_ERROR, IMEI_DUPLICATE_ERROR, IMEI_ERROR, isValidIccid, isValidImei,
 } from '@/domain/tracker-id';
 
-let pairingSeq = 0;
-let trackerSeq = 0;
-
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function trackerById(trackerId: string): Tracker | null {
-  return seed.trackers.find(t => t.id === trackerId) ?? null;
+  return db.getState().trackers.find(t => t.id === trackerId) ?? null;
 }
 
 /** The pairing that is still open for a tracker (`to === null`). */
 export function currentPairingForTracker(trackerId: string): Pairing | null {
-  return seed.pairings.find(p => p.trackerId === trackerId && p.to === null) ?? null;
+  return db.getState().pairings.find(p => p.trackerId === trackerId && p.to === null) ?? null;
 }
 
 /** The pairing that is still open for an asset — its current tracker. */
 export function currentPairingForAsset(assetId: string): Pairing | null {
-  return seed.pairings.find(p => p.assetId === assetId && p.to === null) ?? null;
+  return db.getState().pairings.find(p => p.assetId === assetId && p.to === null) ?? null;
 }
 
 export function currentTrackerForAsset(assetId: string): Tracker | null {
   const pairing = currentPairingForAsset(assetId);
   if (pairing) return trackerById(pairing.trackerId);
   // Seeded assets may carry the link on the tracker itself.
-  return seed.trackers.find(t => t.assetId === assetId && t.stockStatus === 'paired') ?? null;
+  return db.getState().trackers.find(t => t.assetId === assetId && t.stockStatus === 'paired') ?? null;
 }
 
 /** The open pairing comes first, then the closes newest-first. */
@@ -46,27 +43,27 @@ function byOpenThenNewest(a: Pairing, b: Pairing): number {
 }
 
 export function pairingHistory(trackerId: string): Pairing[] {
-  return seed.pairings.filter(p => p.trackerId === trackerId).sort(byOpenThenNewest);
+  return db.getState().pairings.filter(p => p.trackerId === trackerId).sort(byOpenThenNewest);
 }
 
 export function assetPairingHistory(assetId: string): Pairing[] {
-  return seed.pairings.filter(p => p.assetId === assetId).sort(byOpenThenNewest);
+  return db.getState().pairings.filter(p => p.assetId === assetId).sort(byOpenThenNewest);
 }
 
 /** Trackers registered but not fitted to any asset. */
 export function stockTrackers(): Tracker[] {
-  return seed.trackers.filter(t => t.stockStatus === 'in_stock');
+  return db.getState().trackers.filter(t => t.stockStatus === 'in_stock');
 }
 
 /** Assets with no current tracker — the only sensible pairing targets. */
 export function assetsWithoutTracker(): Asset[] {
-  return seed.assets.filter(a => !currentTrackerForAsset(a.id));
+  return db.getState().assets.filter(a => !currentTrackerForAsset(a.id));
 }
 
 /** Assets a tracker could move to: anything not already carrying it. */
 export function pairingTargetsFor(trackerId: string): Asset[] {
   const alreadyOn = currentPairingForTracker(trackerId)?.assetId ?? null;
-  return seed.assets.filter(a => {
+  return db.getState().assets.filter(a => {
     if (a.id === alreadyOn) return false;
     return !currentTrackerForAsset(a.id);
   });
@@ -92,11 +89,11 @@ export function registerTracker(session: Session, input: RegisterTrackerInput): 
   const simIccid = input.simIccid.replace(/\s+/g, '');
 
   if (!/^\d{15}$/.test(imei) || !isValidImei(imei)) return fail(IMEI_ERROR);
-  if (seed.trackers.some(t => t.imei === imei)) return fail(IMEI_DUPLICATE_ERROR);
+  if (db.getState().trackers.some(t => t.imei === imei)) return fail(IMEI_DUPLICATE_ERROR);
   if (!isValidIccid(simIccid)) return fail(ICCID_ERROR);
 
   const tracker: Tracker = {
-    id: `tr-new-${++trackerSeq}`,
+    id: `tr-new-${nextNumber('tr-new-', db.getState().trackers)}`,
     assetId: null,
     imei,
     model: 'FMC130',
@@ -108,7 +105,7 @@ export function registerTracker(session: Session, input: RegisterTrackerInput): 
     registeredAt: new Date(clock.now()).toISOString(),
     registeredBy: session.userId,
   };
-  seed.trackers.push(tracker);
+  append('trackers', tracker);
 
   recordAuditForSession(session, {
     action: 'tracker.register',
@@ -127,7 +124,7 @@ export function pairTracker(session: Session, trackerId: string, assetId: string
   }
   const tracker = trackerById(trackerId);
   if (!tracker) return fail('Tracker not found.');
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return fail('Asset not found.');
   if (tracker.stockStatus === 'retired') return fail('This tracker is retired.');
   if (tracker.stockStatus === 'faulty') return fail('This tracker is flagged faulty.');
@@ -145,10 +142,11 @@ export function pairTracker(session: Session, trackerId: string, assetId: string
   const now = new Date(clock.now()).toISOString();
   if (existingForTracker) {
     existingForTracker.to = now;
-    const from = seed.assets.find(a => a.id === existingForTracker.assetId);
+    const from = db.getState().assets.find(a => a.id === existingForTracker.assetId);
     tracker.assetId = asset.id;
     tracker.stockStatus = 'paired';
-    seed.pairings.push({ id: `p-new-${++pairingSeq}`, trackerId, assetId, from: now, to: null });
+    append('pairings', { id: `p-new-${nextNumber('p-new-', db.getState().pairings)}`, trackerId, assetId, from: now, to: null });
+    touch('trackers', 'pairings');
     recordAuditForSession(session, {
       action: 'pairing.move',
       assetId,
@@ -161,7 +159,8 @@ export function pairTracker(session: Session, trackerId: string, assetId: string
   tracker.assetId = asset.id;
   tracker.stockStatus = 'paired';
   tracker.flaggedForSupport = undefined;
-  seed.pairings.push({ id: `p-new-${++pairingSeq}`, trackerId, assetId, from: now, to: null });
+  append('pairings', { id: `p-new-${nextNumber('p-new-', db.getState().pairings)}`, trackerId, assetId, from: now, to: null });
+  touch('trackers', 'pairings');
   recordAuditForSession(session, {
     action: 'pairing.create',
     assetId,
@@ -180,10 +179,11 @@ export function unpairTracker(session: Session, trackerId: string): OpResult<Tra
   const pairing = currentPairingForTracker(trackerId);
   if (!pairing) return fail('This tracker is not paired to an asset.');
 
-  const asset = seed.assets.find(a => a.id === pairing.assetId);
+  const asset = db.getState().assets.find(a => a.id === pairing.assetId);
   pairing.to = new Date(clock.now()).toISOString();
   tracker.assetId = null;
   tracker.stockStatus = 'in_stock';
+  touch('trackers', 'pairings');
   recordAuditForSession(session, {
     action: 'pairing.end',
     assetId: pairing.assetId,
@@ -202,7 +202,7 @@ export function markTrackerFaulty(session: Session, trackerId: string, note: str
 
   const pairing = currentPairingForTracker(trackerId);
   if (pairing) {
-    const asset = seed.assets.find(a => a.id === pairing.assetId);
+    const asset = db.getState().assets.find(a => a.id === pairing.assetId);
     pairing.to = new Date(clock.now()).toISOString();
     tracker.assetId = null;
     recordAuditForSession(session, {
@@ -217,6 +217,7 @@ export function markTrackerFaulty(session: Session, trackerId: string, note: str
     at: new Date(clock.now()).toISOString(),
     note: note.trim(),
   };
+  touch('trackers', 'pairings');
   recordAuditForSession(session, {
     action: 'tracker.faulty',
     detail: `Tracker ${tracker.imei} marked faulty — ${note.trim()}`,
@@ -235,6 +236,7 @@ export function retireTracker(session: Session, trackerId: string): OpResult<Tra
     return fail('Unpair the tracker before retiring it.');
   }
   tracker.stockStatus = 'retired';
+  touch('trackers', 'pairings');
   recordAuditForSession(session, {
     action: 'tracker.retire',
     detail: `Tracker ${tracker.imei} retired`,
@@ -258,6 +260,7 @@ export function updateTrackerSettings(session: Session, trackerId: string, input
   }
   tracker.pingIntervalSec = Math.round(input.pingIntervalSec);
   tracker.sleepMode = input.sleepMode;
+  touch('trackers', 'pairings');
   recordAuditForSession(session, {
     action: 'tracker.settings',
     assetId: tracker.assetId ?? undefined,

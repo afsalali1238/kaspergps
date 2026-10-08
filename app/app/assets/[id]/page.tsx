@@ -10,7 +10,7 @@ import {
   TierChip, Badge, Button, StatusBadge,
 } from '@/components/ui';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
 import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server/telemetry/simulator';
@@ -72,6 +72,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
+  const seed = useDb(s => s);
   const session = useStore.getState().session!;
   const t = useT();
   const options = expiryOptions(asset.id);
@@ -237,6 +238,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
 type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'maintenance' | 'alerts';
 
 export default function AssetDetailPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
   const params = useParams();
@@ -255,7 +257,7 @@ export default function AssetDetailPage() {
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [assetId]);
+  const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [seed.assets, assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
   const rel = useMemo(() => asset && session ? getRelationship(session, asset.id) : null, [asset, session]);
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { now as clockNow } from '@/lib/clock';
 
 function getClockNow() {
@@ -11,6 +11,7 @@ function getClockNow() {
 }
 
 export default function ConsoleOverviewPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

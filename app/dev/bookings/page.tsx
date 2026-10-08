@@ -6,7 +6,7 @@ import {
 } from '@/components/ui';
 import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import type { Session, Booking } from '@/domain/types';
 import {
@@ -33,7 +33,7 @@ function formatBookingTime(ms: string | number): string {
 
 function canModifyBooking(session: Session, booking: Booking): boolean {
   // Owner tenant admin or Kasper can modify bookings
-  const asset = seed.assets.find(a => a.id === booking.assetId);
+  const asset = db.getState().assets.find(a => a.id === booking.assetId);
   if (!asset) return false;
   if (session.isKasper) return true;
   if (hasRole(session, 'tenant_admin') && asset.ownerTenantId === session.tenantId) return true;
@@ -41,6 +41,7 @@ function canModifyBooking(session: Session, booking: Booking): boolean {
 }
 
 export default function BookingsSimulatorPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

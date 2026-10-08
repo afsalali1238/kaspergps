@@ -5,17 +5,15 @@
 // admin rule applies here too. Every change is audited.
 
 import type { Session, Tenant } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
 import { hasRole } from '@/server/capabilities';
 import * as clock from '@/lib/clock';
 
-let tenantSeq = 100;
-
 export function tenantById(tenantId: string): Tenant | null {
-  return seed.tenants.find(t => t.id === tenantId) ?? null;
+  return db.getState().tenants.find(t => t.id === tenantId) ?? null;
 }
 
 function canManageTenants(session: Session): boolean {
@@ -31,18 +29,18 @@ export function createTenant(session: Session, input: CreateTenantInput): OpResu
   if (!canManageTenants(session)) return fail('Only Kasper Admin can create companies.');
   const name = input.name.trim();
   if (!name) return fail('Company name required.');
-  if (seed.tenants.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+  if (db.getState().tenants.some(t => t.name.toLowerCase() === name.toLowerCase())) {
     return fail('A company with that name already exists.');
   }
 
   const tenant: Tenant = {
-    id: `t-${++tenantSeq}`,
+    id: `t-${nextNumber('t-', db.getState().tenants, 100)}`,
     name,
     type: input.type,
     status: 'active',
     createdAt: new Date(clock.now()).toISOString(),
   };
-  seed.tenants.push(tenant);
+  append('tenants', tenant);
 
   recordAuditForSession(session, {
     action: 'tenant.create',
@@ -67,16 +65,18 @@ export function updateTenant(session: Session, tenantId: string, input: UpdateTe
     const name = input.name.trim();
     if (!name) return fail('Company name required.');
     if (name !== tenant.name) {
-      if (seed.tenants.some(t => t.id !== tenantId && t.name.toLowerCase() === name.toLowerCase())) {
+      if (db.getState().tenants.some(t => t.id !== tenantId && t.name.toLowerCase() === name.toLowerCase())) {
         return fail('A company with that name already exists.');
       }
       changes.push(`name ${tenant.name} → ${name}`);
       tenant.name = name;
+      touch('tenants');
     }
   }
   if (input.type !== undefined && input.type !== tenant.type) {
     changes.push(`type ${tenant.type} → ${input.type}`);
     tenant.type = input.type;
+    touch('tenants');
   }
   if (changes.length === 0) return ok(tenant, 'Nothing changed.');
 
@@ -94,7 +94,7 @@ export function setTenantStatus(session: Session, tenantId: string, status: Tena
   if (!canManageTenants(session)) return fail('Only Kasper Admin can change a company\u2019s status.');
   if (tenant.status === status) return ok(tenant, `${tenant.name} is already ${status}.`);
   if (status === 'suspended') {
-    const admins = seed.users.filter(u => u.tenantId === tenantId && hasRole(u, 'tenant_admin') && u.status === 'active');
+    const admins = db.getState().users.filter(u => u.tenantId === tenantId && hasRole(u, 'tenant_admin') && u.status === 'active');
     if (admins.length === 0) {
       return fail('This company has no active Tenant Admin — suspend it only after adding one.');
     }
@@ -102,6 +102,7 @@ export function setTenantStatus(session: Session, tenantId: string, status: Tena
 
   const before = tenant.status;
   tenant.status = status;
+  touch('tenants');
   recordAuditForSession(session, {
     action: status === 'suspended' ? 'tenant.suspend' : 'tenant.unsuspend',
     tenantId,
@@ -123,5 +124,5 @@ export function unsuspendTenant(session: Session, tenantId: string): OpResult<Te
 
 /** Tenants whose users are seen as "on trial" in the demo data. */
 export function onboardingTenants(): Tenant[] {
-  return seed.tenants.filter(t => t.status !== 'active');
+  return db.getState().tenants.filter(t => t.status !== 'active');
 }

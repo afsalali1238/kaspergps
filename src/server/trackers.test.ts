@@ -20,12 +20,12 @@ import {
 import {
   markAllRead, markNotificationRead, notificationsFor, notifyUser, sessionNotifications, unreadCount,
 } from './notifications';
-import { seed } from '@/server/seed/data';
+import { db, append } from '@/server/db';
 import type { Asset, Notification, Session } from '@/domain/types';
 import * as clock from '@/lib/clock';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id,
     user,
@@ -47,14 +47,14 @@ const omar = () => sessionFor('u-omar');   // Al Noor Tenant Admin
  */
 function newAsset(code: string, ownerTenantId = 't-emirates'): Asset {
   const asset: Asset = {
-    ...seed.assets[0],
+    ...db.getState().assets[0],
     id: `a-test-${code.toLowerCase()}`,
     code,
     name: `${code} test asset`,
     ownerTenantId,
     createdAt: clock.now() - 86400000,
   };
-  seed.assets.push(asset);
+  append('assets', asset);
   return asset;
 }
 
@@ -74,22 +74,22 @@ function freshTracker(): string {
 
 describe('trackers — registration', () => {
   it('registers a tracker with a valid IMEI and SIM', () => {
-    const before = seed.trackers.length;
+    const before = db.getState().trackers.length;
     const result = registerTracker(sara(), { imei: '352093100009999', simIccid: '89971000000000000001' });
     // 352093100009999 may or may not have a valid check digit — accept either outcome
     // and assert the rule that matters: a bad check digit never registers.
     if (result.ok) {
-      expect(seed.trackers.length).toBe(before + 1);
+      expect(db.getState().trackers.length).toBe(before + 1);
       expect(result.data!.stockStatus).toBe('in_stock');
       expect(stockTrackers().some(t => t.id === result.data!.id)).toBe(true);
     } else {
       expect(result.error).toContain("isn't valid");
-      expect(seed.trackers.length).toBe(before);
+      expect(db.getState().trackers.length).toBe(before);
     }
   });
 
   it('refuses a duplicate IMEI and a bad SIM', () => {
-    const existing = seed.trackers[0];
+    const existing = db.getState().trackers[0];
     expect(registerTracker(sara(), { imei: existing.imei, simIccid: '89971000000000000001' }).error)
       .toBe('This IMEI is already registered.');
 
@@ -159,7 +159,7 @@ describe('trackers — pairing', () => {
   });
 
   it('unpairs back to In stock and Mark faulty takes it off the asset', () => {
-    const asset = seed.assets.find(a => a.code === 'FL-09')!;
+    const asset = db.getState().assets.find(a => a.code === 'FL-09')!;
     const tracker = currentTrackerForAsset(asset.id)!;
     expect(tracker).toBeTruthy();
 
@@ -178,7 +178,7 @@ describe('trackers — pairing', () => {
   });
 
   it('will not retire a paired tracker, and retires an unpaired one', () => {
-    const paired = seed.trackers.find(t => currentPairingForTracker(t.id))!;
+    const paired = db.getState().trackers.find(t => currentPairingForTracker(t.id))!;
     expect(retireTracker(ravi(), paired.id).ok).toBe(false);
 
     const spareId = freshTracker();
@@ -190,7 +190,7 @@ describe('trackers — pairing', () => {
   });
 
   it('validates tracker settings (30–300 s)', () => {
-    const tracker = seed.trackers[1];
+    const tracker = db.getState().trackers[1];
     expect(updateTrackerSettings(ravi(), tracker.id, { pingIntervalSec: 20, sleepMode: 'off' }).ok).toBe(false);
     expect(updateTrackerSettings(ravi(), tracker.id, { pingIntervalSec: 301, sleepMode: 'off' }).ok).toBe(false);
     expect(updateTrackerSettings(ravi(), tracker.id, { pingIntervalSec: 60, sleepMode: 'deep' }).ok).toBe(true);
@@ -263,7 +263,7 @@ describe('tracker requests', () => {
   });
 
   it('refuses a request from a Tenant Admin who does not own the asset, and duplicates', () => {
-    const alNoorAsset = seed.assets.find(a => a.ownerTenantId === 't-alnoor' && !currentTrackerForAsset(a.id));
+    const alNoorAsset = db.getState().assets.find(a => a.ownerTenantId === 't-alnoor' && !currentTrackerForAsset(a.id));
     if (alNoorAsset) {
       expect(requestTracker(priya(), alNoorAsset.id).ok).toBe(false);
     }
@@ -278,16 +278,14 @@ describe('tracker requests', () => {
     expect(currentTrackerForAsset('a-lb02')).toBeTruthy();
     expect(requestTracker(omar(), 'a-lb02').ok).toBe(false);
     expect(requestTracker(priya(), 'a-nope').ok).toBe(false);
-    expect(allTrackerRequests().length).toBe(seed.trackerRequests.length);
+    expect(allTrackerRequests().length).toBe(db.getState().trackerRequests.length);
   });
 });
 
 describe('audit log', () => {
   beforeEach(() => {
-    seed.auditEntries.push(
-      { id: 'au-test-1', at: clock.now() - 3600000, actorUserId: 'u-sara', action: 'tenant.suspend', tenantId: 't-palm', detail: 'Palm Contracting suspended' },
-      { id: 'au-test-2', at: clock.now() - 7200000, actorUserId: 'u-ravi', action: 'pairing.create', assetId: 'a-fb12', detail: 'Tracker paired to FB-12' },
-    );
+    append('auditEntries', { id: 'au-test-1', at: clock.now() - 3600000, actorUserId: 'u-sara', action: 'tenant.suspend', tenantId: 't-palm', detail: 'Palm Contracting suspended' });
+    append('auditEntries', { id: 'au-test-2', at: clock.now() - 7200000, actorUserId: 'u-ravi', action: 'pairing.create', assetId: 'a-fb12', detail: 'Tracker paired to FB-12' });
   });
 
   it('records an entry for a session and reads names back', () => {
@@ -348,7 +346,7 @@ describe('notifications', () => {
     const notification: Notification = {
       id: 'ntf-test', userId: 'u-omar', at: clock.now(), text: 'Test', read: false,
     };
-    seed.notifications.push(notification);
+    append('notifications', notification);
 
     expect(notificationsFor('u-omar').some(n => n.id === 'ntf-test')).toBe(true);
     expect(unreadCount('u-omar')).toBeGreaterThanOrEqual(1);

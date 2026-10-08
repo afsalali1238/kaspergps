@@ -7,12 +7,11 @@ import clsx from 'clsx';
 import { useStore } from '@/store';
 import { anyAssetHasFeature, visibleAssetIds, hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import { bellAlerts } from '@/server/alerts';
 import { SearchCommand } from '@/components/layout/SearchCommand';
 import * as clock from '@/lib/clock';
-import type { Tenant } from '@/domain/types';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 
@@ -122,6 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const store = useStore;
   const session = store.getState().session;
+  const tenantRows = useDb(s => s.tenants);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBellOpen, setIsBellOpen] = useState(false);
@@ -171,7 +171,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {session.isKasper
                 ? t('shell.all_tenants', 'All tenants')
                 : session.user.tenantId
-                  ? seedTenants().find(t => t.id === session.user.tenantId)?.name ?? ''
+                  ? tenantRows.find(t => t.id === session.user.tenantId)?.name ?? ''
                   : ''}
             </span>
           )}
@@ -444,6 +444,3 @@ function roleLabel(role: string, t: (key: string, fallback: string) => string): 
   return labels[role] ?? role;
 }
 
-function seedTenants(): readonly Tenant[] {
-  return seed.tenants;
-}

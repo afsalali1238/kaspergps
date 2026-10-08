@@ -9,7 +9,7 @@ import {
   Badge, Button, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { hasCapability } from '@/server/access';
 import type { InvoiceView } from '@/server/billing';
 import {
@@ -61,6 +61,7 @@ const PAYMENT_METHODS = [
 ] as const;
 
 export default function BillingPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const store = useStore;
   const session = store.getState().session;

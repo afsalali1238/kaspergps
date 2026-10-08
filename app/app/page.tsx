@@ -11,7 +11,7 @@ import {
   Button,
 } from '@/components/ui';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship } from '@/server/access';
 import { getReadingForAsset } from '@/server/telemetry/simulator';
@@ -73,9 +73,9 @@ interface AssetMarker {
 }
 
 function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
-  const pairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
+  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!pairing) return 'no_tracker';
-  const tracker = seed.trackers.find(t => t.id === pairing.trackerId);
+  const tracker = db.getState().trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'no_tracker';
   const reading = getReadingForAsset(asset);
   if (!reading) return 'no_tracker';
@@ -131,6 +131,7 @@ function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
 }
 
 export default function MapPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
   const locale = useLocale();

@@ -2,11 +2,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildMucPdf, mucVerifyUrl, mucFileName } from '@/lib/muc-pdf';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 
 describe('muc-pdf', () => {
   it('builds a real PDF for a sealed certificate', async () => {
-    const muc = seed.mucs.find(m => m.status === 'sealed')!;
+    const muc = db.getState().mucs.find(m => m.status === 'sealed')!;
     expect(muc).toBeTruthy();
     const bytes = await buildMucPdf(muc);
     const header = new TextDecoder().decode(bytes.slice(0, 5));
@@ -15,7 +15,7 @@ describe('muc-pdf', () => {
   });
 
   it('uses the per-number verify URL and a stable file name', () => {
-    const muc = seed.mucs[0];
+    const muc = db.getState().mucs[0];
     expect(mucVerifyUrl(muc)).toBe(`https://kaspergps.ae/verify/${encodeURIComponent(muc.number)}`);
     expect(mucFileName(muc)).toContain(muc.number);
     expect(mucFileName(muc)).toMatch(/^Kasper_MUC_/);

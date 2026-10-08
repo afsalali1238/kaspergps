@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import { useStore } from '@/store';
+import { createTenant } from '@/server/tenants';
 import type { Tenant } from '@/domain/types';
 
 function tenantTypeLabel(type: string): string {
@@ -19,20 +20,23 @@ function tenantTypeLabel(type: string): string {
 }
 
 function hardwareMix(tenant: Tenant): string {
-  const assets = seed.assets.filter(a => a.ownerTenantId === tenant.id);
+  const assets = db.getState().assets.filter(a => a.ownerTenantId === tenant.id);
   const t1 = assets.filter(a => a.canProfile.adapter === 'none' || a.canProfile.adapter === 'LVCAN200').length;
   const t2 = assets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
   return `T1 ${t1} · T3 ${t2}`;
 }
 
 export default function TenantsPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState<Tenant['type']>('client');
 
-  const tenants = useMemo(() => seed.tenants, []);
+  const tenants = seed.tenants;
 
   const showToast = (message: string) => {
     setToast(message);
@@ -79,13 +83,19 @@ export default function TenantsPage() {
               <label className="text-xs text-grey-500 font-medium">Name</label>
               <input
                 type="text"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 placeholder="Company name"
               />
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">Type</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+              <select
+                value={newType}
+                onChange={e => setNewType(e.target.value as Tenant['type'])}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              >
                 <option value="vendor">Vendor</option>
                 <option value="client">Client</option>
                 <option value="both">Vendor + Client</option>
@@ -116,7 +126,20 @@ export default function TenantsPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setShowCreateForm(false)}>Cancel</Button>
-              <Button onClick={() => { setShowCreateForm(false); showToast('Tenant created'); }}>Create</Button>
+              <Button
+                onClick={() => {
+                  const result = createTenant(session, { name: newName, type: newType });
+                  if (result.ok) {
+                    setShowCreateForm(false);
+                    setNewName('');
+                    showToast(result.message ?? 'Tenant created');
+                  } else {
+                    showToast(result.error ?? 'Could not create the tenant.');
+                  }
+                }}
+              >
+                Create
+              </Button>
             </div>
           </div>
         </div>

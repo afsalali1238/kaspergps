@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 
 function roleLabel(role: string): string {
@@ -18,6 +18,7 @@ function roleLabel(role: string): string {
 }
 
 export default function UsersPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 

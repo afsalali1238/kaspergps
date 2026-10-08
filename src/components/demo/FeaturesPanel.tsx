@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import clsx from 'clsx';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { hasCapability, isFeatureVisible, getRelationship } from '@/server/access';
 import { reasonFor } from '@/server/capability-reasons';
 import { FEATURES } from '@/domain/features';
@@ -48,6 +48,7 @@ const ALL_CAPABILITIES: Capability[] = [
 // ── Main component ──────────────────────────────────────────────────────────────
 
 export function FeaturesPanel() {
+  const seed = useDb(s => s);
   const session = useStore.getState().session;
   const selectedAssetId = useStore.getState().selectedAssetId;
   const showHidden = useStore.getState().demoSwitches.showHidden;

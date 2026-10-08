@@ -1,12 +1,12 @@
 // Access layer unit tests — verify visibility, grants, relationship.
 import { describe, it, expect } from 'vitest';
-import { seed } from './seed/data';
+import { db } from '@/server/db';
 import * as access from './access';
 import type { Session } from '@/domain/types';
 
 /** Build a session for a seeded user without the store. */
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id,
     user,
@@ -59,7 +59,7 @@ describe('access — isAssetVisible', () => {
     // BK-1003 starts tomorrow — not visible yet
     expect(access.isAssetVisible(s, 'a-ex07')).toBe(false);
     // BK-1003 is scheduled, not active
-    const booking = seed.bookings.find(b => b.id === 'b-1003');
+    const booking = db.getState().bookings.find(b => b.id === 'b-1003');
     expect(booking?.status).toBe('scheduled');
   });
 
@@ -87,9 +87,9 @@ describe('access — isAssetVisible', () => {
   it('EX-11 access ended early for Palm (BK-1010 override)', () => {
     const s = sessionFor('u-fatima');
     // BK-1010 had an early override by Khalid
-    const booking = seed.bookings.find(b => b.id === 'b-1010');
+    const booking = db.getState().bookings.find(b => b.id === 'b-1010');
     expect(booking).toBeDefined();
-    const override = seed.grantOverrides.find(o => o.bookingId === 'b-1010');
+    const override = db.getState().grantOverrides.find(o => o.bookingId === 'b-1010');
     expect(override).toBeDefined();
     expect(override!.reason).toBe('Payment overdue for two weeks');
     // The override ended the grant — Palm can't see EX-11

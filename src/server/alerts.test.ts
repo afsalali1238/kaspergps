@@ -4,11 +4,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Session, User } from '@/domain/types';
 import { visibleAlerts, acknowledgeAlert, openAlertCount } from '@/server/alerts';
 import { isKasperStaff } from '@/server/capabilities';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import * as clock from '@/lib/clock';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId) as User;
+  const user = db.getState().users.find(u => u.id === userId) as User;
   return {
     userId: user.id,
     user,

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button, Badge, StatusBadge, TierChip, Table } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { db, useDb, type DbRow } from '@/server/db';
 import type { AssetStatus } from '@/domain/types';
 import * as clock from '@/lib/clock';
 import { hasFeature } from '@/domain/features';
@@ -20,16 +20,17 @@ interface SeedRow {
   features: string[];
 }
 
-function computeStatus(asset: typeof seed.assets[0]) {
-  const tracker = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
+function computeStatus(asset: DbRow<'assets'>) {
+  const tracker = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!tracker) return 'no_tracker';
-  const tr = seed.trackers.find(t => t.id === tracker.trackerId);
+  const tr = db.getState().trackers.find(t => t.id === tracker.trackerId);
   if (!tr) return 'no_tracker';
   // Simplified
   return 'live';
 }
 
 export default function DevSeedPage() {
+  const seed = useDb(s => s);
   const assetRows: SeedRow[] = seed.assets.map(a => {
     const tracker = seed.pairings.find(p => p.assetId === a.id && p.to === null);
     const tr = tracker ? seed.trackers.find(t => t.id === tracker.trackerId) : null;

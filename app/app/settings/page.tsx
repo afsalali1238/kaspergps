@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
 import { useT, useHref } from '@/i18n';
@@ -29,6 +29,7 @@ function userStatusBadge(status: string, t: T): React.ReactNode {
 }
 
 export default function SettingsPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
   const store = useStore;

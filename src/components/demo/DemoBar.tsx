@@ -4,10 +4,11 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import * as clocklib from '@/lib/clock';
 
 import { ANCHOR_MS } from '@/server/seed/data';
+import { exportDemoState, importDemoState, resetDemoState } from '@/lib/demo-state';
 import { tamperWithMuc } from '@/server/muc';
 import { runDueSchedules } from '@/server/schedules';
 import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
@@ -118,7 +119,7 @@ const SCENARIOS: Scenario[] = [
 ];
 
 function buildSessionFor(userId: string): Session | null {
-  const user = seed.users.find(u => u.id === userId);
+  const user = db.getState().users.find(u => u.id === userId);
   if (!user) return null;
   return {
     userId: user.id,
@@ -154,9 +155,9 @@ interface ClockPreset {
 }
 
 function bookingFor(code: string, status: string) {
-  const asset = seed.assets.find(a => a.code === code);
+  const asset = db.getState().assets.find(a => a.code === code);
   if (!asset) return null;
-  return seed.bookings.find(b => b.assetId === asset.id && b.status === status) ?? null;
+  return db.getState().bookings.find(b => b.assetId === asset.id && b.status === status) ?? null;
 }
 
 function jumpToPresets(): ClockPreset[] {
@@ -176,15 +177,15 @@ function jumpToPresets(): ClockPreset[] {
   const ex04 = bookingFor('EX-04', 'active');
   add('EX-04 rental ends', ex04 ? new Date(ex04.end).getTime() : null);
 
-  const fb12Asset = seed.assets.find(a => a.code === 'FB-12');
-  const fb12Link = seed.trackingLinks.find(l => l.assetId === fb12Asset?.id && l.revokedAt === undefined);
+  const fb12Asset = db.getState().assets.find(a => a.code === 'FB-12');
+  const fb12Link = db.getState().trackingLinks.find(l => l.assetId === fb12Asset?.id && l.revokedAt === undefined);
   if (fb12Link) add('FB-12 link expires', toMs(fb12Link.expiresAt));
 
-  const tp22Asset = seed.assets.find(a => a.code === 'TP-22');
-  const tp22Link = seed.trackingLinks.find(l => l.assetId === tp22Asset?.id);
+  const tp22Asset = db.getState().assets.find(a => a.code === 'TP-22');
+  const tp22Link = db.getState().trackingLinks.find(l => l.assetId === tp22Asset?.id);
   if (tp22Link) add('TP-22 24-hour link expires', toMs(tp22Link.expiresAt));
 
-  const wt08 = seed.assets.find(a => a.code === 'WT-08');
+  const wt08 = db.getState().assets.find(a => a.code === 'WT-08');
   if (wt08) {
     const readings = getReadingsForAsset(wt08, now - 3600000, now);
     const last = readings.length > 0 ? new Date(readings[readings.length - 1].deviceTime).getTime() : null;
@@ -192,7 +193,7 @@ function jumpToPresets(): ClockPreset[] {
   }
 
   if (fb12Asset && fb12Link) {
-    const booking = seed.bookings.find(b => b.id === fb12Link.bookingId);
+    const booking = db.getState().bookings.find(b => b.id === fb12Link.bookingId);
     const readings = getReadingsForAsset(fb12Asset, now - 3600000, now);
     const last = readings.length > 0 ? readings[readings.length - 1] : null;
     if (booking?.destination && last) {
@@ -208,7 +209,7 @@ function jumpToPresets(): ClockPreset[] {
   add('Start of last month', startOfLastMonthDubai());
   add('End of last month', startOfThisMonthDubai() - 60000);
 
-  const overdueInvoice = seed.invoices.find(i => i.status === 'unpaid' || i.status === 'part_paid' || i.status === 'overdue');
+  const overdueInvoice = db.getState().invoices.find(i => i.status === 'unpaid' || i.status === 'part_paid' || i.status === 'overdue');
   if (overdueInvoice) add(`${overdueInvoice.number} becomes overdue`, toMs(overdueInvoice.dueAt));
 
   return out;
@@ -249,6 +250,7 @@ function toolsItems(): { label: string; desc: string; href?: string }[] {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function DemoBar() {
+  const seed = useDb(s => s);
   const router = useRouter();
   const session = useStore.getState().session;
 
@@ -266,12 +268,12 @@ export function DemoBar() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result as string);
-        if (data.demoSwitches) useStore.getState().setDemoSwitches(data.demoSwitches);
-        if (data.clockOffsetMs != null) useStore.getState().setClockOffsetMs(data.clockOffsetMs);
-        if (data.session) useStore.getState().setSession(data.session);
+        importDemoState(String(reader.result ?? ''));
+        // The db and session are now the file's. Re-render the current page
+        // from them without a full reload.
+        router.refresh();
       } catch (err) {
-        console.error('Invalid demo state file:', err);
+        window.alert(err instanceof Error ? err.message : 'That file could not be imported.');
       }
     };
     reader.readAsText(file);
@@ -614,15 +616,12 @@ export function DemoBar() {
                       setResetArmed(true);
                       return;
                     }
-                    // Prototype data lives in memory, so a reload puts every screen
-                    // back to the seeded day one. Switches and clock go back too —
-                    // the signed-in user stays signed in.
-                    useStore.getState().setDemoSwitches({ phase: 'later', showHidden: false, salesView: false });
-                    clocklib.resetOffset();
-                    useStore.getState().resetClock();
+                    // Back to the seeded demo: every row, the switches and the clock.
+                    // Reset also signs out, so the next screen is sign-in.
+                    resetDemoState();
                     setResetArmed(false);
                     setToolsOpen(false);
-                    window.location.reload();
+                    router.replace('/sign-in');
                   }}
                   className={
                     resetArmed
@@ -651,12 +650,7 @@ export function DemoBar() {
                 </button>
                 <button
                   onClick={() => {
-                    const state = useStore.getState();
-                    const blob = new Blob([JSON.stringify({
-                      demoSwitches: state.demoSwitches,
-                      clockOffsetMs: state.clockOffsetMs,
-                      session: state.session,
-                    }, null, 2)], { type: 'application/json' });
+                    const blob = new Blob([exportDemoState()], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;

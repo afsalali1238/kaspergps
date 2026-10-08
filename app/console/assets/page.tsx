@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Button, Badge, TierChip, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import { useStore } from '@/store';
 import type { Asset } from '@/domain/types';
 
@@ -19,18 +19,19 @@ function adapterLabel(adapter: string): string {
 }
 
 function assetStatus(asset: Asset): string {
-  const pairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
+  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!pairing) return 'No tracker';
-  const tracker = seed.trackers.find(t => t.id === pairing.trackerId);
+  const tracker = db.getState().trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'No tracker';
   return 'Fitted';
 }
 
 function activeBooking(asset: Asset): string | null {
-  return seed.bookings.find(b => b.assetId === asset.id && b.status === 'active')?.reference ?? null;
+  return db.getState().bookings.find(b => b.assetId === asset.id && b.status === 'active')?.reference ?? null;
 }
 
 export default function AssetsPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 
@@ -61,7 +62,7 @@ export default function AssetsPage() {
     });
   }, [tenantFilter, tierFilter, classFilter, noTrackerFilter, retiredFilter]);
 
-  const tenantOptions = useMemo(() => seed.tenants, []);
+  const tenantOptions = seed.tenants;
   const classOptions = useMemo(() => [...new Set(seed.assets.map(a => a.assetClass))], []);
 
   if (!session || !session.isKasper) {

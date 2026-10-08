@@ -2,7 +2,7 @@
 // Reads/resolution live in links.ts — this module only creates and revokes.
 
 import type { Booking, LinkRevokeReason, Session, TrackingLink } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, nextNumber, touch } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability, getRelationship } from '@/server/access';
@@ -33,7 +33,7 @@ function canShare(session: Session, assetId: string): boolean {
 
 /** Jobs the Share panel can attach a link to: this asset's active/upcoming bookings. */
 export function shareableBookings(assetId: string): Booking[] {
-  return seed.bookings
+  return db.getState().bookings
     .filter(b => b.assetId === assetId && (b.status === 'active' || b.status === 'scheduled'))
     .sort((a, b) => toMs(a.start) - toMs(b.start));
 }
@@ -60,17 +60,17 @@ export function expiryOptions(assetId: string, nowMs: number = clock.now()): Exp
 }
 
 export function linkById(linkId: string): TrackingLink | null {
-  return seed.trackingLinks.find(l => l.id === linkId) ?? null;
+  return db.getState().trackingLinks.find(l => l.id === linkId) ?? null;
 }
 
 export function activeLinksForAsset(assetId: string, nowMs: number = clock.now()): TrackingLink[] {
-  return seed.trackingLinks
+  return db.getState().trackingLinks
     .filter(l => l.assetId === assetId && getTrackingLinkState(l.token, nowMs) === 'active')
     .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
 
 export function pastLinksForAsset(assetId: string, nowMs: number = clock.now()): TrackingLink[] {
-  return seed.trackingLinks
+  return db.getState().trackingLinks
     .filter(l => l.assetId === assetId && getTrackingLinkState(l.token, nowMs) !== 'active')
     .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
@@ -80,7 +80,7 @@ export function linkEndWords(link: TrackingLink, nowMs: number = clock.now()): s
   const state = getTrackingLinkState(link.token, nowMs);
   switch (state) {
     case 'revoked': {
-      const by = seed.users.find(u => u.id === link.revokedBy)?.name ?? 'Kasper';
+      const by = db.getState().users.find(u => u.id === link.revokedBy)?.name ?? 'Kasper';
       const why = link.revokeReason === 'job_closed' ? 'Job closed' :
         link.revokeReason === 'booking_cancelled' ? 'Booking cancelled' :
         link.revokeReason === 'access_ended' ? 'Access ended' : 'Revoked';
@@ -102,13 +102,13 @@ export interface CreateLinkInput {
 }
 
 export function createTrackingLink(session: Session, input: CreateLinkInput): OpResult<TrackingLink> {
-  const asset = seed.assets.find(a => a.id === input.assetId);
+  const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
   if (!canShare(session, asset.id)) {
     return fail('Only the asset owner or Kasper can share a tracking link.');
   }
 
-  const booking = input.bookingId ? seed.bookings.find(b => b.id === input.bookingId) ?? null : null;
+  const booking = input.bookingId ? db.getState().bookings.find(b => b.id === input.bookingId) ?? null : null;
   if (input.bookingId && !booking) return fail('Booking not found.');
   if (booking && booking.status !== 'active' && booking.status !== 'scheduled') {
     return fail('That job has ended — links are created for active or upcoming jobs.');
@@ -123,7 +123,7 @@ export function createTrackingLink(session: Session, input: CreateLinkInput): Op
       : clock.now() + LINK_TTL_HOURS * 3600000;
 
   const link: TrackingLink = {
-    id: `lk-new-${seed.trackingLinks.length + 1}-${expiresAt}`,
+    id: `lk-new-${nextNumber('lk-new-', db.getState().trackingLinks)}`,
     token: randomToken(),
     assetId: asset.id,
     bookingId: booking?.id ?? null,
@@ -132,7 +132,7 @@ export function createTrackingLink(session: Session, input: CreateLinkInput): Op
     expiresAt: new Date(expiresAt).toISOString(),
     showEta,
   };
-  seed.trackingLinks.push(link);
+  append('trackingLinks', link);
 
   recordAuditForSession(session, {
     action: 'link.create',
@@ -147,7 +147,7 @@ export function createTrackingLink(session: Session, input: CreateLinkInput): Op
 export function revokeTrackingLink(session: Session, linkId: string, reason: LinkRevokeReason = 'manual'): OpResult<TrackingLink> {
   const link = linkById(linkId);
   if (!link) return fail('Link not found.');
-  const asset = seed.assets.find(a => a.id === link.assetId);
+  const asset = db.getState().assets.find(a => a.id === link.assetId);
   if (!asset) return fail('Asset not found.');
   if (!hasCapability(session, 'link.revoke') || !(getRelationship(session, asset.id) === 'owner' || getRelationship(session, asset.id) === 'kasper')) {
     return fail('You cannot revoke this link.');
@@ -157,6 +157,7 @@ export function revokeTrackingLink(session: Session, linkId: string, reason: Lin
   link.revokedAt = new Date(clock.now()).toISOString();
   link.revokedBy = session.userId;
   link.revokeReason = reason;
+  touch('trackingLinks');
 
   recordAuditForSession(session, {
     action: 'link.revoke',
@@ -172,12 +173,13 @@ export function revokeTrackingLink(session: Session, linkId: string, reason: Lin
 /** End every link that belongs to a job — used by cancel / close / end access early. */
 export function revokeLinksForBooking(bookingId: string, reason: LinkRevokeReason, byUserId: string): number {
   let revoked = 0;
-  for (const link of seed.trackingLinks) {
+  for (const link of db.getState().trackingLinks) {
     if (link.bookingId !== bookingId || link.revokedAt) continue;
     link.revokedAt = new Date(clock.now()).toISOString();
     link.revokedBy = byUserId;
     link.revokeReason = reason;
     revoked += 1;
   }
+  if (revoked > 0) touch('trackingLinks');
   return revoked;
 }

@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
 import type { Booking } from '@/domain/types';
@@ -38,6 +38,7 @@ function toLocalInput(ms: number): string {
 }
 
 export default function ConsoleBookingsPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 
@@ -294,6 +295,7 @@ function CreateBookingForm({ onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
+  const seed = useDb(s => s);
   const session = useStore.getState().session!;
   const [assetId, setAssetId] = useState(seed.assets[0]?.id ?? '');
   const [renterTenantId, setRenterTenantId] = useState('');

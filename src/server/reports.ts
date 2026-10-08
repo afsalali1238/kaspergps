@@ -3,7 +3,7 @@
 // Downloads. Files regenerate on demand from the deterministic simulator.
 
 import type { Asset, Reading, ReportRun, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, removeWhere, nextNumber } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability, getRelationship, isAssetVisible, isRenterWindowPast, rentalWindow } from '@/server/access';
 import { hasFeature } from '@/domain/features';
@@ -66,12 +66,12 @@ export interface RunReportInput {
  * held a rental grant on in the past (past rentals stay reportable — spec §5).
  */
 export function reportableAssets(session: Session): Asset[] {
-  return seed.assets.filter(a => {
+  return db.getState().assets.filter(a => {
     if (isAssetVisible(session, a.id)) return true;
     if (session.isKasper) return true;
     if (!session.tenantId) return false;
     // Past grants: any booking for my tenant on this asset.
-    return seed.bookings.some(b => b.assetId === a.id && b.renterTenantId === session.tenantId);
+    return db.getState().bookings.some(b => b.assetId === a.id && b.renterTenantId === session.tenantId);
   });
 }
 
@@ -374,7 +374,7 @@ function buildSummary(reportType: ReportTypeId, entries: { asset: Asset; tables:
 
 export function availableReportTypes(session: Session, assetIds: string[], phase: string): ReportTypeOption[] {
   const assets = assetIds
-    .map(id => seed.assets.find(a => a.id === id))
+    .map(id => db.getState().assets.find(a => a.id === id))
     .filter((a): a is Asset => Boolean(a));
   return REPORT_TYPES.filter(rt => {
     if (rt.phase === 'phase2' && phase === 'day_one') return false;
@@ -393,8 +393,6 @@ function fileNameFor(reportType: ReportTypeId, assets: Asset[], from: string, to
 }
 
 // ── Run / regenerate ─────────────────────────────────────────────────────────
-
-let runSeq = 0;
 
 function buildTables(
   session: Session,
@@ -461,7 +459,7 @@ export function runReport(session: Session, input: RunReportInput): OpResult<Rep
   const rt = REPORT_TYPES.find(r => r.id === input.reportType);
   if (!rt) return fail('Unknown report type.');
   const assets = input.assetIds
-    .map(id => seed.assets.find(a => a.id === id))
+    .map(id => db.getState().assets.find(a => a.id === id))
     .filter((a): a is Asset => Boolean(a));
   if (assets.length === 0) return fail('Pick at least one asset.');
   const reportable = new Set(reportableAssets(session).map(a => a.id));
@@ -486,8 +484,9 @@ export function runReport(session: Session, input: RunReportInput): OpResult<Rep
   }
 
   const scope = assets.length <= 2 ? assets.map(a => a.code).join(', ') : `${assets[0].code} + ${assets.length - 1} more`;
+  const runPrefix = `rr-${clock.now()}-`;
   const run: ReportRun = {
-    id: `rr-${clock.now()}-${++runSeq}`,
+    id: `${runPrefix}${nextNumber(runPrefix, db.getState().reportRuns)}`,
     userId: session.userId,
     reportType: rt.label,
     scope,
@@ -500,12 +499,12 @@ export function runReport(session: Session, input: RunReportInput): OpResult<Rep
     fileName: fileNameFor(input.reportType, assets, input.from, input.to, input.format),
     assetIds: assets.map(a => a.id),
   };
-  seed.reportRuns.push(run);
+  append('reportRuns', run);
 
   const meta: ExportMeta = {
     fileName: run.fileName!.replace(/\.(pdf|xlsx)$/, ''),
     subtitle: [
-      `Company: ${session.user.tenantId ? (seed.tenants.find(t => t.id === session.user.tenantId)?.name ?? '—') : 'Kasper'}`,
+      `Company: ${session.user.tenantId ? (db.getState().tenants.find(t => t.id === session.user.tenantId)?.name ?? '—') : 'Kasper'}`,
       `Assets: ${assets.map(a => a.code).join(', ')}`,
       `Period: ${input.from} to ${input.to} (times in Dubai time, GST)`,
       `Generated: ${clock.formatDubaiDateTime(clock.now())} by ${session.user.name}`,
@@ -518,7 +517,7 @@ export function runReport(session: Session, input: RunReportInput): OpResult<Rep
 
 /** Re-check permission *now* and rebuild the same report (spec §11.13 Download again). */
 export function regenerateReport(session: Session, runId: string): OpResult<ReportResult> {
-  const run = seed.reportRuns.find(r => r.id === runId);
+  const run = db.getState().reportRuns.find(r => r.id === runId);
   if (!run) return fail('Report not found.');
   const isOwn = run.userId === session.userId;
   const isAdmin = session.isKasper && hasCapability(session, 'console.audit.view');
@@ -530,7 +529,7 @@ export function regenerateReport(session: Session, runId: string): OpResult<Repo
   }
   const rt = REPORT_TYPES.find(r => r.label === run.reportType);
   if (!rt) return fail('Unknown report type.');
-  const assets = assetIds.map(id => seed.assets.find(a => a.id === id)).filter((a): a is Asset => Boolean(a));
+  const assets = assetIds.map(id => db.getState().assets.find(a => a.id === id)).filter((a): a is Asset => Boolean(a));
   const fromMs = clock.isoFromDubai(`${String(run.from).slice(0, 10)}T00:00:00`);
   const toMs = clock.isoFromDubai(`${String(run.to).slice(0, 10)}T23:59:59`);
   const { tables, clipNotes } = buildTables(session, rt.id, assets, fromMs, toMs);
@@ -543,14 +542,14 @@ export function regenerateReport(session: Session, runId: string): OpResult<Repo
 
 export function reportRunsFor(session: Session): ReportRun[] {
   const isAdmin = session.isKasper && hasCapability(session, 'console.audit.view');
-  return seed.reportRuns
+  return db.getState().reportRuns
     .filter(r => r.userId === session.userId || isAdmin)
     .sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());
 }
 
 export function deleteReportRun(session: Session, runId: string): OpResult<null> {
-  const idx = seed.reportRuns.findIndex(r => r.id === runId && r.userId === session.userId);
+  const idx = db.getState().reportRuns.findIndex(r => r.id === runId && r.userId === session.userId);
   if (idx < 0) return fail('Report not found.');
-  seed.reportRuns.splice(idx, 1);
+  removeWhere('reportRuns', r => r.id === runId);
   return ok(null, 'Removed from your downloads.');
 }

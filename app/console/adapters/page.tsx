@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
 import type { Asset, CanAdapter } from '@/domain/types';
@@ -33,6 +33,7 @@ function tierOf(asset: Asset): 1 | 2 | 3 {
 }
 
 export default function AdaptersPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 
@@ -337,6 +338,7 @@ function FitPicker({ adapter, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: (assetId: string) => void;
 }) {
+  const seed = useDb(s => s);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
 

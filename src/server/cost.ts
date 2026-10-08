@@ -7,7 +7,7 @@
 // same one the product uses for Tier 1/2 estimates.
 
 import type { Asset, AssetCostProfile, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
@@ -127,7 +127,7 @@ export function setDieselPrice(session: Session, priceAed: number): OpResult<num
 }
 
 export function costProfileFor(assetId: string): AssetCostProfile | null {
-  return seed.costProfiles.find(p => p.assetId === assetId) ?? null;
+  return db.getState().costProfiles.find(p => p.assetId === assetId) ?? null;
 }
 
 export function canViewCost(session: Session): boolean {
@@ -173,11 +173,11 @@ function costProfileLine(profile: AssetCostProfile | null, fromMs: number, toMs:
 
 function bookingAssetId(bookingId: string | undefined): string | null {
   if (!bookingId) return null;
-  return seed.bookings.find(b => b.id === bookingId)?.assetId ?? null;
+  return db.getState().bookings.find(b => b.id === bookingId)?.assetId ?? null;
 }
 
 function rentalRevenue(tenantId: string, assetId: string, fromMs: number, toMs: number): number {
-  return n2(seed.invoices
+  return n2(db.getState().invoices
     .filter(inv => inv.kind === 'rental' && inv.issuerTenantId === tenantId && inv.status !== 'void')
     .filter(inv => bookingAssetId(inv.bookingId) === assetId)
     .filter(inv => {
@@ -188,7 +188,7 @@ function rentalRevenue(tenantId: string, assetId: string, fromMs: number, toMs: 
 }
 
 function maintenanceCost(assetId: string, fromMs: number, toMs: number): number {
-  return n2(seed.serviceRecords
+  return n2(db.getState().serviceRecords
     .filter(r => r.assetId === assetId)
     .filter(r => {
       const at = typeof r.doneAt === 'number' ? r.doneAt : new Date(r.doneAt).getTime();
@@ -201,7 +201,7 @@ function maintenanceCost(assetId: string, fromMs: number, toMs: number): number 
 
 export function costRows(session: Session, fromMs: number, toMs: number): AssetCostRow[] {
   if (!canViewCost(session)) return [];
-  const assets = seed.assets
+  const assets = db.getState().assets
     .filter(a => !a.retiredAt)
     .filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
 
@@ -298,7 +298,7 @@ export interface RoiView {
 export function roiFor(asset: Asset, nowMs: number = clock.now()): RoiView {
   const profile = costProfileFor(asset.id);
   if (!profile) return { roiPct: null, paybackMonths: null, note: 'Add a cost profile to see ROI' };
-  const invoices = seed.invoices
+  const invoices = db.getState().invoices
     .filter(inv => inv.kind === 'rental' && inv.issuerTenantId === (asset.ownerTenantId ?? '') && inv.status !== 'void')
     .filter(inv => bookingAssetId(inv.bookingId) === asset.id);
   if (invoices.length === 0) return { roiPct: null, paybackMonths: null, note: 'Not enough data — no rental invoices yet' };
@@ -335,7 +335,7 @@ export interface CostProfileInput {
 
 export function saveCostProfile(session: Session, input: CostProfileInput): OpResult<AssetCostProfile> {
   if (!canViewCost(session)) return fail('Your role can\u2019t change cost profiles.');
-  const asset = seed.assets.find(a => a.id === input.assetId);
+  const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
   if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only cost your own assets.');
   const values = [input.purchaseValueAed, input.monthlyFinanceAed, input.operatorCostPerHourAed, input.insurancePerMonthAed];
@@ -345,7 +345,8 @@ export function saveCostProfile(session: Session, input: CostProfileInput): OpRe
   const profile: AssetCostProfile = existing
     ? Object.assign(existing, input)
     : { ...input, tenantId: asset.ownerTenantId ?? '' };
-  if (!existing) seed.costProfiles.push(profile);
+  if (existing) touch('costProfiles');
+  else append('costProfiles', profile);
 
   recordAuditForSession(session, {
     action: 'cost.profile',

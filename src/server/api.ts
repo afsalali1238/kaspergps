@@ -3,7 +3,7 @@
 // Every function takes a session first and delegates access to access.ts.
 
 import type { Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, type DbRow, touch } from '@/server/db';
 import { computeStatus } from '@/server/telemetry/simulator';
 import { hasCapability } from '@/server/access';
 import { isKasperStaff } from '@/server/capabilities';
@@ -17,7 +17,7 @@ export interface ApiResult<T> {
 
 // Auth
 export async function signIn(email: string, _password: string): Promise<ApiResult<{ session: Session }>> {
-  const user = seed.users.find(u => u.email === email);
+  const user = db.getState().users.find(u => u.email === email);
   if (!user) {
     return { success: false, error: "You don't have an account. Please contact your administrator." };
   }
@@ -27,6 +27,7 @@ export async function signIn(email: string, _password: string): Promise<ApiResul
   if (user.status === 'invited') {
     // Activate on sign in
     user.status = 'active';
+    touch('users');
     return {
       success: true,
       data: {
@@ -34,7 +35,7 @@ export async function signIn(email: string, _password: string): Promise<ApiResul
       },
     };
   }
-  const tenant = user.tenantId ? seed.tenants.find(t => t.id === user.tenantId) : null;
+  const tenant = user.tenantId ? db.getState().tenants.find(t => t.id === user.tenantId) : null;
   if (tenant && tenant.status === 'suspended') {
     return { success: false, error: "Your company's account is suspended. Contact Kasper." };
   }
@@ -44,7 +45,7 @@ export async function signIn(email: string, _password: string): Promise<ApiResul
   };
 }
 
-function buildSession(user: typeof seed.users[0]): Session {
+function buildSession(user: DbRow<'users'>): Session {
   return {
     userId: user.id,
     user,
@@ -61,7 +62,7 @@ export async function getAsset(session: Session, assetId: string): Promise<ApiRe
   if (!access) {
     return { success: false, error: 'Asset not found' };
   }
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) {
     return { success: false, error: 'Asset not found' };
   }
@@ -76,14 +77,14 @@ export async function getVisibleAssets(session: Session): Promise<ApiResult<Asse
   if (!access) {
     return { success: false, error: 'Access denied' };
   }
-  const all = seed.assets.filter(a => assetVisibleTo(session, a));
+  const all = db.getState().assets.filter(a => assetVisibleTo(session, a));
   return { success: true, data: all.map(a => assetToView(a, session)) };
 }
 
-function assetVisibleTo(session: Session, asset: typeof seed.assets[0]): boolean {
+function assetVisibleTo(session: Session, asset: DbRow<'assets'>): boolean {
   if (session.isKasper) return true;
   if (asset.ownerTenantId === session.tenantId) return true;
-  const booking = seed.bookings.find(b => b.assetId === asset.id && isBookingActive(b));
+  const booking = db.getState().bookings.find(b => b.assetId === asset.id && isBookingActive(b));
   if (booking && booking.renterTenantId === session.tenantId) {
     const nowMs = clock.now();
     return new Date(booking.start).getTime() <= nowMs && nowMs <= new Date(booking.end).getTime();
@@ -91,11 +92,11 @@ function assetVisibleTo(session: Session, asset: typeof seed.assets[0]): boolean
   return false;
 }
 
-function isBookingActive(b: typeof seed.bookings[0]): boolean {
+function isBookingActive(b: DbRow<'bookings'>): boolean {
   return b.status === 'active' || b.status === 'scheduled';
 }
 
-function assetToView(asset: typeof seed.assets[0], _session: Session): AssetView {
+function assetToView(asset: DbRow<'assets'>, _session: Session): AssetView {
   return {
     id: asset.id,
     code: asset.code,
@@ -107,9 +108,9 @@ function assetToView(asset: typeof seed.assets[0], _session: Session): AssetView
     year: asset.year,
     plateOrSerial: asset.plateOrSerial,
     ownerTenantId: asset.ownerTenantId,
-    ownerName: seed.tenants.find(t => t.id === asset.ownerTenantId)?.name ?? '',
+    ownerName: db.getState().tenants.find(t => t.id === asset.ownerTenantId)?.name ?? '',
     homeSiteId: asset.homeSiteId,
-    homeSiteName: seed.sites.find(s => s.id === asset.homeSiteId)?.name ?? '',
+    homeSiteName: db.getState().sites.find(s => s.id === asset.homeSiteId)?.name ?? '',
     tankLitres: asset.tankLitres,
     canProfile: asset.canProfile,
     status: computeStatus(asset, clock.now()),

@@ -2,7 +2,7 @@
 // Architecture rule 1: every API function checks access in this module first.
 
 import type { Session, Booking } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import { hasFeature, featurePhase } from '@/domain/features';
 import { hasRoleCapability } from '@/server/capabilities';
 import type { Capability } from '@/server/capabilities';
@@ -17,7 +17,7 @@ export function hasCapability(session: Session, capability: Capability): boolean
 // ── Asset visibility ───────────────────────────────────────────────────────────
 
 export function isAssetVisible(session: Session, assetId: string): boolean {
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return false;
 
   if (session.isKasper) return true;
@@ -43,7 +43,7 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
 
 export function findActiveGrantFor(session: Session, assetId: string): Booking | null {
   if (!session.tenantId) return null;
-  const booking = seed.bookings.find(b =>
+  const booking = db.getState().bookings.find(b =>
     b.assetId === assetId &&
     b.renterTenantId === session.tenantId &&
     (b.status === 'active' || b.status === 'scheduled')
@@ -62,7 +62,7 @@ export function findActiveGrantFor(session: Session, assetId: string): Booking |
  */
 export function canEndAccess(session: Session, assetId: string): boolean {
   if (!hasCapability(session, 'grant.endEarly')) return false;
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return false;
   if (session.isKasper) return true;
   return session.tenantId !== null && asset.ownerTenantId === session.tenantId;
@@ -73,14 +73,14 @@ export function getGrantEnd(booking: Booking): number {
   if (booking.cancelledAt) return new Date(booking.cancelledAt).getTime();
   if (booking.closedAt) return new Date(booking.closedAt).getTime();
   // Check for early override
-  const override = seed.grantOverrides.find(o => o.bookingId === booking.id);
+  const override = db.getState().grantOverrides.find(o => o.bookingId === booking.id);
   if (override) return new Date(override.endedAt).getTime();
   return end;
 }
 
 export function getRelationship(session: Session, assetId: string): 'kasper' | 'owner' | 'renter' | 'none' {
   if (session.isKasper) return 'kasper';
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return 'none';
   if (asset.ownerTenantId === session.tenantId) return 'owner';
   if (findActiveGrantFor(session, assetId)) return 'renter';
@@ -98,7 +98,7 @@ export function isAssetEditable(session: Session, assetId: string): boolean {
 // ── Feature visibility ─────────────────────────────────────────────────────────
 
 export function isFeatureVisible(session: Session, assetId: string, featureKey: string, phase: string, _salesView: boolean): boolean {
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return false;
   const phaseMap: Record<string, 'day_one' | 'phase2' | 'later'> = {
     day_one: 'day_one',
@@ -144,19 +144,19 @@ function featureCapability(key: string): string | null {
 export function anyAssetHasFeature(session: Session, featureKey: string): boolean {
   const visible = visibleAssetIds(session);
   return visible.some(id => {
-    const asset = seed.assets.find(a => a.id === id);
+    const asset = db.getState().assets.find(a => a.id === id);
     return asset && hasFeature(asset, featureKey);
   });
 }
 
 export function visibleAssetIds(session: Session): string[] {
-  return seed.assets
+  return db.getState().assets
     .filter(a => isAssetVisible(session, a.id))
     .map(a => a.id);
 }
 
 export function visibleAssetCodes(session: Session): string[] {
-  return visibleAssetIds(session).map(id => seed.assets.find(a => a.id === id)!.code);
+  return visibleAssetIds(session).map(id => db.getState().assets.find(a => a.id === id)!.code);
 }
 
 // ── Relationship helpers ────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ export function rentalWindow(session: Session, assetId: string): { start: number
 export function isRenterWindowPast(session: Session, assetId: string): { start: number; end: number } | null {
   // Past rental windows for reports
   if (!session.tenantId) return null;
-  const booking = seed.bookings.find(b =>
+  const booking = db.getState().bookings.find(b =>
     b.assetId === assetId &&
     b.renterTenantId === session.tenantId &&
     (b.status === 'closed' || b.status === 'cancelled')

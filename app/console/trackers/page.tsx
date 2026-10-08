@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { db, useDb } from '@/server/db';
 import { useStore } from '@/store';
 import type { Asset, Tracker, TrackerSleepMode } from '@/domain/types';
 import * as clock from '@/lib/clock';
@@ -46,14 +46,15 @@ function fmtDay(ts: string | number | null): string {
 
 function currentAssetFor(tracker: Tracker): Asset | null {
   const pairing = currentPairingForTracker(tracker.id);
-  if (pairing) return seed.assets.find(a => a.id === pairing.assetId) ?? null;
-  if (tracker.assetId) return seed.assets.find(a => a.id === tracker.assetId) ?? null;
+  if (pairing) return db.getState().assets.find(a => a.id === pairing.assetId) ?? null;
+  if (tracker.assetId) return db.getState().assets.find(a => a.id === tracker.assetId) ?? null;
   return null;
 }
 
 const SLEEP_MODES: TrackerSleepMode[] = ['off', 'deep', 'gps'];
 
 export default function TrackersPage() {
+  const seed = useDb(s => s);
   const store = useStore;
   const session = store.getState().session;
 
@@ -324,7 +325,7 @@ function previewRows(text: string): PreviewRow[] {
       const simIccid = rawSim.replace(/\D/g, '');
       let error: string | null = null;
       if (!/^\d{15}$/.test(imei) || !isValidImei(imei)) error = IMEI_ERROR;
-      else if (seed.trackers.some(t => t.imei === imei)) error = 'Already registered.';
+      else if (db.getState().trackers.some(t => t.imei === imei)) error = 'Already registered.';
       else if (seen.has(imei)) error = 'Duplicate in this file.';
       else if (!isValidIccid(simIccid)) error = ICCID_ERROR;
       if (!error) seen.add(imei);
@@ -433,6 +434,7 @@ function TrackerRow({ tracker, onToast, onChanged }: {
   onToast: (kind: 'ok' | 'error', text: string) => void;
   onChanged: () => void;
 }) {
+  const seed = useDb(s => s);
   const session = useStore.getState().session!;
   const [panel, setPanel] = useState<'none' | 'pair' | 'move' | 'faulty' | 'settings' | 'history'>('none');
   const [faultyNote, setFaultyNote] = useState('');
@@ -655,6 +657,7 @@ function AssetPicker({ title, hint, assets, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: (assetId: string) => void;
 }) {
+  const seed = useDb(s => s);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(assets[0]?.id ?? null);
 

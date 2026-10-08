@@ -5,16 +5,14 @@
 // manage any company; a Tenant Admin only its own.
 
 import type { Role, Session, User } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
 import { hasCompanyCapability, hasRole } from '@/server/capabilities';
 
-let userSeq = 900;
-
 export function userById(userId: string): User | null {
-  return seed.users.find(u => u.id === userId) ?? null;
+  return db.getState().users.find(u => u.id === userId) ?? null;
 }
 
 // Kasper Admin has the role capability; a Tenant Admin only for its own company
@@ -30,7 +28,7 @@ function canManageUser(session: Session, user: User): boolean {
 }
 
 function activeAdminsFor(tenantId: string | null, excludingUserId?: string): User[] {
-  return seed.users.filter(u =>
+  return db.getState().users.filter(u =>
     u.tenantId === tenantId &&
     hasRole(u, 'tenant_admin') &&
     u.status === 'active' &&
@@ -56,11 +54,11 @@ export function createUser(session: Session, input: CreateUserInput): OpResult<U
   const email = input.email.trim().toLowerCase();
   if (!name) return fail('Name required.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Enter a valid email address.');
-  if (seed.users.some(u => u.email.toLowerCase() === email)) return fail('This email is already in use.');
+  if (db.getState().users.some(u => u.email.toLowerCase() === email)) return fail('This email is already in use.');
   if (!input.tenantId) return fail('Pick a company.');
 
   const user: User = {
-    id: `u-${++userSeq}`,
+    id: `u-${nextNumber('u-', db.getState().users, 900)}`,
     name,
     email,
     role: input.role,
@@ -69,7 +67,7 @@ export function createUser(session: Session, input: CreateUserInput): OpResult<U
     status: 'invited',
     title: input.title,
   };
-  seed.users.push(user);
+  append('users', user);
 
   recordAuditForSession(session, {
     action: 'user.create',
@@ -89,6 +87,7 @@ export function updateUserName(session: Session, userId: string, name: string): 
   const before = user.name;
   if (before === trimmed) return ok(user, `${trimmed} unchanged.`);
   user.name = trimmed;
+  touch('users');
   recordAuditForSession(session, {
     action: 'user.rename',
     tenantId: user.tenantId ?? undefined,
@@ -111,6 +110,7 @@ export function updateUserRole(session: Session, userId: string, nextRole: Role)
   }
   const before = user.role;
   user.role = nextRole;
+  touch('users');
   recordAuditForSession(session, {
     action: 'user.role',
     tenantId: user.tenantId ?? undefined,
@@ -130,6 +130,7 @@ export function deactivateUser(session: Session, userId: string): OpResult<User>
   if (session.userId === user.id) return fail('You can\u2019t deactivate your own account.');
 
   user.status = 'deactivated';
+  touch('users');
   recordAuditForSession(session, {
     action: 'user.deactivate',
     tenantId: user.tenantId ?? undefined,
@@ -144,6 +145,7 @@ export function reactivateUser(session: Session, userId: string): OpResult<User>
   if (!canManageUser(session, user)) return fail('You can\u2019t reactivate this user.');
   if (user.status === 'active') return fail(`${user.name} is already active.`);
   user.status = 'active';
+  touch('users');
   recordAuditForSession(session, {
     action: 'user.reactivate',
     tenantId: user.tenantId ?? undefined,
@@ -157,16 +159,17 @@ export function updateUserSites(session: Session, userId: string, siteIds: strin
   if (!user) return fail('User not found.');
   if (!canManageUser(session, user)) return fail('You can\u2019t change this user\u2019s sites.');
   if (user.role !== 'site_user') return fail('Only Site Users are tied to sites.');
-  const valid = siteIds.filter(id => seed.sites.some(s => s.id === id && s.tenantId === user.tenantId));
+  const valid = siteIds.filter(id => db.getState().sites.some(s => s.id === id && s.tenantId === user.tenantId));
   user.siteIds = valid;
+  touch('users');
   recordAuditForSession(session, {
     action: 'user.sites',
     tenantId: user.tenantId ?? undefined,
-    detail: `${user.name} sites set to ${valid.length === 0 ? 'none' : valid.map(id => seed.sites.find(s => s.id === id)?.name ?? id).join(', ')}`,
+    detail: `${user.name} sites set to ${valid.length === 0 ? 'none' : valid.map(id => db.getState().sites.find(s => s.id === id)?.name ?? id).join(', ')}`,
   });
   return ok(user, `${user.name} updated.`);
 }
 
 export function usersForTenant(tenantId: string): User[] {
-  return seed.users.filter(u => u.tenantId === tenantId);
+  return db.getState().users.filter(u => u.tenantId === tenantId);
 }

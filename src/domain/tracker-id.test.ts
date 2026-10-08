@@ -1,7 +1,7 @@
 // Unit tests for the standard-Luhn IMEI / SIM-ICCID rules (spec 11.9, 11.14).
 import { describe, it, expect } from 'vitest';
 import { isValidIccid, isValidImei, imeiCheckDigit, luhnValid, makeImei } from './tracker-id';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 
 describe('tracker-id — Luhn', () => {
   it('accepts the canonical Luhn example 79927398713', () => {
@@ -13,7 +13,7 @@ describe('tracker-id — Luhn', () => {
   });
 
   it('every seeded IMEI is 15 digits and passes Luhn', () => {
-    for (const t of seed.trackers) {
+    for (const t of db.getState().trackers) {
       expect(t.imei).toMatch(/^\d{15}$/);
       expect(luhnValid(t.imei)).toBe(true);
       expect(isValidImei(t.imei)).toBe(true);
@@ -58,7 +58,7 @@ describe('tracker-id — SIM ICCID', () => {
   });
 
   it('accepts every seeded SIM ICCID', () => {
-    for (const t of seed.trackers) {
+    for (const t of db.getState().trackers) {
       expect(isValidIccid(t.simIccid)).toBe(true);
     }
   });

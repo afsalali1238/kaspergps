@@ -7,7 +7,7 @@ import {
   Button, Badge, EmptyState, Tabs,
   TierChip,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
 
@@ -37,6 +37,7 @@ function assetStatusBadge(status: string): React.ReactNode {
 // ── page ───────────────────────────────────────────────────────────────────────
 
 export default function ConsoleAssetDetailPage() {
+  const seed = useDb(s => s);
   const params = useParams();
   const store = useStore;
   const session = store.getState().session;

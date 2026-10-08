@@ -3,7 +3,7 @@
 // declines, and the requesting Tenant Admin hears back through the bell.
 
 import type { Session, TrackerRequest, Asset } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, touch, nextNumber } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
@@ -11,7 +11,6 @@ import { recordAuditForSession } from '@/server/audit';
 import { notifyUser } from '@/server/notifications';
 import { currentTrackerForAsset, pairTracker, trackerById } from '@/server/trackers';
 
-let requestSeq = 0;
 
 export interface TrackerRequestView extends TrackerRequest {
   asset: Asset | null;
@@ -20,17 +19,17 @@ export interface TrackerRequestView extends TrackerRequest {
 }
 
 function view(request: TrackerRequest): TrackerRequestView {
-  const asset = seed.assets.find(a => a.id === request.assetId) ?? null;
+  const asset = db.getState().assets.find(a => a.id === request.assetId) ?? null;
   return {
     ...request,
     asset,
-    tenantName: seed.tenants.find(t => t.id === request.tenantId)?.name ?? '—',
-    requesterName: seed.users.find(u => u.id === request.requestedBy)?.name ?? request.requestedBy,
+    tenantName: db.getState().tenants.find(t => t.id === request.tenantId)?.name ?? '—',
+    requesterName: db.getState().users.find(u => u.id === request.requestedBy)?.name ?? request.requestedBy,
   };
 }
 
 export function allTrackerRequests(): TrackerRequestView[] {
-  return seed.trackerRequests
+  return db.getState().trackerRequests
     .map(view)
     .sort((a, b) => toMs(b.at) - toMs(a.at));
 }
@@ -40,7 +39,7 @@ export function openTrackerRequests(): TrackerRequestView[] {
 }
 
 export function trackerRequestForAsset(assetId: string): TrackerRequestView | null {
-  const request = seed.trackerRequests
+  const request = db.getState().trackerRequests
     .filter(r => r.assetId === assetId)
     .sort((a, b) => toMs(b.at) - toMs(a.at))[0];
   return request ? view(request) : null;
@@ -57,7 +56,7 @@ export function requestTracker(session: Session, assetId: string, note = ''): Op
   if (!hasCapability(session, 'tracker.request')) {
     return fail('Only a Tenant Admin or Kasper can request a tracker.');
   }
-  const asset = seed.assets.find(a => a.id === assetId);
+  const asset = db.getState().assets.find(a => a.id === assetId);
   if (!asset) return fail('Asset not found.');
   if (!session.isKasper && asset.ownerTenantId !== session.tenantId) {
     return fail('You can only request trackers for your own assets.');
@@ -70,7 +69,7 @@ export function requestTracker(session: Session, assetId: string, note = ''): Op
   }
 
   const request: TrackerRequest = {
-    id: `trreq-${String(++requestSeq + 1).padStart(3, '0')}`,
+    id: `trreq-${String(nextNumber('trreq-', db.getState().trackerRequests)).padStart(3, '0')}`,
     tenantId: asset.ownerTenantId,
     assetId,
     requestedBy: session.userId,
@@ -78,7 +77,7 @@ export function requestTracker(session: Session, assetId: string, note = ''): Op
     note: note.trim() || `Tracker requested for ${asset.code}`,
     status: 'open',
   };
-  seed.trackerRequests.push(request);
+  append('trackerRequests', request);
 
   recordAuditForSession(session, {
     action: 'tracker.request',
@@ -96,13 +95,13 @@ export function pairTrackerRequest(session: Session, requestId: string, trackerI
   if (!hasCapability(session, 'console.trackers.manage')) {
     return fail('Only Kasper can pair trackers.');
   }
-  const request = seed.trackerRequests.find(r => r.id === requestId);
+  const request = db.getState().trackerRequests.find(r => r.id === requestId);
   if (!request) return fail('Request not found.');
   if (request.status !== 'open') return fail('This request has already been handled.');
 
   const tracker = trackerById(trackerId);
   if (!tracker) return fail('Pick a tracker from stock.');
-  const asset = seed.assets.find(a => a.id === request.assetId);
+  const asset = db.getState().assets.find(a => a.id === request.assetId);
 
   const paired = pairTracker(session, trackerId, request.assetId);
   if (!paired.ok) return fail(paired.error ?? 'Could not pair the tracker.');
@@ -110,6 +109,7 @@ export function pairTrackerRequest(session: Session, requestId: string, trackerI
   request.status = 'done';
   request.handledBy = session.userId;
   request.handledAt = new Date(clock.now()).toISOString();
+  touch('trackerRequests');
 
   notifyUser(
     request.requestedBy,
@@ -129,18 +129,19 @@ export function declineTrackerRequest(session: Session, requestId: string, reaso
   if (!hasCapability(session, 'console.trackers.manage')) {
     return fail('Only Kasper can decline requests.');
   }
-  const request = seed.trackerRequests.find(r => r.id === requestId);
+  const request = db.getState().trackerRequests.find(r => r.id === requestId);
   if (!request) return fail('Request not found.');
   if (request.status !== 'open') return fail('This request has already been handled.');
   if (reason.trim().length < 10) {
     return fail('Add a reason of at least 10 characters so the tenant knows why.');
   }
 
-  const asset = seed.assets.find(a => a.id === request.assetId);
+  const asset = db.getState().assets.find(a => a.id === request.assetId);
   request.status = 'declined';
   request.handledBy = session.userId;
   request.handledAt = new Date(clock.now()).toISOString();
   request.note = `${request.note} — declined: ${reason.trim()}`;
+  touch('trackerRequests');
 
   notifyUser(
     request.requestedBy,

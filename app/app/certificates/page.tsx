@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/db';
 import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
 import {
@@ -48,6 +48,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
   verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
 }) {
+  const seed = useDb(s => s);
   const t = useT();
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
@@ -86,6 +87,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
 }
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
+  const seed = useDb(s => s);
   const t = useT();
   const muc = seed.mucs.find(m => m.number === number);
   const [status, setStatus] = useState<MucVerifyStatus | 'checking'>('checking');
@@ -262,6 +264,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 }
 
 export default function CertificatesPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const store = useStore;
   const session = store.getState().session;

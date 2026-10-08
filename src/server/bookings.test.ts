@@ -5,13 +5,14 @@ import {
   bookingById, canManageBookings, cancelBooking, closeBooking, createBooking, endEarly,
   extendBooking, nextBookingReference, openBookingsForAsset, overlappingBooking, shortenBooking,
 } from './bookings';
-import { seed, ANCHOR_MS } from '@/server/seed/data';
+import { db } from '@/server/db';
+import { ANCHOR_MS } from '@/server/seed/data';
 import { findActiveGrantFor, getGrantEnd, isAssetVisible } from './access';
 import type { Session } from '@/domain/types';
 import * as clock from '@/lib/clock';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id,
     user,
@@ -48,7 +49,7 @@ describe('bookings — references and reads', () => {
   });
 
   it('lets Kasper and the owner manage bookings, not the renter', () => {
-    const asset = seed.assets.find(a => a.code === 'EX-07')!;
+    const asset = db.getState().assets.find(a => a.code === 'EX-07')!;
     expect(canManageBookings(ravi(), asset)).toBe(true);
     expect(canManageBookings(khalid(), asset)).toBe(true);
     expect(canManageBookings(lina(), asset)).toBe(false);
@@ -56,7 +57,7 @@ describe('bookings — references and reads', () => {
 });
 
 describe('bookings — create validations', () => {
-  const asset = () => seed.assets.find(a => a.code === 'EX-07')!; // Emirates, has a scheduled booking for BK-1010
+  const asset = () => db.getState().assets.find(a => a.code === 'EX-07')!; // Emirates, has a scheduled booking for BK-1010
 
   it('refuses an end before the start and a rent-your-own-asset', () => {
     const now = clock.now();
@@ -84,7 +85,7 @@ describe('bookings — create validations', () => {
     expect(clash.ok).toBe(false);
     expect(clash.error).toContain('already booked');
 
-    const retiredAsset = seed.assets.find(a => a.retiredAt)!;
+    const retiredAsset = db.getState().assets.find(a => a.retiredAt)!;
     if (retiredAsset) {
       const retired = createBooking(ravi(), {
         assetId: retiredAsset.id, renterTenantId: 't-alnoor',
@@ -94,7 +95,7 @@ describe('bookings — create validations', () => {
       expect(retired.error).toContain('retired');
     }
 
-    const foreignSite = seed.sites.find(s => s.tenantId === 't-marina')!;
+    const foreignSite = db.getState().sites.find(s => s.tenantId === 't-marina')!;
     const site = createBooking(ravi(), {
       assetId: asset().id, renterTenantId: 't-alnoor', renterSiteId: foreignSite.id,
       start: clock.now() + 90 * DAY, end: clock.now() + 91 * DAY,
@@ -135,7 +136,7 @@ describe('bookings — create validations', () => {
   });
 
   it('only the owner or Kasper can create, never the renter', () => {
-    const other = seed.assets.find(a => a.code === 'PU-51')!; // Marina's asset
+    const other = db.getState().assets.find(a => a.code === 'PU-51')!; // Marina's asset
     const denied = createBooking(lina(), {
       assetId: asset().id, renterTenantId: 't-marina',
       start: clock.now() + 120 * DAY, end: clock.now() + 121 * DAY,
@@ -153,7 +154,7 @@ describe('bookings — changes move the grant window', () => {
   it('extending keeps the renter in and shortening cuts access off', () => {
     const start = clock.now() + 200 * DAY;
     const created = createBooking(ravi(), {
-      assetId: seed.assets.find(a => a.code === 'EX-04')!.id,
+      assetId: db.getState().assets.find(a => a.code === 'EX-04')!.id,
       renterTenantId: 't-marina',
       start,
       end: start + 3 * DAY,
@@ -184,7 +185,7 @@ describe('bookings — changes move the grant window', () => {
   it('cancelling ends the grant now and hides the asset from the renter', () => {
     const start = clock.now() + 300 * DAY;
     const created = createBooking(ravi(), {
-      assetId: seed.assets.find(a => a.code === 'WL-03')!.id,
+      assetId: db.getState().assets.find(a => a.code === 'WL-03')!.id,
       renterTenantId: 't-marina',
       start,
       end: start + 4 * DAY,
@@ -207,7 +208,7 @@ describe('bookings — changes move the grant window', () => {
   it('closing a job ends it, and ending early needs a reason and a capability', () => {
     const start = clock.now() + 400 * DAY;
     const created = createBooking(ravi(), {
-      assetId: seed.assets.find(a => a.code === 'BD-02')!.id,
+      assetId: db.getState().assets.find(a => a.code === 'BD-02')!.id,
       renterTenantId: 't-marina',
       start,
       end: start + 3 * DAY,
@@ -226,14 +227,14 @@ describe('bookings — changes move the grant window', () => {
     expect(opsCan.ok).toBe(true);
 
     expect(booking.status).toBe('closed');
-    expect(seed.grantOverrides.some(o => o.bookingId === booking.id)).toBe(true);
+    expect(db.getState().grantOverrides.some(o => o.bookingId === booking.id)).toBe(true);
     expect(endEarly(khalid(), booking.id, 'Again and again')).toEqual({
       ok: false, error: 'This booking has already ended.',
     });
 
     const start2 = clock.now() + 500 * DAY;
     const next = createBooking(ravi(), {
-      assetId: seed.assets.find(a => a.code === 'GN-02')!.id,
+      assetId: db.getState().assets.find(a => a.code === 'GN-02')!.id,
       renterTenantId: 't-marina',
       start: start2,
       end: start2 + 2 * DAY,

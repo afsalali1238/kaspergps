@@ -4,7 +4,7 @@
 // pause the schedule.
 
 import type { ReportSchedule, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, removeWhere, touch, nextNumber } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
 import { isKasperStaff } from '@/server/capabilities';
@@ -26,10 +26,6 @@ export interface CreateScheduleInput {
   format: 'pdf' | 'xlsx';
 }
 
-// The seed's ReportSchedule predates assetIds; keep them on the side so runs can
-// rebuild files. New schedules store ids in the object below.
-const scheduleAssetIds = new Map<string, string[]>();
-const scheduleSkips = new Map<string, number>();
 
 function nextRunAfter(baseMs: number, frequency: ScheduleFrequency, runAt: string, weekday?: number): number {
   const [hh, mm] = runAt.split(':').map(Number);
@@ -48,6 +44,7 @@ function nextRunAfter(baseMs: number, frequency: ScheduleFrequency, runAt: strin
 }
 
 export function createSchedule(session: Session, input: CreateScheduleInput): OpResult<ReportSchedule> {
+  const schedulePrefix = `rs-${clock.now()}-`;
   if (!hasCapability(session, 'report.schedule')) return fail('You can’t create report schedules.');
   const reportable = new Set(reportableAssets(session).map(a => a.id));
   if (input.assetIds.length === 0) return fail('Pick at least one asset.');
@@ -57,7 +54,7 @@ export function createSchedule(session: Session, input: CreateScheduleInput): Op
   if (!/^\d{2}:\d{2}$/.test(input.runAt)) return fail('Enter a time like 07:00.');
 
   const schedule: ReportSchedule = {
-    id: `rs-${clock.now()}-${seed.reportSchedules.length + 1}`,
+    id: `${schedulePrefix}${nextNumber(schedulePrefix, db.getState().reportSchedules)}`,
     userId: session.userId,
     reportType: input.reportType,
     scope: input.scope,
@@ -67,19 +64,19 @@ export function createSchedule(session: Session, input: CreateScheduleInput): Op
     format: input.format,
     nextRunAt: nextRunAfter(clock.now(), input.frequency, input.runAt, input.weekday),
     active: true,
+    assetIds: input.assetIds,
+    consecutiveSkips: 0,
   };
-  seed.reportSchedules.push(schedule);
-  scheduleAssetIds.set(schedule.id, input.assetIds);
-  scheduleSkips.set(schedule.id, 0);
+  append('reportSchedules', schedule);
   return ok(schedule, `Schedule saved — next run ${clock.formatDubaiDateTime(Number(schedule.nextRunAt))}.`);
 }
 
 export function schedulesFor(session: Session): ReportSchedule[] {
-  return seed.reportSchedules.filter(s => s.userId === session.userId);
+  return db.getState().reportSchedules.filter(s => s.userId === session.userId);
 }
 
 function findSchedule(session: Session, id: string): ReportSchedule | null {
-  return seed.reportSchedules.find(s => s.id === id && s.userId === session.userId) ?? null;
+  return db.getState().reportSchedules.find(s => s.id === id && s.userId === session.userId) ?? null;
 }
 
 export function setScheduleActive(session: Session, id: string, active: boolean): OpResult<ReportSchedule> {
@@ -87,25 +84,23 @@ export function setScheduleActive(session: Session, id: string, active: boolean)
   if (!schedule) return fail('Schedule not found.');
   schedule.active = active;
   if (active) {
-    scheduleSkips.set(id, 0);
+    schedule.consecutiveSkips = 0;
     schedule.nextRunAt = nextRunAfter(clock.now(), schedule.frequency, schedule.runAt, schedule.weekday);
   }
+  touch('reportSchedules');
   return ok(schedule, active ? 'Schedule resumed.' : 'Schedule paused.');
 }
 
 export function deleteSchedule(session: Session, id: string): OpResult<null> {
-  const idx = seed.reportSchedules.findIndex(s => s.id === id && s.userId === session.userId);
+  const idx = db.getState().reportSchedules.findIndex(s => s.id === id && s.userId === session.userId);
   if (idx < 0) return fail('Schedule not found.');
-  seed.reportSchedules.splice(idx, 1);
-  scheduleAssetIds.delete(id);
-  scheduleSkips.delete(id);
+  removeWhere('reportSchedules', s => s.id === id);
   return ok(null, 'Schedule deleted.');
 }
 
 // Seeded schedules: map their scope to the label's assets (§8.10 report schedules).
 function assetIdsFor(schedule: ReportSchedule): string[] {
-  const known = scheduleAssetIds.get(schedule.id);
-  if (known) return known;
+  if (schedule.assetIds) return schedule.assetIds;
   if (schedule.scope.includes('Project Alpha')) return ['a-ex04', 'a-wl03', 'a-bd02'];
   if (schedule.scope.includes('EX-04')) return ['a-ex04'];
   return [];
@@ -131,14 +126,14 @@ export interface DueRunOutcome {
  */
 export function runDueSchedules(atMs: number = clock.now()): DueRunOutcome[] {
   const outcomes: DueRunOutcome[] = [];
-  for (const schedule of [...seed.reportSchedules]) {
+  for (const schedule of [...db.getState().reportSchedules]) {
     if (!schedule.active) continue;
     let guard = 0;
     while (Number(schedule.nextRunAt) <= atMs && guard++ < 40) {
       const periodEnd = Number(schedule.nextRunAt);
       const periodFrom = clock.dubaiDateKey(periodEnd - 86_400_000);
       const periodTo = clock.dubaiDateKey(periodEnd - 60_000);
-      const user = seed.users.find(u => u.id === schedule.userId);
+      const user = db.getState().users.find(u => u.id === schedule.userId);
       const assetIds = assetIdsFor(schedule);
       if (!user || assetIds.length === 0) {
         schedule.nextRunAt = nextRunAfter(periodEnd, schedule.frequency, schedule.runAt, schedule.weekday);
@@ -162,11 +157,11 @@ export function runDueSchedules(atMs: number = clock.now()): DueRunOutcome[] {
         scheduleId: schedule.id,
       });
       if (result.ok && result.data) {
-        scheduleSkips.set(schedule.id, 0);
+        schedule.consecutiveSkips = 0;
         outcomes.push({ scheduleId: schedule.id, runId: result.data.run.id, status: 'ready', detail: `${result.data.run.fileName ?? ''} ready` });
       } else {
-        const skips = (scheduleSkips.get(schedule.id) ?? 0) + 1;
-        scheduleSkips.set(schedule.id, skips);
+        const skips = (schedule.consecutiveSkips ?? 0) + 1;
+        schedule.consecutiveSkips = skips;
         const reason = result.error ?? 'Skipped — you no longer have access.';
         const run = {
           id: `rr-${periodEnd}-skip-${schedule.id}`,
@@ -182,7 +177,7 @@ export function runDueSchedules(atMs: number = clock.now()): DueRunOutcome[] {
           skipReason: `Skipped — ${reason}`,
           assetIds,
         };
-        seed.reportRuns.push(run);
+        append('reportRuns', run);
         outcomes.push({ scheduleId: schedule.id, runId: run.id, status: 'skipped', detail: reason });
         if (skips >= 2) {
           schedule.active = false;
@@ -192,6 +187,7 @@ export function runDueSchedules(atMs: number = clock.now()): DueRunOutcome[] {
       }
       schedule.nextRunAt = nextRunAfter(periodEnd, schedule.frequency, schedule.runAt, schedule.weekday);
     }
+    touch('reportSchedules');
   }
   return outcomes;
 }
