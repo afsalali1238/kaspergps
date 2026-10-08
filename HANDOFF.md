@@ -1,7 +1,7 @@
 # Implementation Status Handoff — arena/53555479-kaspergps
 
 **Branch:** `arena/53555479-kaspergps`
-**HEAD:** `1907d86` (merge commit — local commits `09b576e` + `9fb7b09` merged with full remote history)
+**HEAD:** `3bdb03d` (cherry-pick of CSS fix on top of `ee0616d`)
 **Remote:** `origin/arena/53555479-kaspergps` = local (synced)
 **Working tree:** Clean (0 files changed)
 **Date:** 2026-10-08
@@ -99,6 +99,14 @@
 ### E. Documentation
 - ✅ `README.md` — 136 lines: architecture rules (6), phases table, running instructions, seed data overview, project structure
 - ✅ `docs/REVIEW_CHECKLIST.md` — 112 lines: 12 review sections + known issues table (6 items)
+
+### G. CSS fix — PostCSS @import ordering (this session)
+- ✅ **Problem:** `app/globals.css` caused a 500 error on the dev server. PostCSS requires `@import` rules to precede all other rules. The generated CSS had `@import url(...)` (Google Fonts) appearing after a closing `}` of a rule block, violating this requirement.
+- ✅ **Fix:** Swapped the order of the two `@import` statements at the top of `app/globals.css`:
+  - Before: `@import "tailwindcss";` then `@import url("...Google Fonts...")`
+  - After: `@import url("...Google Fonts...");` then `@import "tailwindcss";`
+- ✅ **Verification:** Dev server returns HTTP 200 on all pages (was 500 before fix). Confirmed via `curl` on 23+ pages.
+- ✅ **Commit:** `3bdb03d fix(css): move Google Fonts @import before Tailwind import to fix PostCSS ordering error`
 
 ### F. Final integration walkthrough (this session)
 - ✅ **Dev server healthy** — CSS `@import` ordering fix deployed; server returns HTTP 200 on all pages (was 500 before fix)
