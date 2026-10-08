@@ -13,6 +13,7 @@ import type { MucVerifyStatus } from '@/server/muc';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
+import { useT } from '@/i18n';
 
 function formatTs(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
@@ -45,6 +46,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
   verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
 }) {
+  const t = useT();
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
 
@@ -61,18 +63,18 @@ function MucRow({ muc, canView, verifyState, onView }: {
       </td>
       <td className="px-3 py-2 border-b border-line text-center">
         {verifyState === 'tampered' ? (
-          <Badge variant="red">Seal broken</Badge>
+          <Badge variant="red">{t('certificates.status.seal_broken', 'Seal broken')}</Badge>
         ) : muc.status === 'sealed' ? (
-          <Badge variant="green">Sealed</Badge>
+          <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
         ) : (
-          <Badge variant="yellow">Voided</Badge>
+          <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>
         )}
       </td>
       <td className="px-3 py-2 text-right border-b border-line">
         {muc.status === 'sealed' && canView ? (
-          <Button size="sm" onClick={() => onView(muc.number)}>View</Button>
+          <Button size="sm" onClick={() => onView(muc.number)}>{t('certificates.actions.view', 'View')}</Button>
         ) : muc.status === 'voided' ? (
-          <span className="text-xs text-grey-500">Voided</span>
+          <span className="text-xs text-grey-500">{t('certificates.status.voided', 'Voided')}</span>
         ) : (
           <span className="text-xs text-grey-400">—</span>
         )}
@@ -82,6 +84,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
 }
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
+  const t = useT();
   const muc = seed.mucs.find(m => m.number === number);
   const [status, setStatus] = useState<MucVerifyStatus | 'checking'>('checking');
 
@@ -113,48 +116,52 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
           <span className="text-sm font-semibold text-ink">Kasper GPS</span>
         </div>
         <Badge variant={isValid ? 'green' : status === 'checking' ? 'grey' : 'red'}>
-          {status === 'checking' ? 'Checking…' : isValid ? 'Seal intact' : 'Seal broken'}
+          {status === 'checking'
+              ? t('verify.checking', 'Checking…')
+              : isValid
+                ? t('certificates.seal_intact', 'Seal intact')
+                : t('certificates.status.seal_broken', 'Seal broken')}
         </Badge>
       </div>
 
       <h1 className="text-base font-semibold text-ink">{muc.number}</h1>
-      <p className="text-xs text-grey-500">Monthly Utilisation Certificate</p>
+      <p className="text-xs text-grey-500">{t('certificates.detail.monthly', 'Monthly Utilisation Certificate')}</p>
 
       <div className="bg-paper-2 rounded-lg p-3 border border-line text-sm space-y-1.5">
         <div className="flex justify-between">
-          <span className="text-grey-500">Asset</span>
-          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? 'Unknown'}</span>
+          <span className="text-grey-500">{t('certificates.detail.asset', 'Asset')}</span>
+          <span className="text-ink font-medium">{asset?.code ?? '—'} — {asset?.name ?? t('common.unknown', 'Unknown')}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Owner</span>
+          <span className="text-grey-500">{t('certificates.detail.owner', 'Owner')}</span>
           <span className="text-ink">{owner?.name ?? '—'}</span>
         </div>
         {muc.payload.renter && (
           <div className="flex justify-between">
-            <span className="text-grey-500">Renter</span>
+            <span className="text-grey-500">{t('certificates.detail.renter', 'Renter')}</span>
             <span className="text-ink">{muc.payload.renter.name}</span>
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-grey-500">Period</span>
+          <span className="text-grey-500">{t('certificates.detail.period', 'Period')}</span>
           <span className="text-ink text-xs font-mono">
             {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Opening ECU hours</span>
+          <span className="text-grey-500">{t('certificates.detail.opening_ecu', 'Opening ECU hours')}</span>
           <span className="text-ink font-mono">{muc.payload.openingHoursEcu.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Closing ECU hours</span>
+          <span className="text-grey-500">{t('certificates.detail.closing_ecu', 'Closing ECU hours')}</span>
           <span className="text-ink font-mono">{muc.payload.closingHoursEcu.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Billable hours</span>
+          <span className="text-grey-500">{t('certificates.detail.billable_hours', 'Billable hours')}</span>
           <span className="text-ink font-mono font-medium">{muc.payload.billableHours.toFixed(1)} h</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Source</span>
+          <span className="text-grey-500">{t('certificates.detail.source', 'Source')}</span>
           <span className="text-ink text-xs">{muc.payload.source}</span>
         </div>
       </div>
@@ -172,27 +179,29 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 
       <div className="text-xs space-y-1 pt-2 border-t border-line">
         <div className="flex justify-between">
-          <span className="text-grey-500">Status</span>
+          <span className="text-grey-500">{t('certificates.detail.status', 'Status')}</span>
           <span className="text-ink">
-            {muc.status === 'sealed' ? <Badge variant="green">Sealed</Badge> : <Badge variant="yellow">Voided</Badge>}
+            {muc.status === 'sealed'
+              ? <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
+              : <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Issued</span>
+          <span className="text-grey-500">{t('certificates.detail.issued', 'Issued')}</span>
           <span className="text-ink">{formatTs(muc.issuedAt)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-grey-500">Issued by</span>
+          <span className="text-grey-500">{t('certificates.detail.issued_by', 'Issued by')}</span>
           <span className="text-ink">{seed.users.find(u => u.id === muc.issuedBy)?.name ?? '—'}</span>
         </div>
         {muc.status === 'voided' && (
           <>
             <div className="flex justify-between">
-              <span className="text-grey-500">Voided</span>
+              <span className="text-grey-500">{t('certificates.status.voided', 'Voided')}</span>
               <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt) : '—'}</span>
             </div>
             <div className="flex justify-between gap-3">
-              <span className="text-grey-500">Void reason</span>
+              <span className="text-grey-500">{t('certificates.detail.void_reason', 'Void reason')}</span>
               <span className="text-ink text-xs text-right">{muc.voidReason}</span>
             </div>
           </>
@@ -206,7 +215,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
       </div>
 
       <div className="pt-2 border-t border-line">
-        <div className="text-xs text-grey-500 mb-1">SHA-256 seal</div>
+        <div className="text-xs text-grey-500 mb-1">{t('certificates.detail.seal', 'SHA-256 seal')}</div>
         <div className="bg-ink text-paper px-2 py-1 rounded text-xs font-mono break-all">
           {muc.sealSha256}
         </div>
@@ -221,8 +230,8 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
       {muc.status === 'voided' && (
         <div className="bg-yellow/5 border border-yellow/20 text-yellow-dark text-sm px-3 py-2 rounded-lg">
           {replacement
-            ? <>This certificate was voided and replaced. See <strong>{replacement.number}</strong>.</>
-            : <>This certificate was voided. No replacement has been issued.</>}
+            ? <>{t('certificates.detail.voided_replaced', 'This certificate was voided and replaced. See')} <strong>{replacement.number}</strong>.</>
+            : <>{t('certificates.detail.voided_no_replacement', 'This certificate was voided. No replacement has been issued.')}</>}
         </div>
       )}
 
@@ -236,13 +245,14 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
       </a>
 
       <div className="flex justify-end">
-        <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
+        <Button variant="secondary" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>
       </div>
     </div>
   );
 }
 
 export default function CertificatesPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -310,8 +320,8 @@ export default function CertificatesPage() {
   if (phase === 'day_one') {
     return (
       <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">Monthly Utilisation Certificates</h1>
-        <EmptyState title="Not available" description="Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only." />
+        <h1 className="text-lg font-semibold text-ink mb-4">{t('asset_detail.certificates_tab.title', 'Monthly Utilisation Certificates')}</h1>
+        <EmptyState title={t('common.not_available', 'Not available')} description={t('certificates.phase_gate', 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.')} />
       </div>
     );
   }
@@ -376,9 +386,9 @@ export default function CertificatesPage() {
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold text-ink">Monthly Utilisation Certificates</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('asset_detail.certificates_tab.title', 'Monthly Utilisation Certificates')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.
+          {t('certificates.subtitle', 'Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.')}
         </p>
       </div>
 
@@ -396,10 +406,10 @@ export default function CertificatesPage() {
 
       {showIssue && canIssue && myTier3.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <h2 className="text-sm font-medium text-ink mb-3">Issue a certificate</h2>
+          <h2 className="text-sm font-medium text-ink mb-3">{t('certificates.actions.issue', 'Issue a certificate')}</h2>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-grey-500 font-medium">Asset (Tier 3 with ECU)</label>
+              <label className="text-xs text-grey-500 font-medium">{t('certificates.issue.asset', 'Asset (Tier 3 with ECU)')}</label>
               <select
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 value={selectedAsset?.id ?? ''}
@@ -411,7 +421,7 @@ export default function CertificatesPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-grey-500 font-medium">Period</label>
+              <label className="text-xs text-grey-500 font-medium">{t('certificates.issue.period', 'Period')}</label>
               <select
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 value={issuePeriod}
@@ -432,14 +442,14 @@ export default function CertificatesPage() {
               <input
                 type="text"
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                placeholder="Only needed when the period has a gap longer than 24 hours"
+                placeholder={t('certificates.issue.gap_reason', 'Only needed when the period has a gap longer than 24 hours')}
                 value={gapOverride}
                 onChange={e => setGapOverride(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleIssue}>Issue and seal</Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowIssue(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleIssue}>{t('certificates.issue.issue_and_seal', 'Issue and seal')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowIssue(false)}>{t('common.cancel', 'Cancel')}</Button>
             </div>
           </div>
         </div>
@@ -448,17 +458,19 @@ export default function CertificatesPage() {
       {actionNumber && actionKind && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <h2 className="text-sm font-medium text-ink mb-2">
-            {actionKind === 'void' ? `Void ${actionNumber}` : `Reissue ${actionNumber}`}
+            {actionKind === 'void'
+              ? t('certificates.actions.void_named', 'Void {number}', { number: actionNumber })
+              : t('certificates.actions.reissue_named', 'Reissue {number}', { number: actionNumber })}
           </h2>
           <p className="text-xs text-grey-500 mb-2">
             {actionKind === 'void'
-              ? 'A void needs a reason of at least 10 characters. The certificate stays listed as Voided.'
-              : 'Reissue copies the period into a new -02 certificate with a fresh seal and audit entry.'}
+              ? t('certificates.void_note', 'A void needs a reason of at least 10 characters. The certificate stays listed as Voided.')
+              : t('certificates.reissue_note', 'Reissue copies the period into a new -02 certificate with a fresh seal and audit entry.')}
           </p>
           <input
             type="text"
             className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-            placeholder="Reason (at least 10 characters)"
+            placeholder={t('common.reason_min_10', 'Reason (at least 10 characters)')}
             value={actionReason}
             onChange={e => setActionReason(e.target.value)}
           />
@@ -468,10 +480,12 @@ export default function CertificatesPage() {
               variant={actionKind === 'void' ? 'danger' : 'primary'}
               onClick={actionKind === 'void' ? handleVoid : handleReissue}
             >
-              {actionKind === 'void' ? 'Void certificate' : 'Reissue certificate'}
+              {actionKind === 'void'
+                ? t('certificates.actions.void_certificate', 'Void certificate')
+                : t('certificates.actions.reissue_certificate', 'Reissue certificate')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => { setActionNumber(null); setActionKind(null); setActionReason(''); }}>
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </Button>
           </div>
         </div>
@@ -479,26 +493,26 @@ export default function CertificatesPage() {
 
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <div className="flex items-center justify-between p-3 border-b border-line">
-          <h2 className="text-sm font-medium text-ink">Certificates</h2>
+          <h2 className="text-sm font-medium text-ink">{t('certificates.title', 'Certificates')}</h2>
           {canIssue && myTier3.length > 0 && (
             <Button variant="secondary" size="sm" onClick={() => setShowIssue(!showIssue)}>
-              {showIssue ? 'Cancel' : 'Issue certificate'}
+              {showIssue ? t('common.cancel', 'Cancel') : t('certificates.actions.issue', 'Issue certificate')}
             </Button>
           )}
         </div>
         {myMucs.length === 0 ? (
-          <div className="p-6 text-center text-sm text-grey-500">No certificates yet.</div>
+          <div className="p-6 text-center text-sm text-grey-500">{t('certificates.none', 'No certificates yet.')}</div>
         ) : (
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-paper-2 text-grey-500">
-                <th className="px-3 py-2 text-left font-medium">Certificate</th>
-                <th className="px-3 py-2 text-left font-medium">Asset</th>
-                <th className="px-3 py-2 text-left font-medium">Owner</th>
-                <th className="px-3 py-2 text-left font-medium">Period</th>
-                <th className="px-3 py-2 text-right font-medium">Hours</th>
-                <th className="px-3 py-2 text-center font-medium">Status</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.certificate', 'Certificate')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.asset', 'Asset')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.detail.owner', 'Owner')}</th>
+                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.period', 'Period')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('certificates.columns.hours', 'Hours')}</th>
+                <th className="px-3 py-2 text-center font-medium">{t('certificates.columns.status', 'Status')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('certificates.columns.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -519,7 +533,7 @@ export default function CertificatesPage() {
                               className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
                               onClick={() => { setActionNumber(muc.number); setActionKind('void'); setActionReason(''); }}
                             >
-                              Void
+                              {t('certificates.actions.void', 'Void')}
                             </button>
                           )}
                           {muc.status === 'voided' && (
@@ -527,7 +541,7 @@ export default function CertificatesPage() {
                               className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
                               onClick={() => { setActionNumber(muc.number); setActionKind('reissue'); setActionReason(''); }}
                             >
-                              Reissue
+                              {t('certificates.actions.reissue', 'Reissue')}
                             </button>
                           )}
                           <a
@@ -536,7 +550,7 @@ export default function CertificatesPage() {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Verify
+                            {t('certificates.actions.verify', 'Verify')}
                           </a>
                         </div>
                       </td>
@@ -558,7 +572,7 @@ export default function CertificatesPage() {
       )}
 
       <div className="text-xs text-grey-500 p-4 bg-paper-2 border border-line rounded-lg">
-        <strong className="text-ink">About MUCs:</strong> A Monthly Utilisation Certificate is a sealed record of ECU engine hours for a Tier 3 asset over a calendar month or rental period. Issued by the owner Tenant Admin or Kasper Admin, sealed with SHA-256, and cannot be edited. Renters can view certificates for periods inside their rental windows.
+        <strong className="text-ink">{t('certificates.about', 'About MUCs:')}</strong> {t('certificates.about_body', 'A Monthly Utilisation Certificate is a sealed record of ECU engine hours for a Tier 3 asset over a calendar month or rental period. Issued by the owner Tenant Admin or Kasper Admin, sealed with SHA-256, and cannot be edited. Renters can view certificates for periods inside their rental windows.')}
       </div>
     </div>
   );

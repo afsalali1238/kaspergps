@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { ToastProvider } from '@/components/ui';
-import { DemoBar } from '@/components/demo/DemoBar';
 import { AppShell } from '@/components/layout/AppShell';
 import { useStore } from '@/store';
 
@@ -20,7 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <DemoBar />
+      {/* The demo bar is rendered once by the root layout (app/layout.tsx) —
+          rendering it here as well produced two bars on every customer screen. */}
       <AppShell>{children}</AppShell>
     </ToastProvider>
   );

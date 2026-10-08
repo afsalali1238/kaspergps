@@ -3,8 +3,10 @@
 import React from 'react';
 import { EmptyState } from '@/components/ui';
 import { useStore } from '@/store';
+import { useT } from '@/i18n';
 
 export default function SchedulesPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -13,18 +15,18 @@ export default function SchedulesPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-lg font-semibold text-ink mb-4">Schedules</h1>
+      <h1 className="text-lg font-semibold text-ink mb-4">{t('schedules.title', 'Schedules')}</h1>
       <p className="text-sm text-grey-500 mb-4">
-        Automated report generation on a schedule.
+        {t('schedules.subtitle', 'Automated report generation on a schedule.')}
       </p>
       {phase === 'day_one' ? (
         <EmptyState
-          title="Not available"
-          description="Schedules are available in Phase 2."
+          title={t('common.not_available', 'Not available')}
+          description={t('schedules.phase_gate', 'Schedules are available in Phase 2.')}
         />
       ) : (
         <div className="text-sm text-grey-500">
-          Schedule list coming soon.
+          {t('schedules.coming_soon', 'Schedule list coming soon.')}
         </div>
       )}
     </div>

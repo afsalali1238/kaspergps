@@ -10,6 +10,7 @@ import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible } from '@/server/access';
 import type { AlertType } from '@/domain/types';
+import { useT } from '@/i18n';
 
 type AlertFilter = 'all' | 'unacknowledged' | 'acknowledged';
 type StatusFilter = 'all' | 'open' | 'acknowledged';
@@ -53,6 +54,7 @@ const ALERT_TYPE_WORDS: Record<AlertType, string> = {
 };
 
 export default function AlertsPage() {
+  const t = useT();
   const store = useStore;
   const session = store.getState().session;
   const phase = store.getState().demoSwitches.phase;
@@ -152,16 +154,18 @@ export default function AlertsPage() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold text-ink">Alerts</h1>
+        <h1 className="text-lg font-semibold text-ink">{t('alerts.title', 'Alerts')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          {openCount} open alert{openCount !== 1 ? 's' : ''}
-          {phase === 'day_one' && ' (Day one: offline alerts only)'}
+          {openCount === 1
+            ? t('alerts.open_count', '{count} open alert', { count: openCount })
+            : t('alerts.open_count_plural', '{count} open alerts', { count: openCount })}
+          {phase === 'day_one' && ` ${t('alerts.day_one_note', '(Day one: offline alerts only)')}`}
         </p>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <span className="text-xs text-grey-500 font-medium">Show:</span>
+        <span className="text-xs text-grey-500 font-medium">{t('alerts.show', 'Show:')}</span>
         <button
           onClick={() => setAlertFilter('unacknowledged')}
           className={clsx(
@@ -169,7 +173,7 @@ export default function AlertsPage() {
             alertFilter === 'unacknowledged' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          Unacknowledged
+          {t('alerts.filter.unacknowledged', 'Unacknowledged')}
         </button>
         <button
           onClick={() => setAlertFilter('acknowledged')}
@@ -178,7 +182,7 @@ export default function AlertsPage() {
             alertFilter === 'acknowledged' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          Acknowledged
+          {t('alerts.filter.acknowledged', 'Acknowledged')}
         </button>
         <button
           onClick={() => setAlertFilter('all')}
@@ -187,15 +191,15 @@ export default function AlertsPage() {
             alertFilter === 'all' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
           )}
         >
-          All
+          {t('alerts.filter.all', 'All')}
         </button>
       </div>
 
       {/* Alerts list */}
       {filteredAlerts.length === 0 ? (
         <EmptyState
-          title="No alerts"
-          description="There are no alerts to show."
+          title={t('alerts.none', 'No alerts')}
+          description={t('alerts.none_hint', 'There are no alerts to show.')}
         />
       ) : (
         <div className="space-y-2">
@@ -215,22 +219,25 @@ export default function AlertsPage() {
                     <Badge
                       variant={alert.status === 'open' ? 'red' : 'grey'}
                     >
-                      {alert.typeLabel}
+                      {t(`alerts.types.${alert.type}`, alert.typeLabel)}
                     </Badge>
                   </div>
-                  <div className="text-sm text-grey-700 mt-1">{alert.typeWords}</div>
+                  <div className="text-sm text-grey-700 mt-1">{t(`alerts.words.${alert.type}`, alert.typeWords)}</div>
                   <div className="text-xs text-grey-500 mt-1">
-                    Since {alert.since} · {alert.siteName}
+                    {t('alerts.since', 'Since {time} · {site}', { time: alert.since, site: alert.siteName })}
                   </div>
                   {alert.status === 'acknowledged' && alert.acknowledgedBy && (
                     <div className="text-xs text-grey-500 mt-1">
-                      Acknowledged by {alert.acknowledgedBy} at {alert.acknowledgedAt}
+                      {t('alerts.acknowledged_by', 'Acknowledged by {name} at {at}', {
+                        name: alert.acknowledgedBy,
+                        at: alert.acknowledgedAt ?? '',
+                      })}
                     </div>
                   )}
                 </div>
                 {alert.status === 'open' && canAcknowledge && (
                   <Button size="sm" variant="secondary">
-                    Acknowledge
+                    {t('alerts.acknowledge', 'Acknowledge')}
                   </Button>
                 )}
               </div>

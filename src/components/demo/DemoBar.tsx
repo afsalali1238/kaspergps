@@ -342,6 +342,7 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setViewAsOpen(!viewAsOpen)}
+          aria-label="View as"
           className="flex items-center gap-1.5 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors whitespace-nowrap border border-[#2a2c30]"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-paper/60">
@@ -403,6 +404,7 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setClockOpen(!clockOpen)}
+          aria-label="Clock"
           className="flex-shrink-0 bg-[#1a1b20] text-paper text-[10px] font-mono px-2 py-1 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
           {currentTimeStr} · {currentDateStr}

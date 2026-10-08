@@ -25,6 +25,7 @@ import type { Asset, TrackingLink } from '@/domain/types';
 import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
 import { canManageMaintenance, planSnapshot, plansForAsset, serviceHistory } from '@/server/maintenance';
+import { useT, useHref } from '@/i18n';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +71,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
   onError: (message: string) => void;
 }) {
   const session = useStore.getState().session!;
+  const t = useT();
   const options = expiryOptions(asset.id);
   const [optionKey, setOptionKey] = useState(String(options[0]?.bookingId ?? 'none'));
   const [showEta, setShowEta] = useState(true);
@@ -86,9 +88,9 @@ function SharePanel({ asset, onClose, onDone, onError }: {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(linkUrl);
-      onDone('Link copied to the clipboard.');
+      onDone(t('asset_detail.share.copied', 'Link copied to the clipboard.'));
     } catch {
-      onError('Copy blocked by the browser — select the link and copy it manually.');
+      onError(t('asset_detail.share.copy_blocked', 'Copy blocked by the browser — select the link and copy it manually.'));
     }
   };
 
@@ -96,17 +98,17 @@ function SharePanel({ asset, onClose, onDone, onError }: {
     <div className="bg-surface border border-line rounded-lg p-4 space-y-3" key={version}>
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-sm font-medium text-ink">Share tracking link</h2>
+          <h2 className="text-sm font-medium text-ink">{t('asset_detail.share.title', 'Share tracking link')}</h2>
           <p className="text-xs text-grey-500 mt-0.5">
-            Anyone with the link sees {asset.code}&apos;s live position until it expires. No login, nothing else.
+            {t('asset_detail.share.body', 'Anyone with the link sees {code} live position until it expires. No login, nothing else.', { code: asset.code })}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        <Button variant="ghost" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-grey-500 font-medium">Job</label>
+          <label className="text-xs text-grey-500 font-medium">{t('asset_detail.share.job', 'Job')}</label>
           <select
             value={optionKey}
             onChange={e => { setOptionKey(e.target.value); setCreated(null); }}
@@ -118,10 +120,10 @@ function SharePanel({ asset, onClose, onDone, onError }: {
           </select>
         </div>
         <div>
-          <label className="text-xs text-grey-500 font-medium">Expires</label>
+          <label className="text-xs text-grey-500 font-medium">{t('asset_detail.share.expires', 'Expires')}</label>
           <div className="mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper-2 text-grey-700">
             {option ? `${clock.formatDubaiDate(option.expiresAt)} ${clock.formatDubaiTime(option.expiresAt)}` : '—'}
-            {!booking && <span className="text-grey-500"> · 24 h</span>}
+            {!booking && <span className="text-grey-500"> · {t('asset_detail.share.hours_24', '24 h')}</span>}
           </div>
         </div>
       </div>
@@ -134,7 +136,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
             onChange={e => setShowEta(e.target.checked)}
             className="accent-yellow"
           />
-          Show arrival time (ETA) to the hirer
+          {t('asset_detail.share.eta_switch', 'Show arrival time (ETA) to the hirer')}
           <span className="text-xs text-grey-500">· to {booking?.destination?.name}</span>
         </label>
       )}
@@ -152,38 +154,38 @@ function SharePanel({ asset, onClose, onDone, onError }: {
             if (result.ok) {
               setCreated(result.data!);
               setVersion(v => v + 1);
-              onDone(result.message ?? 'Link created.');
+              onDone(result.message ?? t('asset_detail.share.link_created', 'Link created.'));
             } else {
-              onError(result.error ?? 'Could not create the link.');
+              onError(result.error ?? t('asset_detail.share.link_failed', 'Could not create the link.'));
             }
           }}
         >
-          Create
+          {t('asset_detail.share.create', 'Create')}
         </Button>
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <code className="flex-1 min-w-[16rem] px-3 py-2 text-xs rounded-lg border border-line bg-paper-2 text-grey-700 break-all">{linkUrl}</code>
-            <Button size="sm" onClick={copy}>Copy</Button>
+            <Button size="sm" onClick={copy}>{t('common.copy', 'Copy')}</Button>
             <a
               className="text-xs text-yellow-600 hover:text-yellow font-medium px-2"
               href={`/t/${created.token}`}
               target="_blank"
               rel="noreferrer"
             >
-              Open
+              {t('common.open', 'Open')}
             </a>
           </div>
           <div className="text-xs text-grey-500">
-            Suggested message: <span className="text-grey-700">Track {asset.code} live: {linkUrl}</span>
+            {t('asset_detail.share.suggested_label', 'Suggested message:')} <span className="text-grey-700">{t('asset_detail.share.suggested', 'Track {code} live: {link}', { code: asset.code, link: linkUrl })}</span>
           </div>
         </div>
       )}
 
       <div className="pt-2 border-t border-line">
-        <div className="text-xs font-medium text-grey-500 mb-1">Active links ({active.length})</div>
+        <div className="text-xs font-medium text-grey-500 mb-1">{t('asset_detail.share.active_links', 'Active links ({count})', { count: active.length })}</div>
         {active.length === 0 ? (
-          <div className="text-xs text-grey-500">No active links for {asset.code}.</div>
+          <div className="text-xs text-grey-500">{t('asset_detail.share.no_active_links', 'No active links for {code}.', { code: asset.code })}</div>
         ) : (
           <div className="space-y-1">
             {active.map(link => (
@@ -199,11 +201,11 @@ function SharePanel({ asset, onClose, onDone, onError }: {
                   className="px-2 py-0.5 rounded bg-paper border border-line hover:border-ink"
                   onClick={() => {
                     const result = revokeTrackingLink(session, link.id, 'manual');
-                    if (result.ok) { onDone(result.message ?? 'Link revoked.'); setVersion(v => v + 1); }
-                    else onError(result.error ?? 'Could not revoke the link.');
+                    if (result.ok) { onDone(result.message ?? t('asset_detail.share.link_revoked', 'Link revoked.')); setVersion(v => v + 1); }
+                    else onError(result.error ?? t('asset_detail.share.revoke_failed', 'Could not revoke the link.'));
                   }}
                 >
-                  Revoke
+                  {t('asset_detail.share.revoke', 'Revoke')}
                 </button>
               </div>
             ))}
@@ -213,7 +215,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
 
       {past.length > 0 && (
         <div className="pt-2 border-t border-line">
-          <div className="text-xs font-medium text-grey-500 mb-1">Past links ({past.length})</div>
+          <div className="text-xs font-medium text-grey-500 mb-1">{t('asset_detail.share.past_links', 'Past links ({count})', { count: past.length })}</div>
           <div className="space-y-1">
             {past.map(link => (
               <div key={link.id} className="text-xs text-grey-500">
@@ -233,6 +235,8 @@ function SharePanel({ asset, onClose, onDone, onError }: {
 type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'maintenance' | 'alerts';
 
 export default function AssetDetailPage() {
+  const t = useT();
+  const href = useHref();
   const params = useParams();
   const assetId = params.id as string;
   const store = useStore;
@@ -330,12 +334,12 @@ export default function AssetDetailPage() {
   if (!session) return null;
   if (!asset) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset_detail.not_found', 'Asset not found')}</div>
     </div>
   );
   if (!visible) return (
     <div className="flex items-center justify-center h-[400px]">
-      <div className="text-sm text-grey-500">Asset not found</div>
+      <div className="text-sm text-grey-500">{t('asset_detail.not_found', 'Asset not found')}</div>
     </div>
   );
 
@@ -353,16 +357,16 @@ export default function AssetDetailPage() {
   const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
   const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
 
-  const tabs: { id: TabId; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
-    { id: 'overview', label: 'Overview', phase: 'day_one', enabled: true },
-    { id: 'history', label: 'History', phase: 'day_one', enabled: true },
-    { id: 'trips', label: 'Trips', phase: 'day_one', enabled: true },
-    { id: 'engine', label: 'Engine & fuel', phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
-    { id: 'driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'certificates', label: 'Certificates', phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
-    { id: 'maintenance', label: 'Maintenance', phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
-    { id: 'alerts', label: 'Alerts', phase: 'day_one', enabled: true },
+  const tabs: { id: TabId; key: string; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
+    { id: 'overview', key: 'asset_detail.tabs.overview', label: 'Overview', phase: 'day_one', enabled: true },
+    { id: 'history', key: 'asset_detail.tabs.history', label: 'History', phase: 'day_one', enabled: true },
+    { id: 'trips', key: 'asset_detail.tabs.trips', label: 'Trips', phase: 'day_one', enabled: true },
+    { id: 'engine', key: 'asset_detail.tabs.engine_fuel', label: 'Engine & fuel', phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
+    { id: 'driving', key: 'asset_detail.tabs.driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'utilisation', key: 'asset_detail.tabs.utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
+    { id: 'certificates', key: 'asset_detail.tabs.certificates', label: 'Certificates', phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
+    { id: 'maintenance', key: 'asset_detail.tabs.maintenance', label: 'Maintenance', phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
+    { id: 'alerts', key: 'asset_detail.tabs.alerts', label: 'Alerts', phase: 'day_one', enabled: true },
   ];
 
   return (
@@ -373,7 +377,7 @@ export default function AssetDetailPage() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-semibold text-ink">{asset.code}</span>
             <span className="text-sm text-grey-500">— {asset.name}</span>
-            {rel === 'renter' && <Badge variant="yellow">Rented</Badge>}
+            {rel === 'renter' && <Badge variant="yellow">{t('common.status.rented', 'Rented')}</Badge>}
           </div>
           <div className="text-sm text-grey-500 mt-1">
             {asset.make} {asset.model} · {asset.year} · {asset.plateOrSerial}
@@ -390,11 +394,11 @@ export default function AssetDetailPage() {
 
       {/* Last updated */}
       <div className="text-sm text-grey-500">
-        Last updated {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}{' '}
-        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} min ago` : ''}
+        {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}{' '}
+        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} ${t('common.minutes_short', 'min ago')}` : ''}
         {reading && (
           <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
-            (hover for details)
+            {t('asset_detail.hover_details', '(hover for details)')}
           </span>
         )}
       </div>
@@ -405,30 +409,30 @@ export default function AssetDetailPage() {
           <div className="text-sm">
             {currentBooking ? (
               <div>
-                <div className="font-medium text-ink">Current rental</div>
+                <div className="font-medium text-ink">{t('asset_detail.rental_strip.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? 'No destination'} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name} ·
+                  {currentBooking.destination?.name ?? t('asset_detail.rental_strip.no_destination', 'No destination')} ·
                   until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
                 </div>
               </div>
             ) : upcomingBooking ? (
               <div>
-                <div className="font-medium text-ink">Upcoming rental</div>
+                <div className="font-medium text-ink">{t('asset_detail.rental_strip.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  Rented to {seed.tenants.find(t => t.id === upcomingBooking.renterTenantId)?.name} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name} ·
                   from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
                 </div>
               </div>
             ) : (
-              <div className="text-grey-500">No active or upcoming rentals</div>
+              <div className="text-grey-500">{t('asset_detail.rental_strip.none', 'No active or upcoming rentals')}</div>
             )}
             {recentBookings.length > 0 && (
               <div className="mt-3 pt-3 border-t border-line">
-                <div className="font-medium text-ink text-sm">Recent rentals</div>
+                <div className="font-medium text-ink text-sm">{t('asset_detail.rental_strip.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? 'Rented to' : 'Cancelled'} {seed.tenants.find(t => t.id === b.renterTenantId)?.name} ·
+                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {seed.tenants.find(x => x.id === b.renterTenantId)?.name} ·
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}
@@ -438,19 +442,24 @@ export default function AssetDetailPage() {
         )}
         {rel === 'renter' && renterBooking && (
           <div className="text-sm">
-            <div className="font-medium text-ink">Your rental</div>
+            <div className="font-medium text-ink">{t('asset_detail.rental_strip.your_rental', 'Your rental')}</div>
             <div className="text-grey-700 mt-1">
-              Rented from {ownerTenant?.name} until {clock.formatDubaiDate(new Date(renterBooking.end).getTime())} {clock.formatDubaiTime(new Date(renterBooking.end).getTime())}
+              {t('asset_detail.rental_strip.rented_from_line', 'Rented from {company} until {until}', {
+                company: ownerTenant?.name ?? '',
+                until: `${clock.formatDubaiDate(new Date(renterBooking.end).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.end).getTime())}`,
+              })}
             </div>
             <div className="text-grey-500 mt-1">
-              History starts {clock.formatDubaiDate(new Date(renterBooking.start).getTime())} {clock.formatDubaiTime(new Date(renterBooking.start).getTime())}
+              {t('asset_detail.rental_strip.history_starts', 'History starts {from}', {
+                from: `${clock.formatDubaiDate(new Date(renterBooking.start).getTime())} ${clock.formatDubaiTime(new Date(renterBooking.start).getTime())}`,
+              })}
             </div>
           </div>
         )}
         {rel === 'kasper' && (
           <div className="text-sm text-grey-700">
-            Kasper view · Owner: {ownerTenant?.name} · Current rental:{' '}
-            {currentBooking ? seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name : 'None'}
+            {t('asset_detail.rental_strip.kasper_view', 'Kasper view · Owner: {owner}', { owner: ownerTenant?.name ?? '' })} · {t('asset_detail.rental_strip.current_rental', 'Current rental:')}{' '}
+            {currentBooking ? seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name : t('common.none', 'None')}
           </div>
         )}
       </div>
@@ -461,24 +470,24 @@ export default function AssetDetailPage() {
           <div className="flex flex-wrap gap-2">
             {canEdit && (
               <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'edit' ? null : 'edit')}>
-                Edit asset
+                {t('asset_detail.actions.edit_asset', 'Edit asset')}
               </Button>
             )}
             {canShare && (
               <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'share' ? null : 'share')}>
-                Share tracking link
+                {t('asset_detail.actions.share_link', 'Share tracking link')}
               </Button>
             )}
             {canEndAccess && rel === 'owner' && currentBooking && (
               <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
-                End access now
+                {t('asset_detail.actions.end_access', 'End access now')}
               </Button>
             )}
             <a
               className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
-              href="/app/reports"
+              href={href('/app/reports')}
             >
-              Run report
+              {t('asset_detail.actions.run_report', 'Run report')}
             </a>
           </div>
 
@@ -489,17 +498,16 @@ export default function AssetDetailPage() {
           {panel === 'end' && currentBooking && (
             <div className="bg-surface border border-red/30 rounded-lg p-4">
               <h2 className="text-sm font-medium text-ink mb-1">
-                End {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? 'the hirer'}&apos;s access now
+                {t('asset_detail.end_access.title', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
               </h2>
               <p className="text-xs text-grey-500 mb-2">
-                The rental is cut short now: the override is saved, the job&apos;s tracking links are revoked and the cut-off is audited.
-                It is not undone by the nightly check.
+                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.')}
               </p>
               <input
                 type="text"
                 value={endReason}
                 onChange={e => setEndReason(e.target.value)}
-                placeholder="Reason (at least 10 characters)"
+                placeholder={t('asset_detail.end_access.reason_label', 'Reason (at least 10 characters)')}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
               />
               <div className="flex gap-2 mt-3">
@@ -509,17 +517,17 @@ export default function AssetDetailPage() {
                   onClick={() => {
                     const result = endEarly(session, currentBooking.id, endReason);
                     if (result.ok) {
-                      showAssetToast('ok', result.message ?? 'Access ended.');
+                      showAssetToast('ok', result.message ?? t('asset_detail.end_access.done_short', 'Access ended.'));
                       setPanel(null);
                       refreshAsset();
                     } else {
-                      showAssetToast('error', result.error ?? 'Could not end access.');
+                      showAssetToast('error', result.error ?? t('asset_detail.end_access.failed', 'Could not end access.'));
                     }
                   }}
                 >
-                  End {seed.tenants.find(t => t.id === currentBooking.renterTenantId)?.name ?? 'the hirer'}&apos;s access now
+                  {t('asset_detail.end_access.confirm', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setPanel(null)}>Cancel</Button>
+                <Button variant="ghost" size="sm" onClick={() => setPanel(null)}>{t('common.cancel', 'Cancel')}</Button>
               </div>
             </div>
           )}
@@ -543,7 +551,7 @@ export default function AssetDetailPage() {
                   : 'text-grey-300 border-transparent cursor-not-allowed'
               )}
             >
-              {tab.label}
+              {t(tab.key, tab.label)}
             </button>
           ))}
         </div>
@@ -581,7 +589,7 @@ export default function AssetDetailPage() {
                   <Popup>
                     <div className="text-left">
                       <div className="text-sm font-semibold text-ink">{asset.code}</div>
-                      <div className="text-xs text-grey-500">{status}</div>
+                      <div className="text-xs text-grey-500">{t(`common.status.${status}`, status)}</div>
                       <div className="text-xs text-grey-500 mt-1">
                         {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
                       </div>
@@ -591,7 +599,7 @@ export default function AssetDetailPage() {
               </MapContainer>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <div className="text-sm text-grey-500">No location data yet</div>
+                <div className="text-sm text-grey-500">{t('asset_detail.overview.no_location', 'No location data yet')}</div>
               </div>
             )}
           </div>
@@ -599,28 +607,28 @@ export default function AssetDetailPage() {
           {/* Status info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Status</div>
-              <div className="text-lg font-semibold text-ink mt-1 capitalize">{status}</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.status', 'Status')}</div>
+              <div className="text-lg font-semibold text-ink mt-1 capitalize">{t(`common.status.${status}`, status)}</div>
               {status === 'offline' && (
                 <div className="text-xs text-red mt-1">
-                  Offline since {reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—'}
+                  {t('asset_detail.overview.offline_since', 'Offline since {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
                 </div>
               )}
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Speed</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.speed', 'Speed')}</div>
               <div className="text-lg font-semibold text-ink mt-1 font-mono">
                 {reading ? `${reading.speedKmh} km/h` : '—'}
               </div>
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Ignition</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.ignition', 'Ignition')}</div>
               <div className="text-lg font-semibold mt-1">
-                {reading ? (reading.ignition ? 'On' : 'Off') : '—'}
+                {reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : '—'}
               </div>
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">Battery</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.battery', 'Battery')}</div>
               <div className="text-lg font-semibold mt-1 font-mono">
                 {reading ? `${reading.intBattery.toFixed(1)} V` : '—'}
               </div>
@@ -631,32 +639,32 @@ export default function AssetDetailPage() {
           {!isTier1 && (
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Engine hours</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_hours', 'Engine hours')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {reading ? `${reading.gnssOdometerKm.toFixed(1)} km` : '—'}
                 </div>
-                <div className="text-xs text-grey-500 mt-1">ECU · today</div>
+                <div className="text-xs text-grey-500 mt-1">{t('asset_detail.overview.ecu_today', 'ECU · today')}</div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Fuel level</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.fuel_level', 'Fuel level')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined
                     ? `${reading.fuelLevelPct.toFixed(0)}%`
                     : 'Not measured'}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('fuelLevel') ? 'Fuel gauge' : 'Not available'}
+                  {asset.canProfile.supported.includes('fuelLevel') ? t('asset_detail.overview.fuel_gauge', 'Fuel gauge') : t('common.not_available', 'Not available')}
                 </div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">Engine RPM</div>
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_rpm', 'Engine RPM')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {asset.canProfile.supported.includes('rpm') && reading?.fuelRateLph !== undefined
                     ? `${Math.floor(Math.random() * 3000)} rpm`
                     : 'Not measured'}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('rpm') ? 'Live value' : 'Not available'}
+                  {asset.canProfile.supported.includes('rpm') ? t('asset_detail.overview.live_value', 'Live value') : t('common.not_available', 'Not available')}
                 </div>
               </div>
             </div>
@@ -667,19 +675,19 @@ export default function AssetDetailPage() {
             <div className="bg-surface border border-line rounded-lg p-4">
               {openRequest ? (
                 <div className="text-center">
-                  <div className="text-sm text-grey-500">No tracker fitted</div>
+                  <div className="text-sm text-grey-500">{t('asset_detail.overview.no_tracker', 'No tracker fitted')}</div>
                   <div className="text-xs text-grey-500 mt-1">
-                    Tracker requested {clock.formatDubaiDate(typeof openRequest.at === 'number' ? openRequest.at : new Date(openRequest.at).getTime())} — Kasper will follow up.
+                    {t('asset_detail.overview.tracker_requested_on', 'Tracker requested {date} — Kasper will follow up.', { date: clock.formatDubaiDate(typeof openRequest.at === 'number' ? openRequest.at : new Date(openRequest.at).getTime()) })}
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="text-center">
-                    <div className="text-sm text-grey-500">No tracker fitted</div>
+                    <div className="text-sm text-grey-500">{t('asset_detail.overview.no_tracker', 'No tracker fitted')}</div>
                     <div className="text-xs text-grey-500 mt-1">
                       {canRequestTracker
-                        ? 'Request a tracker and Kasper will confirm a fitting time.'
-                        : 'This asset has no tracker. Contact Kasper to fit one.'}
+                        ? t('asset_detail.overview.request_hint', 'Request a tracker and Kasper will confirm a fitting time.')
+                        : t('asset_detail.overview.contact_kasper', 'This asset has no tracker. Contact Kasper to fit one.')}
                     </div>
                   </div>
                   {canRequestTracker && (
@@ -688,10 +696,10 @@ export default function AssetDetailPage() {
                         type="text"
                         value={requestNote}
                         onChange={e => setRequestNote(e.target.value)}
-                        placeholder="Optional note for Kasper"
+                        placeholder={t('asset_detail.overview.request_note', 'Optional note for Kasper')}
                         className="flex-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                       />
-                      <Button size="sm" onClick={submitTrackerRequest}>Request a tracker</Button>
+                      <Button size="sm" onClick={submitTrackerRequest}>{t('asset_detail.overview.request_tracker', 'Request a tracker')}</Button>
                     </div>
                   )}
                 </>
@@ -704,17 +712,17 @@ export default function AssetDetailPage() {
       {activeTab === 'history' && (
         <div className="space-y-4">
           <div className="bg-surface border border-line rounded-lg p-4">
-            <div className="text-sm font-medium text-ink mb-3">Positions</div>
+            <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.history.positions', 'Positions')}</div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line">
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Time</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Speed</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Ignition</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Heading</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.time', 'Time')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.speed', 'Speed')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.ignition', 'Ignition')}</th>
+                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.heading', 'Heading')}</th>
                     {asset.canProfile.supported.includes('fuelLevel') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">Fuel %</th>
+                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.fuel_pct', 'Fuel %')}</th>
                     )}
                   </tr>
                 </thead>
@@ -725,7 +733,7 @@ export default function AssetDetailPage() {
                         {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
                       </td>
                       <td className="px-3 py-2 font-mono">{reading.speedKmh} km/h</td>
-                      <td className="px-3 py-2">{reading.ignition ? 'On' : 'Off'}</td>
+                      <td className="px-3 py-2">{reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
                       <td className="px-3 py-2 font-mono">{reading.heading}°</td>
                       {asset.canProfile.supported.includes('fuelLevel') && (
                         <td className="px-3 py-2 font-mono">
@@ -735,7 +743,7 @@ export default function AssetDetailPage() {
                     </tr>
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">No data</td>
+                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">{t('common.no_data', 'No data')}</td>
                     </tr>
                   )}
                 </tbody>
@@ -747,23 +755,23 @@ export default function AssetDetailPage() {
 
       {activeTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Trips</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.trips', 'Trips')}</div>
           <div className="text-sm text-grey-500">
-            No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.
+            {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
           </div>
         </div>
       )}
 
       {activeTab === 'engine' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Engine & fuel</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.engine_fuel', 'Engine & fuel')}</div>
           {isTier1 ? (
             <div className="text-sm text-grey-500">
-              Tier 1 assets don't have CAN data available.
+              {t('asset_detail.no_can_tier1', "Tier 1 assets don't have CAN data available.")}
             </div>
           ) : (
             <div className="text-sm text-grey-500">
-              Engine & fuel data for this asset.
+              {t('asset_detail.engine_fuel_stub', 'Engine & fuel data for this asset.')}
             </div>
           )}
         </div>
@@ -771,7 +779,7 @@ export default function AssetDetailPage() {
 
       {activeTab === 'driving' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Driving events</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.driving_events', 'Driving events')}</div>
           <div className="text-sm text-grey-500">
             No driving events recorded yet.
           </div>
@@ -784,11 +792,11 @@ export default function AssetDetailPage() {
             <>
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-ink">ECU engine hours</div>
+                  <div className="text-sm font-medium text-ink">{t('asset_detail.ecu_engine_hours', 'ECU engine hours')}</div>
                   <div className="font-mono text-lg text-ink">{ecuHoursAt(asset, clock.now()).toFixed(1)} h</div>
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  Meter reading from the ECU. Monthly Utilisation Certificates are sealed from this meter.
+                  {t('asset_detail.muc_note', 'Meter reading from the ECU. Monthly Utilisation Certificates are sealed from this meter.')}
                 </div>
               </div>
               <div className="bg-surface border border-line rounded-lg overflow-hidden">
@@ -796,18 +804,18 @@ export default function AssetDetailPage() {
                   Last 7 days
                 </div>
                 {!breakdown ? (
-                  <div className="p-4 text-sm text-grey-500">Reading the ECU…</div>
+                  <div className="p-4 text-sm text-grey-500">{t('asset_detail.reading_ecu', 'Reading the ECU…')}</div>
                 ) : breakdown.days.length === 0 ? (
-                  <div className="p-4 text-sm text-grey-500">No engine data in this window.</div>
+                  <div className="p-4 text-sm text-grey-500">{t('asset_detail.no_engine_data', 'No engine data in this window.')}</div>
                 ) : (
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-paper-2 text-grey-500">
-                        <th className="px-3 py-2 text-left font-medium">Day</th>
-                        <th className="px-3 py-2 text-right font-medium">Engine (h)</th>
-                        <th className="px-3 py-2 text-right font-medium">Working (h)</th>
-                        <th className="px-3 py-2 text-right font-medium">Idling (h)</th>
-                        <th className="px-3 py-2 text-right font-medium">Gap (min)</th>
+                        <th className="px-3 py-2 text-left font-medium">{t('asset_detail.utilisation.day', 'Day')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.engine_h', 'Engine (h)')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.working_h', 'Working (h)')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.idling_h', 'Idling (h)')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.gap_min', 'Gap (min)')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -827,7 +835,7 @@ export default function AssetDetailPage() {
             </>
           ) : (
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-sm font-medium text-ink mb-3">Utilisation</div>
+              <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.utilisation', 'Utilisation')}</div>
               <div className="text-sm text-grey-500">
                 Last 7 days utilisation for this asset.
               </div>
@@ -840,24 +848,24 @@ export default function AssetDetailPage() {
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">Monthly Utilisation Certificates</span>
+              <span className="text-sm font-medium text-ink">{t('asset_detail.muc_title', 'Monthly Utilisation Certificates')}</span>
               <a className="text-xs text-yellow-600 hover:text-yellow font-medium" href="/app/certificates">
-                Open certificates
+                {t('asset_detail.open_certificates', 'Open certificates')}
               </a>
             </div>
             {mucs.length === 0 ? (
               <div className="p-6 text-center text-sm text-grey-500">
-                No certificates for {asset.code} yet.
+                {t('asset_detail.certificates_none', 'No certificates for {code} yet.', { code: asset.code })}
               </div>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    <th className="px-3 py-2 text-left font-medium">Certificate</th>
-                    <th className="px-3 py-2 text-left font-medium">Period</th>
-                    <th className="px-3 py-2 text-right font-medium">Billable hours</th>
-                    <th className="px-3 py-2 text-center font-medium">Status</th>
-                    <th className="px-3 py-2 text-right font-medium">Verify</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.certificates_tab.certificate', 'Certificate')}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.certificates_tab.period', 'Period')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('asset_detail.certificates_tab.billable_hours', 'Billable hours')}</th>
+                    <th className="px-3 py-2 text-center font-medium">{t('certificates.columns.status', 'Status')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('asset_detail.certificates_tab.verify', 'Verify')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -874,11 +882,11 @@ export default function AssetDetailPage() {
                       </td>
                       <td className="px-3 py-2 border-b border-line text-center">
                         {verifyStates[m.id] === 'tampered' ? (
-                          <Badge variant="red">Seal broken</Badge>
+                          <Badge variant="red">{t('certificates.status.seal_broken', 'Seal broken')}</Badge>
                         ) : m.status === 'sealed' ? (
-                          <Badge variant="green">Sealed</Badge>
+                          <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
                         ) : (
-                          <Badge variant="yellow">Voided</Badge>
+                          <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>
                         )}
                       </td>
                       <td className="px-3 py-2 border-b border-line text-right">
@@ -904,7 +912,7 @@ export default function AssetDetailPage() {
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">Service plans</span>
+              <span className="text-sm font-medium text-ink">{t('asset_detail.service_plans', 'Service plans')}</span>
               <a className="text-xs text-yellow-600 hover:text-yellow font-medium" href="/app/maintenance">
                 Open the maintenance board
               </a>
@@ -918,9 +926,9 @@ export default function AssetDetailPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    <th className="px-3 py-2 text-left font-medium">Plan</th>
-                    <th className="px-3 py-2 text-left font-medium">Due</th>
-                    <th className="px-3 py-2 text-center font-medium">Status</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.maintenance_tab.plan', 'Plan')}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.maintenance_tab.due', 'Due')}</th>
+                    <th className="px-3 py-2 text-center font-medium">{t('certificates.columns.status', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -935,11 +943,11 @@ export default function AssetDetailPage() {
                         </td>
                         <td className="px-3 py-2 border-b border-line text-center">
                           {snapshot.state === 'overdue' ? (
-                            <Badge variant="red">Overdue</Badge>
+                            <Badge variant="red">{t('maintenance.overdue', 'Overdue')}</Badge>
                           ) : snapshot.state === 'due_soon' ? (
-                            <Badge variant="amber">Due soon</Badge>
+                            <Badge variant="amber">{t('maintenance.due_soon', 'Due soon')}</Badge>
                           ) : (
-                            <Badge variant="green">Ok</Badge>
+                            <Badge variant="green">{t('maintenance.ok', 'Ok')}</Badge>
                           )}
                         </td>
                       </tr>
@@ -951,17 +959,17 @@ export default function AssetDetailPage() {
           </div>
 
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
-            <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">Service history</div>
+            <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.service_history', 'Service history')}</div>
             {maintenanceRecords.length === 0 ? (
               <div className="p-6 text-center text-sm text-grey-500">No services logged for {asset.code} yet.</div>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-paper-2 text-grey-500">
-                    <th className="px-3 py-2 text-left font-medium">Date</th>
-                    <th className="px-3 py-2 text-right font-medium">Reading</th>
-                    <th className="px-3 py-2 text-left font-medium">Notes</th>
-                    <th className="px-3 py-2 text-right font-medium">Cost</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.maintenance_tab.date', 'Date')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('asset_detail.maintenance_tab.reading', 'Reading')}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t('asset_detail.maintenance_tab.notes', 'Notes')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('asset_detail.maintenance_tab.cost', 'Cost')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -988,7 +996,7 @@ export default function AssetDetailPage() {
 
       {activeTab === 'alerts' && (
         <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">Alerts</div>
+          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.alerts', 'Alerts')}</div>
           <div className="text-sm text-grey-500">
             No alerts for this asset.
           </div>

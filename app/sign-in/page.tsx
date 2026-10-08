@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { useStore } from '@/store';
 import { signIn } from '@/server/api';
+import { useT } from '@/i18n';
 
 export default function SignInPage() {
+  const t = useT();
   const router = useRouter();
   const store = useStore;
   const [email, setEmail] = useState('');
@@ -30,7 +32,7 @@ export default function SignInPage() {
         router.replace('/app');
       }
     } else {
-      setError(result.error ?? 'Sign in failed.');
+      setError(result.error ?? t('sign_in.errors.failed', 'Sign in failed.'));
       setLoading(false);
     }
   };
@@ -63,13 +65,13 @@ export default function SignInPage() {
             <span className="text-lg font-semibold text-ink">Kasper GPS</span>
           </div>
 
-          <h1 className="text-xl font-semibold text-ink text-center mb-1">Sign in</h1>
-          <p className="text-sm text-grey-500 text-center mb-6">Enter your email to continue.</p>
+          <h1 className="text-xl font-semibold text-ink text-center mb-1">{t('sign_in.title', 'Sign in')}</h1>
+          <p className="text-sm text-grey-500 text-center mb-6">{t('sign_in.subtitle', 'Enter your email to continue.')}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-ink mb-1.5">
-                Email
+                {t('sign_in.email_label', 'Email')}
               </label>
               <input
                 id="email"
@@ -77,7 +79,7 @@ export default function SignInPage() {
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="sara@kasper.ae"
+                placeholder={t('sign_in.email_placeholder', 'sara@kasper.ae')}
                 className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-lg focus:outline-none focus:border-ink transition-colors"
                 disabled={loading}
               />
@@ -85,7 +87,7 @@ export default function SignInPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">
-                Password
+                {t('sign_in.password_label', 'Password')}
               </label>
               <input
                 id="password"
@@ -93,7 +95,7 @@ export default function SignInPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Any password works"
+                placeholder={t('sign_in.password_placeholder', 'Any password works')}
                 className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-lg focus:outline-none focus:border-ink transition-colors"
                 disabled={loading}
               />
@@ -106,16 +108,16 @@ export default function SignInPage() {
             )}
 
             <Button type="submit" fullWidth size="md" loading={loading}>
-              Sign in
+              {t('sign_in.sign_in_button', 'Sign in')}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             {showForgot ? (
               <p className="text-sm text-grey-500">
-                We&apos;ve sent a reset link to your email.
+                {t('sign_in.reset_sent', "We've sent a reset link to your email.")}
                 <br />
-                <span className="text-xs text-grey-500 italic">Kasper staff use two-factor in production.</span>
+                <span className="text-xs text-grey-500 italic">{t('sign_in.staff_2fa_note', 'Kasper staff use two-factor in production.')}</span>
               </p>
             ) : (
               <button
@@ -123,13 +125,13 @@ export default function SignInPage() {
                 onClick={() => setShowForgot(true)}
                 className="text-sm text-grey-500 hover:text-ink transition-colors"
               >
-                Forgot password?
+                {t('sign_in.forgot_password', 'Forgot password?')}
               </button>
             )}
           </div>
 
           <p className="mt-6 text-[10px] text-grey-500 text-center font-mono bg-paper/50 rounded px-3 py-2 border border-line">
-            Prototype — dummy data only. All accounts use any password.
+            {t('sign_in.prototype_note', 'Prototype — dummy data only. All accounts use any password.')}
           </p>
         </div>
       </div>
@@ -137,7 +139,7 @@ export default function SignInPage() {
       {/* Footer */}
       <footer className="bg-paper-2 border-t border-line py-3 px-4">
         <p className="text-[10px] text-grey-500 text-center font-mono">
-          KASPER GPS · Equipment tracking & rental management
+          {t('sign_in.footer', 'KASPER GPS · Equipment tracking & rental management')}
         </p>
       </footer>
     </div>

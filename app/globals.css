@@ -147,3 +147,30 @@ code, pre, .mono {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--grey-500);
 }
+
+/* ── Arabic (spec §14) ────────────────────────────────────────────────────────
+   The document gets lang="ar" dir="rtl" from the root layout when the URL is
+   /ar/... . Everything else mirrors through the normal flow/flex direction.
+   Two deliberate exceptions: the demo bar is prototype tooling and stays
+   English and LTR, and Latin digits are kept for codes, times and quantities
+   (spec §14), which the mono font already isolates. */
+[dir="rtl"] .demo-bar {
+  direction: ltr;
+}
+
+[dir="rtl"] .demo-bar * {
+  unicode-bidi: isolate;
+}
+
+/* Numbers, times, plates and asset codes stay on the Latin grid in Arabic. */
+[dir="rtl"] .font-mono {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+/* Arrows that point "forward" in English point the other way in Arabic. */
+[dir="rtl"] .arrow-forward {
+  transform: scaleX(-1);
+  display: inline-block;
+}
