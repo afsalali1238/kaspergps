@@ -12,6 +12,8 @@ import { isAssetVisible, hasCapability } from '@/server/access';
 import { FEATURES } from '@/domain/features';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type ReportType = 'trip_mileage' | 'location_history' | 'operating_hours' | 'fuel' | 'utilisation' | 'driving_events';
 type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
@@ -125,7 +127,7 @@ export default function ReportsPage() {
 
   const canRunReport = hasCapability(session!, 'report.run');
 
-  // Generate an Excel report from the current selection.
+  // Generate a report in the selected format (Excel or PDF).
   const generateReport = useCallback(() => {
     if (!selectedReport || !canRunReport) return;
     const assets = visibleAssets;
@@ -155,25 +157,73 @@ export default function ReportsPage() {
     }
 
     rows.sort((a, b) => a.Time.localeCompare(b.Time));
+    const reportLabel = REPORT_TYPES.find(r => r.id === selectedReport)?.label ?? selectedReport;
+    const scopeLabel = scope === 'single_asset' ? 'Single asset' : scope === 'site' ? 'Site' : 'Multiple assets';
 
-    const summarySheet = XLSX.utils.json_to_sheet([{
-      Report: REPORT_TYPES.find(r => r.id === selectedReport)?.label ?? selectedReport,
-      Scope: scope === 'single_asset' ? 'Single asset' : scope === 'site' ? 'Site' : 'Multiple assets',
-      From: effectiveDateFrom,
-      To: effectiveDateTo,
-      Format: format === 'pdf' ? 'PDF' : 'Excel',
-      Generated: clock.formatDubaiDateTime(clock.dubaiNow().getTime()),
-      'Number of readings': rows.length,
-    }], { header: ['Report', 'Scope', 'From', 'To', 'Format', 'Generated', 'Number of readings'] });
+    if (format === 'excel') {
+      const summarySheet = XLSX.utils.json_to_sheet([{
+        Report: reportLabel,
+        Scope: scopeLabel,
+        From: effectiveDateFrom,
+        To: effectiveDateTo,
+        Format: 'Excel',
+        Generated: clock.formatDubaiDateTime(clock.dubaiNow().getTime()),
+        'Number of readings': rows.length,
+      }], { header: ['Report', 'Scope', 'From', 'To', 'Format', 'Generated', 'Number of readings'] });
 
-    const dataSheet = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
-    XLSX.utils.book_append_sheet(wb, dataSheet, 'Data');
+      const dataSheet = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+      XLSX.utils.book_append_sheet(wb, dataSheet, 'Data');
 
-    const filename = `Kasper_${selectedReport}_${scope}_${effectiveDateFrom}_to_${effectiveDateTo}.xlsx`;
-    XLSX.writeFile(wb, filename);
+      const filename = `Kasper_${selectedReport}_${scope}_${effectiveDateFrom}_to_${effectiveDateTo}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    } else {
+      generatePdf(reportLabel, scopeLabel, rows);
+    }
   }, [selectedReport, scope, format, effectiveDateFrom, effectiveDateTo, visibleAssets, canRunReport]);
+
+  const generatePdf = (reportLabel: string, scopeLabel: string, rows: typeof rows) => {
+    const doc = new jsPDF({ orientation: rows.length > 30 ? 'landscape' : 'portrait' });
+    const title = `Kasper — ${reportLabel}`;
+    const generated = clock.formatDubaiDateTime(clock.dubaiNow().getTime());
+
+    doc.setFontSize(16);
+    doc.text(title, 14, 16);
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Scope: ${scopeLabel}  |  From: ${effectiveDateFrom || '—'}  |  To: ${effectiveDateTo || '—'}`, 14, 22);
+    doc.text(`Generated: ${generated}  |  Readings: ${rows.length}`, 14, 27);
+    doc.setTextColor(0, 0, 0);
+
+    autoTable(doc, {
+      startY: 32,
+      head: [['Time', 'Asset code', 'Speed', 'Ignition', 'Heading']],
+      body: rows.map(r => [r.Time, r['Asset code'], r.Speed, r.Ignition, r.Heading]),
+      theme: 'grid',
+      headStyles: { fillColor: [45, 52, 54] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      styles: { fontSize: 8 },
+      columnStyles: {
+        0: { minWidth: 28 },
+        1: { minWidth: 22 },
+        2: { minWidth: 18 },
+        3: { minWidth: 16 },
+        4: { minWidth: 16 },
+      },
+    });
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Kasper GPS  |  ${reportLabel}  |  Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 8);
+    }
+
+    const filename = `Kasper_${selectedReport}_${scope}_${effectiveDateFrom || 'all'}_to_${effectiveDateTo || 'all'}.pdf`;
+    doc.save(filename);
+  };
 
   function showToast(message: string) {
     // Simple toast via alert for prototype — the demo bar has a proper toast system.

@@ -9,6 +9,8 @@ import { seed } from '@/server/seed/data';
 import { isAssetVisible } from '@/server/access';
 import type { Geofence, GeofenceEvent } from '@/domain/types';
 import * as clock from '@/lib/clock';
+import { MapContainer, TileLayer, Circle, Polygon, Tooltip } from 'react-leaflet';
+import L from 'leaflet';
 
 function fmtTime(ts: string | number): string {
   const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
@@ -34,6 +36,34 @@ function eventsForGeofence(g: Geofence): GeofenceEvent[] {
   return seed.geofenceEvents.filter(e => e.geofenceId === g.id);
 }
 
+function geofenceColor(kind: string): string {
+  if (kind === 'restricted') return '#dc2626';
+  if (kind === 'site') return '#16a34a';
+  if (kind === 'yard') return '#d97706';
+  return '#ca8a04';
+}
+
+function circleOptions(kind: string): L.CircleOptions {
+  return {
+    radius: 0,
+    color: geofenceColor(kind),
+    fillColor: geofenceColor(kind),
+    fillOpacity: 0.12,
+    weight: 2,
+    dashArray: '4 4',
+  };
+}
+
+function polygonOptions(kind: string): L.PolygonOptions {
+  return {
+    color: geofenceColor(kind),
+    fillColor: geofenceColor(kind),
+    fillOpacity: 0.12,
+    weight: 2,
+    dashArray: '4 4',
+  };
+}
+
 export default function GeofencesPage() {
   const store = useStore;
   const session = store.getState().session;
@@ -56,6 +86,31 @@ export default function GeofencesPage() {
       return true;
     });
   }, [session, phase]);
+
+  // Center the map on the bounds of all visible geofences, falling back to Dubai.
+  const mapCenter = useMemo(() => {
+    if (visibleGeofences.length === 0) return [25.2048, 55.2708];
+    let latSum = 0;
+    let lngSum = 0;
+    let count = 0;
+    for (const g of visibleGeofences) {
+      const c = g.shape.type === 'circle' ? g.shape.center : g.shape.points[0];
+      latSum += c.lat;
+      lngSum += c.lng;
+      count++;
+    }
+    // Also include all polygon points for a tighter bounds estimate.
+    for (const g of visibleGeofences) {
+      if (g.shape.type === 'polygon') {
+        for (const p of g.shape.points) {
+          latSum += p.lat;
+          lngSum += p.lng;
+          count++;
+        }
+      }
+    }
+    return [latSum / count, lngSum / count];
+  }, [visibleGeofences]);
 
   if (!session) return null;
 
@@ -83,8 +138,80 @@ export default function GeofencesPage() {
           </div>
 
           {showMapOverlay && (
-            <div className="bg-amber/5 border border-amber/20 rounded-lg p-3 text-sm text-amber-dark">
-              Showing {visibleGeofences.length} geofence{visibleGeofences.length !== 1 ? 's' : ''} on the map.
+            <div className="rounded-xl border border-line bg-paper overflow-hidden h-[360px] sm:h-[420px] md:h-[480px]">
+              <MapContainer
+                center={mapCenter}
+                zoom={10}
+                scrollWheelZoom={true}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {visibleGeofences.map(g => {
+                  if (g.shape.type === 'circle') {
+                    return (
+                      <Circle
+                        key={g.id}
+                        center={[g.shape.center.lat, g.shape.center.lng]}
+                        radius={g.shape.radiusM}
+                        options={circleOptions(g.kind)}
+                      >
+                        <Tooltip>
+                          <div className="text-left">
+                            <div className="font-medium text-ink text-xs">{g.name}</div>
+                            <div className="text-grey-500 text-xs">{shapeDesc(g)}</div>
+                            <div className="text-grey-500 text-xs mt-1">
+                              {g.alertOnEnter ? 'Enter alert' : ''} {g.alertOnEnter && g.alertOnExit ? ' · ' : ''}
+                              {g.alertOnExit ? 'Exit alert' : ''}
+                            </div>
+                          </div>
+                        </Tooltip>
+                      </Circle>
+                    );
+                  }
+                  return (
+                    <Polygon
+                      key={g.id}
+                      positions={g.shape.points.map(p => [p.lat, p.lng] as [number, number])}
+                      options={polygonOptions(g.kind)}
+                    >
+                      <Tooltip>
+                        <div className="text-left">
+                          <div className="font-medium text-ink text-xs">{g.name}</div>
+                          <div className="text-grey-500 text-xs">{shapeDesc(g)}</div>
+                          <div className="text-grey-500 text-xs mt-1">
+                            {g.alertOnEnter ? 'Enter alert' : ''} {g.alertOnEnter && g.alertOnExit ? ' · ' : ''}
+                            {g.alertOnExit ? 'Exit alert' : ''}
+                          </div>
+                        </div>
+                      </Tooltip>
+                    </Polygon>
+                  );
+                })}
+              </MapContainer>
+              <div className="flex items-center gap-3 px-3 py-2 text-xs text-grey-500 border-t border-line bg-paper-2">
+                Showing {visibleGeofences.length} geofence{visibleGeofences.length !== 1 ? 's' : ''}
+                {visibleGeofences.filter(g => g.kind === 'restricted').length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red" />
+                    Restricted: {visibleGeofences.filter(g => g.kind === 'restricted').length}
+                  </span>
+                )}
+                {visibleGeofences.filter(g => g.kind === 'job').length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-yellow" />
+                    Job: {visibleGeofences.filter(g => g.kind === 'job').length}
+                  </span>
+                )}
+                {visibleGeofences.filter(g => g.kind === 'yard').length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber" />
+                    Yard: {visibleGeofences.filter(g => g.kind === 'yard').length}
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
