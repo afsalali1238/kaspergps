@@ -9,6 +9,8 @@ import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
+import type { AssetClass, Role, SimBehaviour } from '@/domain/types';
+import * as clock from '@/lib/clock';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +95,7 @@ function AssetsImporter() {
       const tenant = tenants.find(t => t.name.toLowerCase() === tenantName?.toLowerCase());
       if (!tenant) errors.push('Unknown tenant');
       // site exists
-      const site = sites.find(s => s.name.toLowerCase() === siteName?.toLowerCase());
+      const site = sites.find(s => s.name.toLowerCase() === siteName?.toLowerCase() && s.tenantId === tenant?.id);
       if (!site) errors.push('Unknown site');
       // code unique across Kasper (seed)
       const dup = seed.assets.find(a => a.code.toLowerCase() === (code?.toLowerCase() ?? ''));
@@ -106,6 +108,22 @@ function AssetsImporter() {
 
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
+    const importedAt = new Date(clock.now()).toISOString();
+    for (const { cells } of valid) {
+      const tenant = tenants.find(t => t.name.toLowerCase() === cells[8].trim().toLowerCase())!;
+      const site = sites.find(s => s.name.toLowerCase() === cells[9].trim().toLowerCase())!;
+      seed.assets.push({
+        id: `asset-import-${seed.assets.length + 1}`,
+        code: cells[0].trim(), name: cells[1].trim(), type: cells[2].trim(),
+        assetClass: cells[3].trim() as AssetClass,
+        make: cells[4].trim(), model: cells[5].trim(), year: Number(cells[6]) || 0,
+        plateOrSerial: cells[7].trim(), ownerTenantId: tenant.id, homeSiteId: site.id,
+        tankLitres: cells[10] ? Number(cells[10]) : undefined,
+        behaviour: (cells[11]?.trim() || 'parked') as SimBehaviour,
+        canProfile: { adapter: 'none', supported: [] }, status: 'no_tracker',
+        createdAt: importedAt, createdBy: 'csv-import',
+      });
+    }
     setDone(`${valid.length} added · ${rows.length - valid.length} skipped`);
     setText('');
     setRows([]);
@@ -180,6 +198,7 @@ function TrackersImporter() {
       const errors: string[] = [];
       if (!imei) errors.push('IMEI required');
       else if (!luhnCheck(imei)) errors.push('Bad IMEI check digit');
+      if (!/^89\d{17,18}$/.test(iccid)) errors.push('Bad SIM number');
       // duplicate in file
       const dup = results.find(r => r.imei === imei);
       if (dup) errors.push('Duplicate in file');
@@ -193,6 +212,13 @@ function TrackersImporter() {
 
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
+    const importedAt = new Date(clock.now()).toISOString();
+    for (const row of valid) seed.trackers.push({
+      id: `tracker-import-${seed.trackers.length + 1}`, assetId: null, imei: row.imei,
+      model: 'FMC130', simIccid: row.iccid, firmware: '03.29.00.Rev.03',
+      pingIntervalSec: 30, sleepMode: 'off', stockStatus: 'in_stock',
+      registeredAt: importedAt, registeredBy: 'csv-import',
+    });
     setDone(`${valid.length} added · ${rows.length - valid.length} skipped`);
     setText('');
     setRows([]);
@@ -260,8 +286,9 @@ function AdaptersImporter() {
       if (!serial) errors.push('Serial required');
       if (!model) errors.push('Model required');
       else if (!['ALL-CAN300', 'LVCAN200'].includes(model)) errors.push('Unknown model');
-      const dup = results.find(r => r.serial === serial);
+      const dup = results.find(r => r.serial.toLowerCase() === serial.toLowerCase());
       if (dup) errors.push('Duplicate in file');
+      if (seed.adapters.some(a => a.serial.toLowerCase() === serial.toLowerCase())) errors.push('Already registered');
       results.push({ serial, model, errors });
     }
     setRows(results);
@@ -269,6 +296,12 @@ function AdaptersImporter() {
 
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
+    const importedAt = new Date(clock.now()).toISOString();
+    for (const row of valid) seed.adapters.push({
+      id: `adapter-import-${seed.adapters.length + 1}`, serial: row.serial,
+      model: row.model as 'LVCAN200' | 'ALL-CAN300', status: 'in_stock',
+      assetId: null, registeredAt: importedAt,
+    });
     setDone(`${valid.length} added · ${rows.length - valid.length} skipped`);
     setText('');
     setRows([]);
@@ -354,6 +387,16 @@ function UsersImporter() {
 
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
+    for (const { cells } of valid) {
+      const tenant = tenants.find(t => t.name.toLowerCase() === cells[3].trim().toLowerCase())!;
+      const siteNames = cells[4].split(/[;|]/).map(v => v.trim().toLowerCase()).filter(Boolean);
+      seed.users.push({
+        id: `user-import-${seed.users.length + 1}`, name: cells[0].trim(), email: cells[1].trim(),
+        role: cells[2].trim() as Role, tenantId: tenant.id,
+        siteIds: seed.sites.filter(site => site.tenantId === tenant.id && siteNames.includes(site.name.toLowerCase())).map(site => site.id),
+        status: 'active',
+      });
+    }
     setDone(`${valid.length} added · ${rows.length - valid.length} skipped`);
     setText('');
     setRows([]);
