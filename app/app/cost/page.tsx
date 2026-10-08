@@ -298,6 +298,7 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
   onClose: () => void;
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
+  const t = useT();
   const asset = row.asset;
   const roi = roiFor(asset);
   const series = monthlySeries(asset, 6);
@@ -310,11 +311,11 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
   const [diesel, setDiesel] = useState(String(getDieselPrice()));
 
   return (
-    <Sheet open onClose={onClose} title={`${asset.code} · ${asset.name}`} width="lg">
+    <Sheet open onClose={onClose} title={t('cost.roi_drawer_title', `ROI — ${asset.code}`).replace('{code}', asset.code)} width="lg">
       <div className="space-y-5">
         {/* Six-month chart */}
         <div>
-          <h2 className="text-sm font-medium text-ink mb-2">Revenue vs cost — last 6 months</h2>
+          <h2 className="text-sm font-medium text-ink mb-2">{t('cost.roi_cumulative', 'Revenue vs cost — last 6 months')}</h2>
           <div className="flex items-end gap-3 h-32">
             {series.map(p => (
               <div key={p.label} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
@@ -343,15 +344,15 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
         {/* ROI */}
         <div className="bg-surface border border-line rounded-lg p-3 grid grid-cols-2 gap-3">
           <div>
-            <div className="text-xs text-grey-500">ROI to date</div>
+            <div className="text-xs text-grey-500">{t('cost.roi_percentage', 'ROI to date')}</div>
             <div className="text-lg font-semibold text-ink">
-              {roi.roiPct === null ? 'Not enough data' : `${roi.roiPct}%`}
+              {roi.roiPct === null ? t('cost.not_enough_data', 'Not enough data') : `${roi.roiPct}%`}
             </div>
           </div>
           <div>
-            <div className="text-xs text-grey-500">Payback estimate</div>
+            <div className="text-xs text-grey-500">{t('cost.roi_payback', 'Payback estimate')}</div>
             <div className="text-lg font-semibold text-ink">
-              {roi.paybackMonths === null ? 'Not enough data' : `${roi.paybackMonths} months`}
+              {roi.paybackMonths === null ? t('cost.not_enough_data', 'Not enough data') : t('cost.roi_payback_months', `${roi.paybackMonths} months`).replace('{months}', String(roi.paybackMonths))}
             </div>
           </div>
           <p className="col-span-2 text-[11px] text-grey-500">{roi.note}</p>
@@ -359,7 +360,7 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
 
         {/* Cost lines */}
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
-          <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">Cost lines</div>
+          <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('cost.columns.total_cost', 'Cost lines')}</div>
           <table className="w-full text-xs">
             <tbody>
               {row.lines.map(line => (
@@ -390,25 +391,25 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
 
         {/* Inputs */}
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-ink">Cost inputs {profile ? '' : '— this asset has no profile yet'}</h2>
+          <h2 className="text-sm font-medium text-ink">{t('cost.roi_edit_profile', 'Cost inputs')}</h2>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-grey-500 block">
-              Purchase value (AED)
+              {t('cost.roi_profile_purchase', 'Purchase value (AED)')}
               <input value={purchaseValue} onChange={e => setPurchaseValue(e.target.value)} inputMode="decimal"
                 className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
             </label>
             <label className="text-xs text-grey-500 block">
-              Finance per month (AED)
+              {t('cost.roi_profile_finance', 'Finance per month (AED)')}
               <input value={finance} onChange={e => setFinance(e.target.value)} inputMode="decimal"
                 className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
             </label>
             <label className="text-xs text-grey-500 block">
-              Operator rate (AED/h)
+              {t('cost.roi_profile_operator', 'Operator rate (AED/h)')}
               <input value={operatorRate} onChange={e => setOperatorRate(e.target.value)} inputMode="decimal"
                 className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
             </label>
             <label className="text-xs text-grey-500 block">
-              Insurance per month (AED)
+              {t('cost.roi_profile_insurance', 'Insurance per month (AED)')}
               <input value={insurance} onChange={e => setInsurance(e.target.value)} inputMode="decimal"
                 className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
             </label>
@@ -424,10 +425,10 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
                   operatorCostPerHourAed: Number(operatorRate || 0),
                   insurancePerMonthAed: Number(insurance || 0),
                 });
-                onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+                onResult(result.ok ? 'ok' : 'error', result.ok ? t('cost.roi_profile_saved', result.message!) : result.error!);
               }}
             >
-              Save cost profile
+              {t('cost.roi_profile_save', 'Save cost profile')}
             </Button>
             <label className="text-xs text-grey-500">
               Diesel price (AED/L, company setting)
@@ -448,15 +449,15 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
             </label>
           </div>
           <p className="text-[11px] text-grey-500">
-            Purchase value drives ROI and payback; finance and insurance are pro-rated to the period. All rates are dummy.
+            {t('cost.roi_calc', 'Purchase value drives ROI and payback; finance and insurance are pro-rated to the period. All rates are dummy.')}
           </p>
         </div>
 
         <div className="flex gap-2">
           <Link href={`/app/assets/${asset.id}`}>
-            <Button variant="secondary" size="sm">Open asset</Button>
+            <Button variant="secondary" size="sm">{t('common.open', 'Open asset')}</Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>
         </div>
       </div>
     </Sheet>
