@@ -119,7 +119,7 @@ export default function MaintenancePage() {
           >
             {t('maintenance.pdf', 'PDF')}
           </Button>
-          {canManage && <Button size="sm" onClick={() => setPlanForm({})}>New plan</Button>}
+          {canManage && <Button size="sm" onClick={() => setPlanForm({})}>{t('maintenance.new_plan', 'New plan')}</Button>}
         </div>
       </div>
 
@@ -136,11 +136,11 @@ export default function MaintenancePage() {
       {/* Alerts (Later) */}
       {alerts.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-3 space-y-1">
-          <h2 className="text-xs font-medium text-grey-500">Alerts</h2>
+          <h2 className="text-xs font-medium text-grey-500">{t('maintenance.alerts', 'Alerts')}</h2>
           {alerts.map(a => (
             <div key={a.text} className="text-sm flex items-center gap-2">
               <Badge variant={a.state === 'overdue' ? 'red' : 'amber'} dot>
-                {a.state === 'overdue' ? 'Overdue' : 'Due soon'}
+                {a.state === 'overdue' ? t('maintenance.overdue', 'Overdue') : t('maintenance.due_soon', 'Due soon')}
               </Badge>
               <span className="text-grey-700">{a.text}</span>
             </div>
@@ -151,7 +151,7 @@ export default function MaintenancePage() {
       {/* Fault-code tasks */}
       {faultCodes.length > 0 && (
         <div className="bg-surface border border-line rounded-lg p-3 space-y-2">
-          <h2 className="text-xs font-medium text-grey-500">Fault codes needing a service task</h2>
+          <h2 className="text-xs font-medium text-grey-500">{t('maintenance.fault_codes', 'Fault codes needing a service task')}</h2>
           {faultCodes.map(a => (
             <div key={a.id} className="flex items-center justify-between gap-3 text-sm">
               <span className="text-grey-700">
@@ -166,7 +166,7 @@ export default function MaintenancePage() {
                     show(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
                   }}
                 >
-                  Create service task
+                  {t('maintenance.create_task', 'Create service task')}
                 </Button>
               )}
             </div>
@@ -177,18 +177,18 @@ export default function MaintenancePage() {
       {/* Open one-off tasks */}
       {tasks.length > 0 && (
         <div className="bg-yellow/5 border border-yellow-dark/30 rounded-lg p-3 space-y-2">
-          <h2 className="text-xs font-medium text-grey-500">Open tasks</h2>
-          {tasks.map(t => {
-            const asset = seed.assets.find(a => a.id === t.assetId);
-            const plan = plans.find(p => p.assetId === t.assetId);
+          <h2 className="text-xs font-medium text-grey-500">{t('maintenance.open_tasks', 'Open tasks')}</h2>
+          {tasks.map(task => {
+            const asset = seed.assets.find(a => a.id === task.assetId);
+            const plan = plans.find(p => p.assetId === task.assetId);
             const snapshot = plan ? planSnapshot(plan, asset!) : null;
             return (
-              <div key={t.id} className="flex items-center justify-between gap-3 text-sm">
+              <div key={task.id} className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-grey-700">
-                  <span className="font-medium text-ink">{asset?.code}</span> · {t.title}
+                  <span className="font-medium text-ink">{asset?.code}</span> · {task.title}
                 </span>
                 {canManage && snapshot && (
-                  <Button variant="secondary" size="sm" onClick={() => setLogFor(snapshot)}>Log service</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setLogFor(snapshot)}>{t('maintenance.log_service', 'Log service')}</Button>
                 )}
               </div>
             );
@@ -236,8 +236,8 @@ export default function MaintenancePage() {
                   </div>
                   {canManage && (
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={() => setLogFor(s)}>Log service</Button>
-                      <Button variant="secondary" size="sm" onClick={() => setPlanForm({ snapshot: s })}>Edit plan</Button>
+                      <Button size="sm" onClick={() => setLogFor(s)}>{t('maintenance.log_service', 'Log service')}</Button>
+                      <Button variant="secondary" size="sm" onClick={() => setPlanForm({ snapshot: s })}>{t('maintenance.edit_plan', 'Edit plan')}</Button>
                     </div>
                   )}
                 </div>
@@ -253,9 +253,9 @@ export default function MaintenancePage() {
                 <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.asset', 'Asset')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.plan', 'Plan')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.basis', 'Basis')}</th>
-                <th className="px-3 py-2 text-right font-medium">Reading</th>
-                <th className="px-3 py-2 text-right font-medium">Due</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-end font-medium">{t('maintenance.reading', 'Reading')}</th>
+                <th className="px-3 py-2 text-end font-medium">{t('maintenance.due', 'Due')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.status', 'Status')}</th>
                 <th className="px-3 py-2 text-right font-medium"></th>
               </tr>
             </thead>
@@ -275,8 +275,8 @@ export default function MaintenancePage() {
                   <td className="px-3 py-2 border-b border-line text-right">
                     {canManage && (
                       <div className="flex gap-1 justify-end">
-                        <Button variant="secondary" size="sm" onClick={() => setLogFor(s)}>Log service</Button>
-                        <Button variant="ghost" size="sm" onClick={() => setPlanForm({ snapshot: s })}>Edit</Button>
+                        <Button variant="secondary" size="sm" onClick={() => setLogFor(s)}>{t('maintenance.log_service', 'Log service')}</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setPlanForm({ snapshot: s })}>{t('common.edit', 'Edit')}</Button>
                       </div>
                     )}
                   </td>
@@ -285,7 +285,10 @@ export default function MaintenancePage() {
               {plans.length === 0 && (
                 <tr className="bg-paper">
                   <td colSpan={7} className="px-3 py-8 text-center text-sm text-grey-500">
-                    No service plans yet. {canManage ? 'Create one with "New plan".' : 'Ask your company admin to set them up.'}
+                    {t('maintenance.no_plans', 'No service plans yet.')}{' '}
+                    {canManage
+                      ? t('maintenance.no_plans_admin', 'Create one with "New plan".')
+                      : t('maintenance.no_plans_ask', 'Ask your company admin to set them up.')}
                   </td>
                 </tr>
               )}
@@ -296,16 +299,16 @@ export default function MaintenancePage() {
 
       {/* Service history */}
       <div className="space-y-2">
-        <h2 className="text-sm font-medium text-ink">Service history</h2>
+        <h2 className="text-sm font-medium text-ink">{t('maintenance.service_history', 'Service history')}</h2>
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-paper-2 text-grey-500">
-                <th className="px-3 py-2 text-left font-medium">Date</th>
-                <th className="px-3 py-2 text-left font-medium">Asset</th>
-                <th className="px-3 py-2 text-right font-medium">Reading</th>
-                <th className="px-3 py-2 text-left font-medium">Notes</th>
-                <th className="px-3 py-2 text-right font-medium">Cost</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.date', 'Date')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.columns.asset', 'Asset')}</th>
+                <th className="px-3 py-2 text-end font-medium">{t('maintenance.reading', 'Reading')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('maintenance.notes', 'Notes')}</th>
+                <th className="px-3 py-2 text-end font-medium">{t('maintenance.cost', 'Cost')}</th>
               </tr>
             </thead>
             <tbody>
@@ -328,13 +331,13 @@ export default function MaintenancePage() {
               })}
               {history.length === 0 && (
                 <tr className="bg-paper">
-                  <td colSpan={5} className="px-3 py-8 text-center text-sm text-grey-500">No services logged yet.</td>
+                  <td colSpan={5} className="px-3 py-8 text-center text-sm text-grey-500">{t('maintenance.no_history', 'No services logged yet.')}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-grey-500">PDF and Excel exports include the plans and this history.</p>
+        <p className="text-xs text-grey-500">{t('maintenance.export_hint', 'PDF and Excel exports include the plans and this history.')}</p>
       </div>
 
       {logFor && (

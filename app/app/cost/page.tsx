@@ -121,7 +121,7 @@ export default function CostPage() {
   const fleetMeta = { fileName: 'kasper-cost-roi', subtitle: `Fleet view · ${range.label} · dummy rates` };
 
   const header = (label: string, key: SortKey, align: 'left' | 'right' = 'right') => (
-    <th className={clsx('px-3 py-2 font-medium', align === 'left' ? 'text-left' : 'text-right')}>
+    <th className={clsx('px-3 py-2 font-medium', align === 'left' ? 'text-start' : 'text-end')}>
       <button
         className="hover:text-ink"
         onClick={() => {
@@ -182,17 +182,17 @@ export default function CostPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-paper-2 text-grey-500">
-              {header('Asset', 'code', 'left')}
-              {header('Revenue', 'revenueAed')}
-              {header('Fuel', 'fuelAed')}
-              {header('Idle', 'idleAed')}
-              {header('Maintenance', 'maintenanceAed')}
-              {header('Fixed', 'fixedAed')}
-              {header('Operator', 'operatorAed')}
-              {header('Total cost', 'costAed')}
-              {header('Margin', 'marginAed')}
-              {header('Margin %', 'marginPct')}
-              {header('Utilisation', 'utilisationPct')}
+              {header(t('cost.columns.asset', 'Asset'), 'code', 'left')}
+              {header(t('cost.columns.revenue', 'Revenue'), 'revenueAed')}
+              {header(t('cost.columns.fuel', 'Fuel'), 'fuelAed')}
+              {header(t('cost.columns.idle', 'Idle'), 'idleAed')}
+              {header(t('cost.columns.maintenance', 'Maintenance'), 'maintenanceAed')}
+              {header(t('cost.columns.fixed', 'Fixed'), 'fixedAed')}
+              {header(t('cost.columns.operator', 'Operator'), 'operatorAed')}
+              {header(t('cost.columns.total_cost', 'Total cost'), 'costAed')}
+              {header(t('cost.columns.margin', 'Margin'), 'marginAed')}
+              {header(t('cost.columns.margin_pct', 'Margin %'), 'marginPct')}
+              {header(t('cost.columns.utilisation', 'Utilisation'), 'utilisationPct')}
             </tr>
           </thead>
           <tbody>
