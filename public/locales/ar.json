@@ -108,7 +108,8 @@
     "open_menu": "فتح القائمة",
     "min_ago": "قبل {count} دقيقة",
     "hours_ago": "قبل {count} ساعة",
-    "just_now": "الآن"
+    "just_now": "الآن",
+    "view_all": "عرض كل التنبيهات"
   },
   "nav": {
     "map": "الخريطة",
@@ -409,7 +410,9 @@
     "filter": {
       "unacknowledged": "غير مُقَرّ",
       "acknowledged": "مُقَرّ",
-      "all": "الكل"
+      "all": "الكل",
+      "all_types": "كل الأنواع",
+      "all_sites": "كل المواقع"
     },
     "since": "منذ {time} · {site}",
     "acknowledged_by": "أقرّه {name} في {at}",
@@ -449,7 +452,9 @@
       "after_hours_move": "تحركت خارج ساعات العمل",
       "idle": "خامل لمدة ساعتين",
       "low_fuel": "وقود منخفض: {percent}%"
-    }
+    },
+    "company": "شركة",
+    "closed": "مغلق"
   },
   "reports": {
     "title": "التقارير",

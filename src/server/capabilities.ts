@@ -101,7 +101,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'asset.edit',
     'report.run',
     'link.create', 'link.revoke', 'grant.endEarly',
-    'alert.view',
+    'alert.view', 'alert.acknowledge',
     'label.view', 'label.manage',
     'geofence.view', 'geofence.manage',
     'playback.view',
