@@ -64,8 +64,9 @@ export function Table<T>({
                 key={col.key}
                 className={clsx(
                   'text-xs font-semibold text-grey-500 uppercase tracking-wider px-3 py-2.5',
-                  col.align === 'right' && 'text-right',
+                  col.align === 'right' && 'text-end',
                   col.align === 'center' && 'text-center',
+                  col.align !== 'right' && col.align !== 'center' && 'text-start',
                   'whitespace-nowrap'
                 )}
                 style={{ width: col.width }}
@@ -102,8 +103,9 @@ export function Table<T>({
                     key={col.key}
                     className={clsx(
                       'px-3 py-2.5 text-sm',
-                      col.align === 'right' && 'text-right',
-                      col.align === 'center' && 'text-center'
+                      col.align === 'right' && 'text-end',
+                      col.align === 'center' && 'text-center',
+                      col.align !== 'right' && col.align !== 'center' && 'text-start'
                     )}
                   >
                     {col.render(row)}

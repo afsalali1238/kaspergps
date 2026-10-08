@@ -81,9 +81,12 @@ so a scenario is reproducible from the Scenarios menu and from the test alike.
 
 ## Coverage summary
 
-- Unit: 19 files, 218 tests (`npx vitest run`), covering the domain rules, the
-  access layer, capabilities and reasons, billing, MUC seals, bookings, links,
-  trackers, requests, adapters, team, tenants, maintenance and cost.
+- Unit: Vitest (`npx vitest run`), covering the domain rules, the access layer,
+  capabilities and reasons, billing, MUC seals, bookings, links, trackers,
+  requests, adapters, team, tenants, maintenance and cost, plus i18n
+  (`src/i18n/i18n.test.tsx`, `src/components/i18n/LanguageToggle.test.tsx`:
+  dictionary coverage of every customer `t()` key, Latin digits, placeholders,
+  RTL `lang`/`dir`, `kasper_lang` cookie, console guard, toggle behaviour).
 - End-to-end: 15 files, 100 tests per project (`npx playwright test`), desktop +
   phone: the ten scenario-group specs above plus the original focused specs —
   public tracking, certificate verification and tampering, demo shell and console

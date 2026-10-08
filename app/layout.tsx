@@ -18,8 +18,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // The proxy tags /ar/... requests with x-kasper-locale (see proxy.ts), so the
-  // very first paint is already in the right language and direction.
+  // Proxy tags Arabic customer requests (the /ar prefix, or kasper_lang=ar on
+  // an unprefixed customer route) with x-kasper-locale. Console and /dev are
+  // never tagged, so RTL starts on the first paint of customer screens only.
   const requestHeaders = await headers();
   const locale: Locale = requestHeaders.get('x-kasper-locale') === 'ar' ? 'ar' : 'en';
 

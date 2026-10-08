@@ -3,6 +3,7 @@
 import React from 'react';
 import clsx from 'clsx';
 import type { AssetStatus } from '@/domain/types';
+import { useT } from '@/i18n';
 
 interface StatusBadgeProps {
   status: AssetStatus;
@@ -19,9 +20,19 @@ const statusConfig: Record<AssetStatus, { label: string; dot: string; bg: string
   no_tracker: { label: 'No tracker', dot: 'bg-no-tracker', bg: 'bg-no-tracker/10', text: 'text-grey-700' },
 };
 
+/** English (and Arabic via t) label for an asset status — used by tests and list cells. */
+export function statusLabel(
+  status: AssetStatus,
+  t: (key: string, fallback: string) => string = (key, fallback) => fallback
+): string {
+  return t(`common.status.${status}`, statusConfig[status].label);
+}
+
 export function StatusBadge({ status, className = '', size = 'md' }: StatusBadgeProps) {
+  const t = useT();
   const cfg = statusConfig[status];
   const isSm = size === 'sm';
+  const label = statusLabel(status, t);
 
   return (
     <span
@@ -33,7 +44,7 @@ export function StatusBadge({ status, className = '', size = 'md' }: StatusBadge
       )}
     >
       <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', cfg.dot)} />
-      <span className={clsx(cfg.text, isSm ? 'font-medium' : 'font-semibold')}>{cfg.label}</span>
+      <span className={clsx(cfg.text, isSm ? 'font-medium' : 'font-semibold')}>{label}</span>
     </span>
   );
 }

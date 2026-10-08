@@ -1,7 +1,7 @@
 // UI Kit — all components used across the Kasper GPS prototype.
 export { Button } from './Button';
 export { Badge } from './Badge';
-export { StatusBadge } from './StatusBadge';
+export { StatusBadge, statusLabel } from './StatusBadge';
 export { TierChip } from './TierChip';
 export { SourceLabel } from './SourceLabel';
 export { Skeleton, CardSkeleton, TableSkeleton } from './Skeleton';

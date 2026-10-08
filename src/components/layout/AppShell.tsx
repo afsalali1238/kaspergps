@@ -10,7 +10,8 @@ import { seed } from '@/server/seed/data';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
-import { useT, useHref, useLocaleSwitch } from '@/i18n';
+import { useT, useHref, stripLocale } from '@/i18n';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -98,21 +99,23 @@ const navItems: NavItem[] = [
   },
 ];
 
-function formatNotificationTime(at: string | number): string {
+function formatNotificationTime(
+  at: string | number,
+  t: (key: string, fallback: string, vars?: Record<string, string | number>) => string
+): string {
   const ms = typeof at === 'number' ? at : new Date(at).getTime();
   const minutes = Math.round((clock.now() - ms) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t('shell.just_now', 'just now');
+  if (minutes < 60) return t('shell.min_ago', '{count} min ago', { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return t('shell.hours_ago', '{count} h ago', { count: hours });
   return clock.formatDubaiDate(ms);
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const href = useHref();
-  const language = useLocaleSwitch();
   const t = useT();
-  const pathname = usePathname();
+  const pathname = stripLocale(usePathname() ?? '');
   const router = useRouter();
   const store = useStore;
   const session = store.getState().session;
@@ -121,7 +124,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [, setBellVersion] = useState(0);
 
-  const locale = language.locale;
   const notifications = bellNotifications(session);
   const unread = bellUnreadCount(session);
 
@@ -195,7 +197,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
 
               {isBellOpen && (
-                <div className="absolute right-0 top-full mt-1 w-80 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
+                <div className="absolute end-0 top-full mt-1 w-80 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
                   <div className="px-3 py-2 border-b border-line flex items-center justify-between">
                     <span className="text-sm font-medium text-ink">{t('shell.notifications', 'Notifications')}</span>
                     {unread > 0 && (
@@ -218,9 +220,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             markNotificationRead(session.userId, n.id);
                             setBellVersion(v => v + 1);
                             setIsBellOpen(false);
-                            if (n.href) router.push(n.href);
+                            if (n.href) router.push(href(n.href));
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-paper-2 transition-colors flex items-start gap-2"
+                          className="w-full text-start px-3 py-2 hover:bg-paper-2 transition-colors flex items-start gap-2"
                         >
                           <span
                             className={n.read ? 'w-1.5 h-1.5 rounded-full mt-1.5 bg-line' : 'w-1.5 h-1.5 rounded-full mt-1.5 bg-red'}
@@ -229,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             <span className={n.read ? 'text-xs text-grey-500 block' : 'text-xs text-ink block'}>
                               {n.text}
                             </span>
-                            <span className="text-[11px] text-grey-500">{formatNotificationTime(n.at)}</span>
+                            <span className="text-[11px] text-grey-500">{formatNotificationTime(n.at, t)}</span>
                           </span>
                         </button>
                       ))}
@@ -252,13 +254,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="hidden lg:inline">{session.user.name}</span>
                 <span className="text-grey-500">·</span>
                 <span className="text-grey-500 text-xs">{roleLabel(session.user.role, t)}</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ml-1 text-grey-500">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ms-1 text-grey-500">
                   <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
+                <div className="absolute end-0 top-full mt-1 w-56 bg-surface border border-line rounded-lg shadow-lg overflow-hidden z-50">
                   {/* User info */}
                   <div className="px-3 py-2 border-b border-line">
                     <div className="text-sm font-medium text-ink">{session.user.name}</div>
@@ -268,17 +270,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {/* Menu items */}
                   <div className="py-1">
                     {/* Language */}
-                    <button
-                      onClick={() => router.push(language.href)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1"/>
-                        <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3.5 3.5l1.5 1.5M9.5 9.5l1.5 1.5M3.5 10.5l1.5-1.5M9.5 4.5l1.5-1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                      </svg>
-                      {t('shell.language', 'Language')}
-                      <span className="ml-auto text-xs text-grey-500">{locale === 'ar' ? 'عربي / EN' : 'EN / عربي'}</span>
-                    </button>
+                    <LanguageToggle variant="menu" />
 
                     {/* Users & sites (Kasper only) */}
                     {session.isKasper && (
@@ -332,7 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 overflow-hidden">
         {/* Left nav (desktop) */}
         {!showMobileNav && (
-          <nav className="w-56 bg-surface border-r border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
+          <nav className="w-56 bg-surface border-e border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
             <div className="flex flex-col gap-0.5 p-2">
               {visibleNavItems.map(item => {
                 const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
@@ -343,12 +335,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className={clsx(
                       'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-yellow/10 text-ink border-l-2 border-yellow border-r-0 -ml-[1px]'
+                        ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
                         : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
                     )}
                   >
                     {item.icon}
-                    {item.label}
+                    {t(item.labelKey, item.label)}
                   </Link>
                 );
               })}
@@ -362,7 +354,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={clsx(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                     pathname === '/app/settings'
-                      ? 'bg-yellow/10 text-ink border-l-2 border-yellow border-r-0 -ml-[1px]'
+                      ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
                       : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
                   )}
                 >
@@ -379,7 +371,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile bottom nav */}
         {showMobileNav && (
-          <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-line z-40 flex lg:hidden overflow-x-auto">
+          <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-line z-40 flex lg:hidden overflow-x-auto">
             <div className="flex w-full">
               {visibleNavItems.slice(0, 5).map(item => {
                 const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href.replace('/app/', '/app/')));

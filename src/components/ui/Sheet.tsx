@@ -66,8 +66,8 @@ export function Sheet({
         className={clsx(
           'relative flex flex-col bg-surface shadow-2xl',
           widthStyles[width],
-          isRight ? 'flex-shrink-0 ml-auto transition-transform duration-200' : '',
-          isLeft ? 'flex-shrink-0 mr-auto transition-transform duration-200' : '',
+          isRight ? 'flex-shrink-0 ms-auto transition-transform duration-200' : '',
+          isLeft ? 'flex-shrink-0 me-auto transition-transform duration-200' : '',
           isBottom ? 'flex-shrink-0 mx-auto mt-16 w-full max-w-lg transition-transform duration-200' : '',
           open ? (isRight ? 'translate-x-0' : isLeft ? 'translate-x-0' : 'translate-y-0') : '',
           className

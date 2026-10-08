@@ -1,24 +1,30 @@
 // Arabic localisation tests (spec §14).
 //
 // Three things are checked here:
-//   1. the pure helpers (prefix, lookup, fallback, interpolation),
+//   1. the pure helpers (prefix, lookup, fallback, interpolation, cookie),
 //   2. every t() key used anywhere in the customer screens exists in ar.json,
 //   3. the Arabic copy follows the house rules — Latin digits, no placeholders
 //      left behind, and the file carries the "Draft — needs native review" mark.
 
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   ARABIC_DICTIONARY,
   ARABIC_META,
+  LANG_COOKIE,
   localeFromPath,
+  localeFromCookie,
+  localeCookie,
   localisePath,
+  resolveLocale,
   stripLocale,
   translate,
 } from './dictionary';
 import { LocaleProvider, useT } from './index';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SourceLabel } from '@/components/ui/SourceLabel';
 
 const ROOT = resolve(__dirname, '../..');
 const ARABIC_DIGITS = /[\u0660-\u0669\u06F0-\u06F9]/;
@@ -71,6 +77,35 @@ describe('locale routing', () => {
   it('keeps the console and the developer tools English', () => {
     expect(localisePath('ar', '/console/billing')).toBe('/console/billing');
     expect(localisePath('ar', '/dev/bookings')).toBe('/dev/bookings');
+    expect(resolveLocale({ pathname: '/console', cookie: `${LANG_COOKIE}=ar` })).toBe('en');
+    expect(resolveLocale({ pathname: '/dev/seed', header: 'ar' })).toBe('en');
+    expect(resolveLocale({ pathname: '/ar/console/tenants' })).toBe('en');
+  });
+});
+
+describe('kasper_lang cookie', () => {
+  it('parses the cookie and ignores a missing one', () => {
+    expect(localeFromCookie(`${LANG_COOKIE}=ar`)).toBe('ar');
+    expect(localeFromCookie(`other=1; ${LANG_COOKIE}=en`)).toBe('en');
+    expect(localeFromCookie('session=abc')).toBeNull();
+    expect(localeFromCookie(null)).toBeNull();
+  });
+
+  it('writes a Path=/ cookie the toggle can round-trip', () => {
+    const cookie = localeCookie('ar');
+    expect(cookie).toContain(`${LANG_COOKIE}=ar`);
+    expect(cookie).toMatch(/Path=\//);
+    expect(localeFromCookie(cookie)).toBe('ar');
+  });
+
+  it('lets the cookie select Arabic on unprefixed customer routes', () => {
+    expect(resolveLocale({ pathname: '/app', cookie: `${LANG_COOKIE}=ar` })).toBe('ar');
+    expect(resolveLocale({ pathname: '/t/abc', cookie: `${LANG_COOKIE}=ar` })).toBe('ar');
+    expect(resolveLocale({ pathname: '/app', cookie: `${LANG_COOKIE}=en` })).toBe('en');
+  });
+
+  it('lets the /ar prefix win over an English cookie (shareable links)', () => {
+    expect(resolveLocale({ pathname: '/ar/app', cookie: `${LANG_COOKIE}=en` })).toBe('ar');
   });
 });
 
@@ -104,6 +139,14 @@ describe('Arabic dictionary', () => {
   it('uses Latin digits everywhere', () => {
     const offenders = arabicValues(ARABIC_DICTIONARY).filter(value => ARABIC_DIGITS.test(value));
     expect(offenders).toEqual([]);
+  });
+
+  it('keeps product words in Latin', () => {
+    expect(translate('ar', 'common.source.ecu', 'ECU')).toBe('ECU');
+    expect(translate('ar', 'common.source.ecu_all_can300', 'ECU (ALL-CAN300)')).toContain('ALL-CAN300');
+    expect(translate('ar', 'maintenance.excel', 'Excel')).toBe('Excel');
+    expect(translate('ar', 'maintenance.pdf', 'PDF')).toBe('PDF');
+    expect(translate('ar', 'cost.excel', 'Excel')).toBe('Excel');
   });
 
   it('has no left-over English placeholder braces it cannot fill', () => {
@@ -149,12 +192,21 @@ describe('Arabic dictionary', () => {
       'certificates',
       'settings',
       'tracking',
+      'maintenance',
+      'cost',
     ]) {
       expect(lookupKey(group)).toBeTruthy();
     }
     for (const group of ['users', 'sites', 'assets']) {
       expect(lookupKey(`settings.${group}`)).toBeTruthy();
     }
+  });
+
+  it('exposes the language toggle on the demo bar and the user menu', () => {
+    const demo = readFileSync(join(ROOT, 'src/components/demo/DemoBar.tsx'), 'utf8');
+    const shell = readFileSync(join(ROOT, 'src/components/layout/AppShell.tsx'), 'utf8');
+    expect(demo).toMatch(/LanguageToggle/);
+    expect(shell).toMatch(/LanguageToggle/);
   });
 });
 
@@ -179,5 +231,55 @@ describe('useT', () => {
       </LocaleProvider>
     );
     expect(screen.getByText('Alerts')).toBeTruthy();
+  });
+});
+
+describe('RTL document', () => {
+  it('sets lang and dir on the root element', async () => {
+    const { unmount } = render(
+      <LocaleProvider locale="ar">
+        <Greeting />
+      </LocaleProvider>
+    );
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe('ar');
+      expect(document.documentElement.dir).toBe('rtl');
+    });
+    unmount();
+
+    render(
+      <LocaleProvider locale="en">
+        <Greeting />
+      </LocaleProvider>
+    );
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe('en');
+      expect(document.documentElement.dir).toBe('ltr');
+    });
+  });
+});
+
+describe('StatusBadge and SourceLabel', () => {
+  it('read Arabic inside an Arabic provider', () => {
+    const { unmount } = render(
+      <LocaleProvider locale="ar">
+        <StatusBadge status="live" />
+        <SourceLabel source="Estimated" />
+        <SourceLabel source="Not measured" />
+      </LocaleProvider>
+    );
+    expect(screen.getByText('مباشر')).toBeTruthy();
+    expect(screen.getByText('تقديري')).toBeTruthy();
+    expect(screen.getByText('غير مقيس')).toBeTruthy();
+    unmount();
+
+    render(
+      <LocaleProvider locale="en">
+        <StatusBadge status="live" />
+        <SourceLabel source="Estimated" />
+      </LocaleProvider>
+    );
+    expect(screen.getByText('Live')).toBeTruthy();
+    expect(screen.getByText('Estimated')).toBeTruthy();
   });
 });

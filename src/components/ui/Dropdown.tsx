@@ -45,7 +45,7 @@ export function Dropdown({ open, onClose, align = 'left', width = '280px', class
         ref={ref}
         className={clsx(
           'relative bg-surface border border-line shadow-xl rounded-xl overflow-hidden',
-          align === 'left' ? 'left-0' : 'right-0',
+          align === 'left' ? 'start-0' : 'end-0',
           'top-full mt-1',
           width
         )}
@@ -118,7 +118,7 @@ export function Combobox({ options, selected, onSelect, placeholder = 'Select…
               onClick={() => onSelect(opt.value)}
               disabled={opt.disabled}
               className={clsx(
-                'w-full text-left px-3 py-2 text-sm hover:bg-paper-2 transition-colors',
+                'w-full text-start px-3 py-2 text-sm hover:bg-paper-2 transition-colors',
                 'disabled:opacity-40 disabled:cursor-not-allowed',
                 selected === opt.value && 'bg-yellow/10 text-ink font-medium'
               )}
