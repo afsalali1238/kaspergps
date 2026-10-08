@@ -11,6 +11,7 @@ import {
   getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
 } from '@/server/muc';
 import type { MucVerifyStatus } from '@/server/muc';
+import { downloadMucPdf } from '@/lib/muc-pdf';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
@@ -236,14 +237,22 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         </div>
       )}
 
-      <a
-        className="text-xs text-yellow-600 hover:text-yellow font-medium"
-        href={`/verify/${encodeURIComponent(muc.number)}`}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open the public verify page
-      </a>
+      <div className="flex items-center gap-4">
+        <button
+          className="text-xs text-yellow-600 hover:text-yellow font-medium"
+          onClick={() => { void downloadMucPdf(muc); }}
+        >
+          {t('certificates.download_pdf', 'Download PDF')}
+        </button>
+        <a
+          className="text-xs text-yellow-600 hover:text-yellow font-medium"
+          href={`/verify/${encodeURIComponent(muc.number)}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t('certificates.open_verify', 'Open the public verify page')}
+        </a>
+      </div>
 
       <div className="flex justify-end">
         <Button variant="secondary" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>

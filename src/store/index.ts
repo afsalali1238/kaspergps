@@ -81,6 +81,13 @@ export const useStore = create<Store>()(
         demoSwitches: state.demoSwitches,
         clockOffsetMs: state.clockOffsetMs,
       }),
+      // Re-apply the persisted demo clock offset to the simulated clock, so a
+      // refresh keeps demo time (spec: reload persistence).
+      onRehydrateStorage: () => (state) => {
+        if (state && typeof state.clockOffsetMs === 'number' && state.clockOffsetMs !== 0) {
+          clock.setOffsetMs(state.clockOffsetMs);
+        }
+      },
     }
   )
 );
