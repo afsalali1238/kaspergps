@@ -21,6 +21,9 @@ export default function KasperTeamPage() {
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'kasper_admin' | 'kasper_ops'>('kasper_admin');
 
   const staff = useMemo(() =>
     seed.users.filter(u => u.role === 'kasper_admin' || u.role === 'kasper_ops'),
@@ -69,6 +72,8 @@ export default function KasperTeamPage() {
               <label className="text-xs text-grey-500 font-medium">Name</label>
               <input
                 type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 placeholder="Full name"
               />
@@ -77,19 +82,34 @@ export default function KasperTeamPage() {
               <label className="text-xs text-grey-500 font-medium">Email</label>
               <input
                 type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 placeholder="staff@kaspergps.com"
               />
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">Role</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+              <select
+                value={role}
+                onChange={e => setRole(e.target.value as 'kasper_admin' | 'kasper_ops')}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              >
                 <option value="kasper_admin">Kasper Admin</option>
                 <option value="kasper_ops">Kasper Ops</option>
               </select>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button size="sm" onClick={() => { setShowForm(false); showToast('Staff added.'); }}>
+              <Button size="sm" onClick={() => {
+                setShowForm(false);
+                const msg = name.trim()
+                  ? `${name.trim()} added as ${roleLabel(role)}.`
+                  : 'Staff added.';
+                showToast(msg);
+                setName('');
+                setEmail('');
+                setRole('kasper_admin');
+              }}>
                 Save
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>

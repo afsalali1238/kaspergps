@@ -41,6 +41,25 @@ export default function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  const exportCsv = () => {
+    const header = 'When,Person,Tenant,Action,Detail';
+    const rows = filtered.map(e => {
+      const when = typeof e.at === 'number' ? new Date(e.at).toISOString() : e.at;
+      const detail = `"${String(e.detail).replace(/"/g, '""')}"`;
+      return `${when},"${e.person}","${e.tenant}",${e.action},${detail}`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!session || !session.isKasper) {
     return (
       <div className="text-center py-8">
@@ -171,7 +190,7 @@ export default function AuditLogPage() {
           <Button variant="secondary" size="sm" onClick={() => { setPerson(''); setTenant(''); setAction(''); setDateFrom(''); setDateTo(''); }}>
             Clear filters
           </Button>
-          <Button variant="secondary" size="sm">Export CSV</Button>
+          <Button variant="secondary" size="sm" onClick={exportCsv}>Export CSV</Button>
         </div>
       </div>
 

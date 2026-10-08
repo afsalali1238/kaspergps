@@ -42,6 +42,16 @@ export default function AssetsPage() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [_toast, setToast] = useState<string | null>(null);
+  const [createCode, setCreateCode] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createType, setCreateType] = useState('');
+  const [createClass, setCreateClass] = useState('truck');
+  const [createMake, setCreateMake] = useState('');
+  const [createModel, setCreateModel] = useState('');
+  const [createYear, setCreateYear] = useState('');
+  const [createPlate, setCreatePlate] = useState('');
+  const [createSite, setCreateSite] = useState('');
+  const [createTenant, setCreateTenant] = useState('');
 
   const showToast = (message: string) => {
     setToast(message);
@@ -149,6 +159,8 @@ export default function AssetsPage() {
               <label className="text-xs text-grey-500 font-medium">Code</label>
               <input
                 type="text"
+                value={createCode}
+                onChange={e => setCreateCode(e.target.value)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 placeholder="FB-12"
               />
@@ -157,6 +169,8 @@ export default function AssetsPage() {
               <label className="text-xs text-grey-500 font-medium">Name</label>
               <input
                 type="text"
+                value={createName}
+                onChange={e => setCreateName(e.target.value)}
                 className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                 placeholder="Flatbed trailer truck"
               />
@@ -166,13 +180,19 @@ export default function AssetsPage() {
                 <label className="text-xs text-grey-500 font-medium">Type</label>
                 <input
                   type="text"
+                  value={createType}
+                  onChange={e => setCreateType(e.target.value)}
                   className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   placeholder="Truck"
                 />
               </div>
               <div>
                 <label className="text-xs text-grey-500 font-medium">Class</label>
-                <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                <select
+                  value={createClass}
+                  onChange={e => setCreateClass(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                >
                   <option value="truck">Truck</option>
                   <option value="light_vehicle">Light vehicle</option>
                   <option value="plant">Plant</option>
@@ -186,6 +206,8 @@ export default function AssetsPage() {
                 <label className="text-xs text-grey-500 font-medium">Make</label>
                 <input
                   type="text"
+                  value={createMake}
+                  onChange={e => setCreateMake(e.target.value)}
                   className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   placeholder="Mercedes"
                 />
@@ -194,6 +216,8 @@ export default function AssetsPage() {
                 <label className="text-xs text-grey-500 font-medium">Model</label>
                 <input
                   type="text"
+                  value={createModel}
+                  onChange={e => setCreateModel(e.target.value)}
                   className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   placeholder="Actros"
                 />
@@ -204,6 +228,8 @@ export default function AssetsPage() {
                 <label className="text-xs text-grey-500 font-medium">Year</label>
                 <input
                   type="number"
+                  value={createYear}
+                  onChange={e => setCreateYear(e.target.value)}
                   className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   placeholder="2017"
                 />
@@ -212,6 +238,8 @@ export default function AssetsPage() {
                 <label className="text-xs text-grey-500 font-medium">Plate or serial</label>
                 <input
                   type="text"
+                  value={createPlate}
+                  onChange={e => setCreatePlate(e.target.value)}
                   className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                   placeholder="AK-1234"
                 />
@@ -219,7 +247,12 @@ export default function AssetsPage() {
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">Home site</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+              <select
+                value={createSite}
+                onChange={e => setCreateSite(e.target.value)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              >
+                <option value="">Select a site</option>
                 {seed.sites.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -227,7 +260,12 @@ export default function AssetsPage() {
             </div>
             <div>
               <label className="text-xs text-grey-500 font-medium">Owner tenant</label>
-              <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+              <select
+                value={createTenant}
+                onChange={e => setCreateTenant(e.target.value)}
+                className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+              >
+                <option value="">Select a tenant</option>
                 {tenantOptions.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -235,7 +273,21 @@ export default function AssetsPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setShowCreateForm(false)}>Cancel</Button>
-              <Button onClick={() => { setShowCreateForm(false); showToast('Asset created'); }}>Create</Button>
+              <Button onClick={() => {
+                setShowCreateForm(false);
+                const label = createCode.trim() || createName.trim() ? `“${createCode.trim() || createName.trim()}” created.` : 'Asset created.';
+                showToast(label);
+                setCreateCode('');
+                setCreateName('');
+                setCreateType('');
+                setCreateClass('truck');
+                setCreateMake('');
+                setCreateModel('');
+                setCreateYear('');
+                setCreatePlate('');
+                setCreateSite('');
+                setCreateTenant('');
+              }}>Create</Button>
             </div>
           </div>
         </div>
@@ -281,16 +333,25 @@ export default function AssetsPage() {
                   <Link href={`/app/assets/${asset.id}`} className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
                     View
                   </Link>
-                  <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
+                  <button
+                    className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+                    onClick={() => showToast(`Editing ${asset.code} — use the detail page form.`)}
+                  >
                     Edit
                   </button>
                   {!asset.retiredAt && (
-                    <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
+                    <button
+                      className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+                      onClick={() => showToast(`Transfer dialog for ${asset.code} — pick a new tenant and site.`)}
+                    >
                       Transfer
                     </button>
                   )}
                   {!asset.retiredAt && (
-                    <button className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20">
+                    <button
+                      className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20"
+                      onClick={() => showToast(`${asset.code} marked as retired.`)}
+                    >
                       Retire
                     </button>
                   )}
