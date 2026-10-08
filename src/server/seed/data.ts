@@ -719,8 +719,8 @@ export const reportSchedules: ReportSchedule[] = [
 // ── Report runs ────────────────────────────────────────────────────────────────
 
 export const reportRuns: ReportRun[] = [
-  { id: 'rr-001', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(7)).toISOString(), to: new Date(ANCHOR_MS).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(7)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-29_to_2026-10-06.pdf' },
-  { id: 'rr-002', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(14)).toISOString(), to: new Date(daysAgo(7)).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(14)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-22_to_2026-09-29.pdf' },
+  { id: 'rr-001', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(7)).toISOString(), to: new Date(ANCHOR_MS).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(7)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-29_to_2026-10-06.pdf', assetIds: ['a-ex04', 'a-wl03', 'a-bd02'] },
+  { id: 'rr-002', userId: 'u-khalid', reportType: 'Trip & Mileage', scope: 'Project Alpha labels', from: new Date(daysAgo(14)).toISOString(), to: new Date(daysAgo(7)).toISOString(), format: 'pdf', createdAt: new Date(daysAgo(14)).toISOString(), scheduleId: 'rs-kh01', status: 'ready', fileName: 'Kasper_TripMileage_Weekly_2026-09-22_to_2026-09-29.pdf', assetIds: ['a-ex04', 'a-wl03', 'a-bd02'] },
 ];
 
 // ── Notifications (bell) ───────────────────────────────────────────────────────

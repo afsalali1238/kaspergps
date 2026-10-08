@@ -6,10 +6,12 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasRole } from '@/server/capabilities';
 import {
   getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
 } from '@/server/muc';
 import type { MucVerifyStatus } from '@/server/muc';
+import { downloadMucPdf } from '@/lib/muc-pdf';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
@@ -235,14 +237,22 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         </div>
       )}
 
-      <a
-        className="text-xs text-yellow-600 hover:text-yellow font-medium"
-        href={`/verify/${encodeURIComponent(muc.number)}`}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open the public verify page
-      </a>
+      <div className="flex items-center gap-4">
+        <button
+          className="text-xs text-yellow-600 hover:text-yellow font-medium"
+          onClick={() => { void downloadMucPdf(muc); }}
+        >
+          {t('certificates.download_pdf', 'Download PDF')}
+        </button>
+        <a
+          className="text-xs text-yellow-600 hover:text-yellow font-medium"
+          href={`/verify/${encodeURIComponent(muc.number)}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t('certificates.open_verify', 'Open the public verify page')}
+        </a>
+      </div>
 
       <div className="flex justify-end">
         <Button variant="secondary" size="sm" onClick={onClose}>{t('common.close', 'Close')}</Button>
@@ -301,8 +311,8 @@ export default function CertificatesPage() {
 
   if (!session) return null;
 
-  const isKasperAdmin = session.isKasper && session.role === 'kasper_admin';
-  const isTenantAdmin = session.role === 'tenant_admin';
+  const isKasperAdmin = hasRole(session, 'kasper_admin');
+  const isTenantAdmin = hasRole(session, 'tenant_admin');
   const canIssue = isKasperAdmin || isTenantAdmin;
 
   const myTier3 = tier3Assets.filter(a =>

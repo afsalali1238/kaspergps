@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
+import { hasRole } from '@/server/capabilities';
 
 interface NavItem {
   href: string;
@@ -149,7 +150,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             ))}
           </div>
           <div className="p-4 text-[11px] text-grey-500 border-t border-line">
-            Signed in as {session.user.name} · {session.role === 'kasper_admin' ? 'Kasper Admin' : 'Kasper Ops'}
+            Signed in as {session.user.name} · {hasRole(session, 'kasper_admin') ? 'Kasper Admin' : 'Kasper Ops'}
           </div>
         </nav>
 

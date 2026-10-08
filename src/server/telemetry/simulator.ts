@@ -544,7 +544,7 @@ export function injectGNFuelDrop(readings: Reading[]): Reading[] {
   return [...readings, dropReading];
 }
 
-// ── Replay batch for FB-14 (20 readings, device time 6h before anchor) ─────────
+// ── Replay batch for FB-14 (20 readings, tracker time 6h before anchor) ────────
 
 export function getFB14ReplayBatch(): Reading[] {
   const readings: Reading[] = [];

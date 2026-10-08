@@ -5,9 +5,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
-import { anyAssetHasFeature, visibleAssetIds } from '@/server/access';
+import { anyAssetHasFeature, visibleAssetIds, hasCapability } from '@/server/access';
+import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
+import { bellAlerts } from '@/server/alerts';
+import { SearchCommand } from '@/components/layout/SearchCommand';
 import * as clock from '@/lib/clock';
 import type { Tenant } from '@/domain/types';
 import { useT, useHref, stripLocale } from '@/i18n';
@@ -18,7 +21,7 @@ interface NavItem {
   /** ar.json key; `label` is the English fallback. */
   labelKey: string;
   label: string;
-  capability: string;
+  capability: Capability;
   phase: 'day_one' | 'phase2' | 'later';
   featureKey?: string;
   icon: React.ReactNode;
@@ -125,12 +128,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [, setBellVersion] = useState(0);
 
   const notifications = bellNotifications(session);
+  const openAlerts = session ? bellAlerts(session, store.getState().demoSwitches.phase) : [];
   const unread = bellUnreadCount(session);
+  const bellCount = unread + openAlerts.length;
 
   const currentPhase = store.getState().demoSwitches.phase;
 
   const visibleNavItems = navItems.filter(item => {
-    const hasCap = session ? session.role === 'kasper_admin' || session.role === 'kasper_ops' || (item.capability === 'asset.view') : true;
+    // §11 nav rule: each item appears only if the user has the capability.
+    const hasCap = session ? hasCapability(session, item.capability) : true;
     if (!hasCap) return false;
     if (item.phase === 'phase2' && currentPhase === 'day_one') return false;
     if (item.phase === 'later' && currentPhase !== 'later') return false;
@@ -173,10 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-2">
           {/* Search */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-paper border border-line rounded-lg px-2.5 py-1.5 text-sm text-grey-500 w-48">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1"/><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>
-            {t('shell.search_placeholder', 'Type to search assets…')}
-          </div>
+          <SearchCommand session={session} />
 
           {/* Notifications bell */}
           {session && (
@@ -189,9 +192,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M8 1a4 4 0 00-4 4v4.5a1 1 0 001 1h6.5a1 1 0 001-1V5a4 4 0 00-4-4zm0 1.5a2.5 2.5 0 012.5 2.5v3.5a1 1 0 01-1 1H6a1 1 0 01-1-1V5a2.5 2.5 0 012.5-2.5zm1.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
-                {unread > 0 && (
+                {bellCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                    {unread}
+                    {bellCount}
                   </span>
                 )}
               </button>
@@ -209,7 +212,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </button>
                     )}
                   </div>
-                  {notifications.length === 0 ? (
+                  {openAlerts.length > 0 && (
+                    <div className="max-h-64 overflow-y-auto divide-y divide-line">
+                      {openAlerts.map(a => (
+                        <button
+                          key={a.id}
+                          onClick={() => {
+                            setIsBellOpen(false);
+                            if (a.assetId) router.push(href(`/app/assets/${a.assetId}`));
+                          }}
+                          className="w-full text-start px-3 py-2 hover:bg-paper-2 transition-colors"
+                        >
+                          <span className="text-xs text-ink block">{a.typeWords}</span>
+                          <span className="text-[11px] text-grey-500">
+                            {a.assetCode} · {t(`alerts.types.${a.type}`, a.typeLabel)}
+                            {a.siteName ? ` · ${a.siteName}` : ''}
+                          </span>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => { setIsBellOpen(false); router.push(href('/app/alerts')); }}
+                        className="w-full text-start px-3 py-2 text-xs text-yellow-dark font-medium hover:bg-paper-2"
+                      >
+                        {t('shell.view_all', 'View all alerts')}
+                      </button>
+                    </div>
+                  )}
+                  {notifications.length === 0 && openAlerts.length === 0 ? (
                     <div className="px-3 py-4 text-xs text-grey-500">{t('shell.nothing_yet', 'Nothing yet.')}</div>
                   ) : (
                     <div className="max-h-80 overflow-y-auto divide-y divide-line">

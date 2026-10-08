@@ -42,6 +42,10 @@ export default [
           message: 'Use "Kasper" not "Dozr".',
         },
         {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Use clock.now(). See src/lib/clock.ts.',
+        },
+        {
           selector: "CallExpression[callee.name='Date'][arguments.length=0]",
           message: 'Use clock.now(). See src/lib/clock.ts.',
         },
@@ -52,6 +56,10 @@ export default [
         {
           selector: 'BinaryExpression[operator="==="][left.name="role"]',
           message: 'Use can(session, cap) instead of role === comparisons.',
+        },
+        {
+          selector: 'BinaryExpression[operator="==="][left.property.name="role"]',
+          message: 'Use can(session, cap) / hasRole() instead of role === comparisons.',
         },
       ],
       // Allow underscore-prefixed args/vars (intentionally unused params)
@@ -70,10 +78,13 @@ export default [
     },
   },
 
-  // Allow role === in server-side modules (capabilities, capability-reasons, seed only).
-  // access.ts and api.ts must use clock.now() — they are NOT exempt from the Date ban.
+  // Allow role comparisons only in the role→capability and role→words maps.
+  // (capability-reasons.ts is mandated by the spec to map roles to plain-word
+  // reason text — see reviews/STATUS-REVIEW.md §7.5.) Test files build sessions
+  // the way the session builder does, so they share the allowance; the
+  // architecture tests grep non-test sources.
   {
-    files: ['src/server/capabilities.ts', 'src/server/capability-reasons.ts', 'src/server/seed/**/*.ts'],
+    files: ['src/server/capabilities.ts', 'src/server/capability-reasons.ts', 'src/server/seed/**/*.ts', '**/*.test.ts', '**/*.test.tsx', 'tests/**/*.ts'],
     rules: {
       'no-restricted-syntax': 'off',
     },

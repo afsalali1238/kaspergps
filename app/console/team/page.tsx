@@ -5,6 +5,7 @@ import { Button, Badge, EmptyState } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
+import { hasRole, isKasperStaff } from '@/server/capabilities';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -23,11 +24,11 @@ export default function KasperTeamPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const staff = useMemo(() =>
-    seed.users.filter(u => u.role === 'kasper_admin' || u.role === 'kasper_ops'),
+    seed.users.filter(u => isKasperStaff(u.role)),
     []
   );
 
-  const activeAdmins = staff.filter(u => u.role === 'kasper_admin' && u.status === 'active');
+  const activeAdmins = staff.filter(u => hasRole(u, 'kasper_admin') && u.status === 'active');
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -118,7 +119,7 @@ export default function KasperTeamPage() {
                 <tr key={u.id} className="bg-paper hover:bg-paper-2">
                   <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
                   <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
-                  <td className="px-3 py-2 border-b border-line"><Badge variant={u.role === 'kasper_admin' ? 'default' : 'grey'}>{roleLabel(u.role)}</Badge></td>
+                  <td className="px-3 py-2 border-b border-line"><Badge variant={hasRole(u, 'kasper_admin') ? 'default' : 'grey'}>{roleLabel(u.role)}</Badge></td>
                   <td className="px-3 py-2 border-b border-line">
                     <Badge variant={u.status === 'active' ? 'green' : 'yellow'}>{u.status}</Badge>
                   </td>

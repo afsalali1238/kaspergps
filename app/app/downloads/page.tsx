@@ -1,123 +1,138 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import {
-  Button, Badge, EmptyState,
-} from '@/components/ui';
+// Downloads (spec §11.13): every report you generate is listed. "Download
+// again" regenerates from the same parameters and re-checks permission now — if
+// you lost access it says so and creates no file. Each user sees only their own
+// runs.
+
+import React, { useMemo, useState } from 'react';
+import clsx from 'clsx';
+import { Button, Badge, EmptyState } from '@/components/ui';
 import { useStore } from '@/store';
-import { isAssetVisible } from '@/server/access';
+import { reportRunsFor, regenerateReport, deleteReportRun } from '@/server/reports';
+import { runDueSchedules } from '@/server/schedules';
+import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
+import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
-
-interface Download {
-  id: string;
-  name: string;
-  scope: string;
-  period: { from: string; to: string };
-  format: 'pdf' | 'excel';
-  generatedAt: string;
-  bySchedule: boolean;
-  size: string;
-  assetIds: string[];
-}
-
-const DOWNLOADS: Download[] = [
-  {
-    id: 'd-1',
-    name: 'Trip & Mileage — EX-04',
-    scope: 'Single asset',
-    period: { from: '2026-10-01', to: '2026-10-07' },
-    format: 'excel',
-    generatedAt: '2026-10-07 10:00',
-    bySchedule: false,
-    size: '45 KB',
-    assetIds: ['a-ex04'],
-  },
-  {
-    id: 'd-2',
-    name: 'Location history — Fleet',
-    scope: 'Multiple assets',
-    period: { from: '2026-10-01', to: '2026-10-07' },
-    format: 'pdf',
-    generatedAt: '2026-10-07 11:30',
-    bySchedule: true,
-    size: '120 KB',
-    assetIds: ['a-ex04', 'a-ex07', 'a-cr02'],
-  },
-  {
-    id: 'd-3',
-    name: 'Operating hours — Dubai Hills',
-    scope: 'Site',
-    period: { from: '2026-10-01', to: '2026-10-07' },
-    format: 'excel',
-    generatedAt: '2026-10-07 14:00',
-    bySchedule: false,
-    size: '32 KB',
-    assetIds: ['a-ex04', 'a-ex07'],
-  },
-];
 
 export default function DownloadsPage() {
   const t = useT();
   const store = useStore;
   const session = store.getState().session;
+  const [notice, setNotice] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [, setTick] = useState(0);
 
-  const visibleDownloads = useMemo(() => {
-    if (!session) return [];
-    return DOWNLOADS.filter(d => {
-      if (!session.isKasper) {
-        return d.assetIds.every(aid => isAssetVisible(session, aid));
-      }
-      return true;
-    });
+  // Any schedule whose clock time has passed produces runs now.
+  useMemo(() => {
+    if (session) runDueSchedules();
   }, [session]);
+
+  const runs = useMemo(() => (session ? reportRunsFor(session) : []), [session]);
 
   if (!session) return null;
 
+  const handleDownloadAgain = (runId: string) => {
+    setNotice(null);
+    setBlocked(null);
+    const result = regenerateReport(session, runId);
+    if (!result.ok || !result.data) {
+      setBlocked(result.error ?? t('downloads.failed', 'The report could not be rebuilt.'));
+      return;
+    }
+    const { meta, tables, run } = result.data;
+    if (run.format === 'pdf') downloadPdf(meta, tables as ExportTable[]);
+    else downloadXlsx(meta, tables as ExportTable[]);
+    setNotice(run.fileName ?? t('downloads.ready', 'Report ready.'));
+    setTick(x => x + 1);
+  };
+
+  const handleDelete = (runId: string) => {
+    setNotice(null);
+    setBlocked(null);
+    deleteReportRun(session, runId);
+    setTick(x => x + 1);
+  };
+
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-ink">{t('downloads.title', 'Downloads')}</h1>
         <p className="text-sm text-grey-500 mt-1">
-          {t('downloads.subtitle', 'Your generated reports and downloads.')}
+          {t('downloads.subtitle', 'Reports you generate appear here. Files rebuild from the same parameters.')}
         </p>
       </div>
 
-      <div className="space-y-2">
-        {visibleDownloads.map(download => (
-          <div key={download.id} className="bg-surface border border-line rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-ink">{download.name}</span>
-                  <Badge variant={download.format === 'pdf' ? 'green' : 'default'}>
-                    {download.format.toUpperCase()}
-                  </Badge>
-                  {download.bySchedule && <Badge variant="grey">{t('downloads.by_schedule', 'By schedule')}</Badge>}
-                </div>
-                <div className="text-sm text-grey-700 mt-1">
-                  {download.scope} · {download.period.from} to {download.period.to}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {t('downloads.generated_at', 'Generated at {at} · {size}', { at: download.generatedAt, size: download.size })}
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="secondary" size="sm" onClick={() => {}}>
-                  {t('common.download_again', 'Download again')}
-                </Button>
-                <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
-                  {t('common.delete', 'Delete')}
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        {visibleDownloads.length === 0 && (
-          <EmptyState
-            title={t('downloads.none', 'No downloads')}
-            description={t('downloads.none_hint', 'Your generated reports will appear here.')}
-          />
-        )}
+      {blocked && (
+        <div className="bg-red/10 border border-red/30 rounded-lg px-4 py-3 text-sm text-red">{blocked}</div>
+      )}
+      {notice && (
+        <div className="bg-green/10 border border-green/30 rounded-lg px-4 py-3 text-sm text-green">{notice}</div>
+      )}
+
+      {runs.length === 0 ? (
+        <EmptyState
+          title={t('downloads.empty', 'Reports you generate appear here.')}
+          description={t('downloads.empty_hint', 'Run a report from the Reports page, or schedule one.')}
+        />
+      ) : (
+        <div className="bg-surface border border-line rounded-lg overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-xs text-grey-500">
+                <th className="px-3 py-2 font-medium">{t('downloads.name', 'Name')}</th>
+                <th className="px-3 py-2 font-medium">{t('downloads.scope', 'Scope')}</th>
+                <th className="px-3 py-2 font-medium">{t('downloads.period', 'Period')}</th>
+                <th className="px-3 py-2 font-medium">{t('downloads.format', 'Format')}</th>
+                <th className="px-3 py-2 font-medium">{t('downloads.generated', 'Generated')}</th>
+                <th className="px-3 py-2 font-medium">{t('downloads.source', 'Source')}</th>
+                <th className="px-3 py-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map(run => (
+                <tr key={run.id} className="border-b border-line last:border-0">
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-ink">{run.reportType}</div>
+                    <div className="text-xs text-grey-500 font-mono">{run.fileName}</div>
+                    {run.status === 'skipped' && (
+                      <Badge variant="yellow">{run.skipReason ?? t('downloads.skipped', 'Skipped')}</Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-grey-700">{run.scope}</td>
+                  <td className="px-3 py-2 text-grey-700 font-mono text-xs">
+                    {String(run.from).slice(0, 10)} → {String(run.to).slice(0, 10)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge variant="grey">{run.format === 'pdf' ? 'PDF' : 'Excel'}</Badge>
+                  </td>
+                  <td className="px-3 py-2 text-grey-700 text-xs">{clock.formatDubaiDateTime(new Date(String(run.createdAt)).getTime())}</td>
+                  <td className="px-3 py-2">
+                    {run.scheduleId
+                      ? <Badge variant="grey">{t('downloads.by_schedule', 'By schedule')}</Badge>
+                      : <span className="text-xs text-grey-500">{t('downloads.by_you', 'By you')}</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-2 justify-end">
+                      {run.status === 'ready' && (
+                        <Button size="sm" variant="secondary" onClick={() => handleDownloadAgain(run.id)}>
+                          {t('downloads.again', 'Download again')}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => handleDelete(run.id)}>
+                        {t('downloads.delete', 'Delete')}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className={clsx('text-xs text-grey-500')}>
+        {t('downloads.recheck_note', 'Download again re-checks permission now. If you lost access to the assets, no file is created.')}
       </div>
     </div>
   );

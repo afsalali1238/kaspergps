@@ -22,8 +22,9 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
 
   if (session.isKasper) return true;
   if (asset.ownerTenantId === session.tenantId) {
-    // Same-tenant assets: tenant admins see all; site users see only at their sites
-    if (session.role === 'tenant_admin') return true;
+    // Same-tenant assets: tenant admins (no sites) see all;
+    // site users see only assets at their sites.
+    if (session.siteIds.length === 0) return true;
     return session.siteIds.includes(asset.homeSiteId);
   }
 
@@ -33,7 +34,7 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
     const now = clock.now();
     if (!(new Date(booking.start).getTime() <= now && now <= getGrantEnd(booking))) return false;
     // Tenant admins with no site restriction see all sites; site users must match a site
-    if (session.role === 'tenant_admin' && session.siteIds.length === 0) return true;
+    if (session.siteIds.length === 0) return true;
     return session.siteIds.includes(booking.renterSiteId!);
   }
 
@@ -89,8 +90,9 @@ export function getRelationship(session: Session, assetId: string): 'kasper' | '
 export function isAssetEditable(session: Session, assetId: string): boolean {
   const rel = getRelationship(session, assetId);
   if (session.isKasper) return rel !== 'none';
-  if (session.role === 'tenant_admin' && rel === 'owner') return true;
-  return false;
+  // Owners' Tenant Admins hold asset.edit (see capabilities matrix);
+  // Site Users and renters never do.
+  return hasCapability(session, 'asset.edit') && rel === 'owner';
 }
 
 // ── Feature visibility ─────────────────────────────────────────────────────────

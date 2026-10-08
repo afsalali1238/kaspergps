@@ -5,6 +5,7 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useStore } from '@/store';
+import { hasRole } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import type { Session, Booking } from '@/domain/types';
@@ -35,7 +36,7 @@ function canModifyBooking(session: Session, booking: Booking): boolean {
   const asset = seed.assets.find(a => a.id === booking.assetId);
   if (!asset) return false;
   if (session.isKasper) return true;
-  if (session.role === 'tenant_admin' && asset.ownerTenantId === session.tenantId) return true;
+  if (hasRole(session, 'tenant_admin') && asset.ownerTenantId === session.tenantId) return true;
   return false;
 }
 

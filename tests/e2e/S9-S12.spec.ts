@@ -2,7 +2,7 @@
 // rented-in asset with a fault code, and forbidden == missing.
 
 import { expect, test } from '@playwright/test';
-import { demo, expectNoText, goTo, NAMES, startScenario, USERS } from './helpers';
+import { demo, expectNoText, goTo, NAMES, startScenario, USERS, viewAs } from './helpers';
 
 test.describe('S9 — Deepa: two sites, a fuel-drop alert', () => {
   test('the alert is visible and Site Users cannot acknowledge', async ({ page }) => {
@@ -59,12 +59,14 @@ test.describe('S12 — Priya: an owner’s asset is not found', () => {
 });
 
 test.describe('alert permissions', () => {
-  test('Khalid (Tenant Admin) can acknowledge, a View as switch keeps it', async ({ page }) => {
+  test('Khalid (Tenant Admin) can acknowledge, and a View as switch keeps it', async ({ page }) => {
+    // Spec §5: the owner's Tenant Admin may acknowledge (open alerts show the button).
     await demo(page, { email: USERS.khalid, on: '/app/alerts' });
-    await page.getByRole('button', { name: 'View as' }).click();
-    await page.getByRole('button', { name: new RegExp('^' + NAMES.omar) }).first().click();
-    await page.waitForURL(/\/app/);
+    await expect(page.getByRole('button', { name: 'Acknowledge' }).first()).toBeVisible();
+
+    // Switching to the other Emirates Tenant Admin keeps the ability.
+    await viewAs(page, NAMES.omar);
     await goTo(page, '/app/alerts');
-    await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Acknowledge' }).first()).toBeVisible();
   });
 });

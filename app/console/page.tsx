@@ -4,9 +4,10 @@ import React from 'react';
 import Link from 'next/link';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
+import { now as clockNow } from '@/lib/clock';
 
 function getClockNow() {
-  return Date.now();
+  return clockNow();
 }
 
 export default function ConsoleOverviewPage() {

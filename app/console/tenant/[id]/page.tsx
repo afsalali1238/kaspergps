@@ -9,6 +9,7 @@ import {
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
+import { hasRole } from '@/server/capabilities';
 import { canManageBookings, extendBooking, shortenBooking } from '@/server/bookings';
 import { deactivateUser, reactivateUser, updateUserName, updateUserRole } from '@/server/team';
 import { suspendTenant, unsuspendTenant, updateTenant } from '@/server/tenants';
@@ -190,7 +191,7 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
   const store = useStore;
   const session = store.getState().session;
   const users = seed.users.filter(u => u.tenantId === tenantId);
-  const activeAdmins = users.filter(u => u.role === 'tenant_admin' && u.status === 'active');
+  const activeAdmins = users.filter(u => hasRole(u, 'tenant_admin') && u.status === 'active');
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [role, setRole] = useState<'tenant_admin' | 'site_user'>('site_user');
@@ -239,8 +240,8 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
                 <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
                 <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
                 <td className="px-3 py-2 border-b border-line">
-                  <Badge variant={u.role === 'tenant_admin' ? 'default' : 'grey'}>
-                    {u.role === 'tenant_admin' ? 'Tenant Admin' : 'Site User'}
+                  <Badge variant={hasRole(u, 'tenant_admin') ? 'default' : 'grey'}>
+                    {hasRole(u, 'tenant_admin') ? 'Tenant Admin' : 'Site User'}
                   </Badge>
                 </td>
                 <td className="px-3 py-2 border-b border-line text-grey-700 text-xs">
@@ -263,7 +264,7 @@ function TenantUsers({ tenantId }: { tenantId: string }) {
                         onClick={() => {
                           setEditing(editing === u.id ? null : u.id);
                           setName(u.name);
-                          setRole(u.role === 'tenant_admin' ? 'tenant_admin' : 'site_user');
+                          setRole(hasRole(u, 'tenant_admin') ? 'tenant_admin' : 'site_user');
                         }}
                       >
                         Edit

@@ -9,10 +9,13 @@ import * as clocklib from '@/lib/clock';
 
 import { ANCHOR_MS } from '@/server/seed/data';
 import { tamperWithMuc } from '@/server/muc';
+import { runDueSchedules } from '@/server/schedules';
+import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { resolveEtaForLink } from '@/server/links';
 import { OFFLINE_AFTER_SEC } from '@/config/thresholds';
 import type { Session } from '@/domain/types';
+import { isKasperStaff } from '@/server/capabilities';
 import { FeaturesPanel } from './FeaturesPanel';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 
@@ -123,7 +126,7 @@ function buildSessionFor(userId: string): Session | null {
     tenantId: user.tenantId,
     siteIds: user.siteIds,
     role: user.role,
-    isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
+    isKasper: isKasperStaff(user.role),
   };
 }
 
@@ -276,6 +279,8 @@ export function DemoBar() {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
+  const walkthrough = useStore(s => s.walkthrough);
+  const walkthroughsDone = useStore(s => s.walkthroughsDone);
 
   const gs = useStore.getState;
   const phase = gs().demoSwitches.phase;
@@ -292,7 +297,7 @@ export function DemoBar() {
 
   // Group users by company
   const usersByCompany = [
-    { name: 'Kasper', users: seed.users.filter(u => u.role === 'kasper_admin' || u.role === 'kasper_ops') },
+    { name: 'Kasper', users: seed.users.filter(u => isKasperStaff(u.role)) },
     { name: 'Al Noor Transport', users: seed.users.filter(u => u.tenantId === 't-alnoor') },
     { name: 'Emirates Earthmovers', users: seed.users.filter(u => u.tenantId === 't-emirates') },
     { name: 'Gulf Lift Rentals', users: seed.users.filter(u => u.tenantId === 't-gulflift') },
@@ -317,6 +322,8 @@ export function DemoBar() {
   const jumpTo = (targetMs: number) => {
     useStore.getState().setClockOffsetMs(targetMs - ANCHOR_MS);
     clocklib.setOffsetMs(targetMs - ANCHOR_MS);
+    // Spec §11.13: schedules whose time passed while the clock moved create runs.
+    runDueSchedules();
     window.dispatchEvent(new CustomEvent('kasper:clock-changed'));
     router.refresh();
   };
@@ -506,6 +513,17 @@ export function DemoBar() {
       {/* Features panel */}
       {featuresOpen && <FeaturesPanel />}
 
+      {/* Guided walkthrough card */}
+      {walkthrough && (
+        <WalkthroughCard
+          scenario={SCENARIOS.find(x => x.id === walkthrough.scenarioId) ?? { id: walkthrough.scenarioId, label: '' }}
+          walkthrough={walkthrough}
+          onSetStep={(stepIndex) => useStore.getState().setWalkthrough({ scenarioId: walkthrough.scenarioId, stepIndex })}
+          onFinish={(id) => useStore.getState().markWalkthroughDone(id)}
+          onDismiss={() => useStore.getState().setWalkthrough(null)}
+        />
+      )}
+
       {/* Scenarios dropdown */}
       <div className="flex-shrink-0 relative">
         <button
@@ -525,21 +543,31 @@ export function DemoBar() {
             <div className="max-h-80 overflow-y-auto p-2 space-y-0.5">
               {orderedScenarios.map(s => {
                 const who = s.user ? seed.users.find(u => u.id === s.user) : null;
+                const notForUser = s.user !== null && s.user !== session?.userId;
+                const done = walkthroughsDone.includes(s.id);
                 return (
                   <button
                     key={s.id}
                     onClick={() => {
                       startScenario(s, router);
+                      useStore.getState().setWalkthrough({ scenarioId: s.id, stepIndex: 0 });
                       setScenariosOpen(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-paper/80 hover:bg-white/5 transition-colors flex items-start gap-2"
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-start gap-2 ${notForUser ? 'opacity-50' : 'text-paper/80'}`}
                   >
-                    <span className="text-yellow/80 font-medium flex-shrink-0 mt-0.5">S{s.id}</span>
+                    <span className="text-yellow/80 font-medium flex-shrink-0 mt-0.5">
+                      S{s.id}{done ? ' ✓' : ''}
+                    </span>
                     <span>
                       {s.label}
                       <span className="block text-[10px] text-paper/40">
                         {who ? `runs as ${who.name}` : 'keeps the current user'}
                       </span>
+                      {notForUser && who && (
+                        <span className="block text-[10px] text-yellow/70">
+                          Not for this user — switch to {who.name.split(' ')[0]} to try this (click to switch)
+                        </span>
+                      )}
                     </span>
                   </button>
                 );

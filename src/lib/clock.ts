@@ -98,6 +98,12 @@ export function formatDubaiDate(ms: number): string {
   });
 }
 
+/** Machine-readable Dubai calendar day (YYYY-MM-DD) — use this for keys, never formatDubaiDate. */
+export function dubaiDateKey(ms: number): string {
+  const d = toZonedTime(new Date(ms), DUBAI_TZ);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function formatDubaiDateTime(ms: number): string {
   return `${formatDubaiDate(ms)} ${formatDubaiTime(ms)}`;
 }

@@ -101,7 +101,7 @@ const ROLE_CAPABILITIES: Record<Role, Capability[]> = {
     'asset.edit',
     'report.run',
     'link.create', 'link.revoke', 'grant.endEarly',
-    'alert.view',
+    'alert.view', 'alert.acknowledge',
     'label.view', 'label.manage',
     'geofence.view', 'geofence.manage',
     'playback.view',
@@ -139,6 +139,19 @@ const COMPANY_CAPABILITIES: Record<Role, Capability[]> = {
 
 export function hasCompanyCapability(session: Session, cap: Capability): boolean {
   return COMPANY_CAPABILITIES[session.role].includes(cap);
+}
+
+// ── Role predicates ───────────────────────────────────────────────────────────
+// Architecture rule 2: role names are only compared in this file (and in the
+// session builder / capability-reasons). Everywhere else uses these helpers or
+// can()/hasCapability().
+
+export function hasRole(user: { role: Role }, ...roles: Role[]): boolean {
+  return roles.includes(user.role);
+}
+
+export function isKasperStaff(role: Role): boolean {
+  return role === 'kasper_admin' || role === 'kasper_ops';
 }
 
 /**

@@ -76,6 +76,11 @@ export async function startScenario(page: Page, id: number): Promise<void> {
   await expect(page.getByText('Guided walkthroughs')).toBeVisible();
   await page.locator('.demo-bar button').filter({ hasText: new RegExp(`^S${id}(?![0-9])`) }).first().click();
   await expect(page.getByText('Guided walkthroughs')).toHaveCount(0);
+  // Starting a scenario also opens its guided walkthrough card — dismiss it so
+  // scenario assertions run against the product UI only.
+  const endTour = page.getByRole('button', { name: 'End tour' });
+  if (await endTour.count()) await endTour.first().click();
+  await expect(page.getByTestId('walkthrough-card')).toHaveCount(0);
 }
 
 /** Open the demo bar's Tools dropdown. */

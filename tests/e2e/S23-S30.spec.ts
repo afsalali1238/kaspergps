@@ -53,12 +53,15 @@ test.describe('S25–S26 — geofences', () => {
 });
 
 test.describe('S27–S28 — playback', () => {
-  test('WT-07 opens its Trips tab with the no-trips fallback', async ({ page }) => {
+  test('WT-07 opens its Trips tab with real detected trips', async ({ page }) => {
     await demo(page, { email: USERS.omar, scenario: 27 });
     await expect(page).toHaveURL(/\/app\/assets\/a-wt07$/);
     await page.getByRole('button', { name: 'Trips' }).click();
     await expect(page.getByText('Trips', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/Trips start when ignition is on/)).toBeVisible();
+    // Real trips with the trip rule spelled out under the table.
+    await expect(page.getByText('Top speed')).toBeVisible();
+    await expect(page.getByText(/km\/h/).first()).toBeVisible();
+    await expect(page.getByText(/A trip starts when ignition is on/)).toBeVisible();
   });
 
   test('a renter’s playback is clipped to the rental window', async ({ page }) => {
@@ -84,7 +87,7 @@ test.describe('S30 — schedules and downloads', () => {
 
     await goTo(page, '/app/downloads');
     await expect(page.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-    await expect(page.getByText(/Download again|No downloads/).first()).toBeVisible();
+    await expect(page.getByText(/Download again|No downloads|Reports you generate appear here/).first()).toBeVisible();
   });
 
   test('the clock preset for the end of EX-04’s rental exists', async ({ page }) => {

@@ -11,6 +11,7 @@ import { seed } from '@/server/seed/data';
 import { recordAudit } from '@/server/audit';
 import { fail, ok } from '@/server/result';
 import type { OpResult } from '@/server/result';
+import { hasCapability } from '@/server/access';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { hasFeature } from '@/domain/features';
 import { MUC_GAP_RULE, MUC_MAX_GAP_H } from '@/config/thresholds';
@@ -184,9 +185,13 @@ export function nextMucNumber(assetCode: string, periodFromMs: number, existing:
 }
 
 function canIssueFor(session: Session, asset: Asset): boolean {
-  if (session.isKasper) return session.role === 'kasper_admin';
-  return session.role === 'tenant_admin' && asset.ownerTenantId === session.tenantId;
+  // muc.issue: Kasper Admin or the asset's owner Tenant Admin (never Kasper Ops).
+  if (!hasCapability(session, 'muc.issue')) return false;
+  if (session.isKasper) return true;
+  return asset.ownerTenantId === session.tenantId;
 }
+
+let mucSeq = 0;
 
 export async function issueMuc(session: Session, input: IssueMucInput): Promise<OpResult<Muc>> {
   const asset = seed.assets.find(a => a.id === input.assetId);
@@ -251,7 +256,7 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
   };
 
   const muc: Muc = {
-    id: `muc-${asset.code.toLowerCase()}-${Date.now()}`,
+    id: `muc-${asset.code.toLowerCase()}-${clock.now()}-${++mucSeq}`,
     number: nextMucNumber(asset.code, fromMs, seed.mucs),
     assetId: asset.id,
     ownerTenantId: asset.ownerTenantId,
@@ -282,7 +287,10 @@ export async function voidMuc(session: Session, mucNumber: string, reason: strin
   const muc = getMucByNumber(mucNumber);
   if (!muc) return fail('Certificate not found.');
   if (muc.status === 'voided') return fail('This certificate is already voided.');
-  if (!session.isKasper && !(session.role === 'tenant_admin' && muc.ownerTenantId === session.tenantId)) {
+  // muc.void: Kasper Admin or the owner Tenant Admin — never Kasper Ops.
+  const canVoid = hasCapability(session, 'muc.void') &&
+    (session.isKasper || muc.ownerTenantId === session.tenantId);
+  if (!canVoid) {
     return fail('Only the owner Tenant Admin or a Kasper Admin can void a certificate.');
   }
   if (reason.trim().length < 10) return fail('Give a reason of at least 10 characters.');
@@ -330,7 +338,7 @@ export async function reissueMuc(session: Session, mucNumber: string, reason: st
   };
 
   const replacement: Muc = {
-    id: `muc-${asset.code.toLowerCase()}-reissue-${Date.now()}`,
+    id: `muc-${asset.code.toLowerCase()}-reissue-${clock.now()}-${++mucSeq}`,
     number: nextMucNumber(asset.code, new Date(original.periodFrom).getTime(), seed.mucs),
     assetId: original.assetId,
     ownerTenantId: original.ownerTenantId,
