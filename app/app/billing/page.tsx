@@ -247,11 +247,7 @@ export default function BillingPage() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-ink">GPS subscription statements</h2>
           <Button variant="secondary" size="sm" onClick={() => {
-            const tenantAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
-            const t1 = tenantAssets.filter(a => a.canProfile.adapter === 'none').length;
-            const t2 = tenantAssets.filter(a => a.canProfile.adapter === 'LVCAN200').length;
-            const t3 = tenantAssets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
-            const total = t1 * 75 + t2 * 110 + t3 * 165;
+            const { t1, t2, t3, total } = gpsData;
             const rows = [
               { Tier: 'Tier 1', Rate: 'AED 75/tracker-month', Count: t1, Total: t1 * 75 },
               { Tier: 'Tier 2', Rate: 'AED 110/tracker-month', Count: t2, Total: t2 * 110 },
