@@ -13,7 +13,9 @@ import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
-import { getReadingForAsset, computeStatus } from '@/server/telemetry/simulator';
+import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server/telemetry/simulator';
+import { detectTrips } from '@/server/trips';
+import { visibleAlerts, acknowledgeAlert } from '@/server/alerts';
 import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
 import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
 import {
@@ -258,6 +260,30 @@ export default function AssetDetailPage() {
   const rel = useMemo(() => asset && session ? getRelationship(session, asset.id) : null, [asset, session]);
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);
   const reading = useMemo(() => asset ? getReadingForAsset(asset) : null, [asset]);
+
+  // Real telemetry-backed tab data (never fabricated).
+  const historyRows = useMemo(() => {
+    if (!asset) return [];
+    const end = clock.now();
+    return getReadingsForAsset(asset, end - 24 * 3600_000, end).slice(-24);
+  }, [asset]);
+
+  const recentTrips = useMemo(() => {
+    if (!asset) return [];
+    return detectTrips(asset, clock.now() - 7 * 86_400_000, clock.now()).slice(-5);
+  }, [asset]);
+
+  const assetAlerts = useMemo(
+    () => (session && asset ? visibleAlerts(session, phase).filter(a => a.assetId === asset.id) : []),
+    [session, phase, asset, requestVersion]
+  );
+
+  const drivingEvents = useMemo(
+    () => assetAlerts.filter(a => a.type === 'overspeed' || a.type === 'harsh_driving'),
+    [assetAlerts]
+  );
+
+  const canAcknowledgeAlerts = session ? hasCapability(session, 'alert.acknowledge') : false;
 
   const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
@@ -641,16 +667,20 @@ export default function AssetDetailPage() {
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_hours', 'Engine hours')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {reading ? `${reading.gnssOdometerKm.toFixed(1)} km` : '—'}
+                  {`${ecuHoursAt(asset, clock.now()).toFixed(1)} h`}
                 </div>
-                <div className="text-xs text-grey-500 mt-1">{t('asset_detail.overview.ecu_today', 'ECU · today')}</div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {asset.canProfile.adapter === 'ALL-CAN300'
+                    ? t('asset_detail.overview.ecu_today', 'ECU · today')
+                    : t('asset_detail.overview.ecu_partial', 'ECU · partial · today')}
+                </div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.fuel_level', 'Fuel level')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
                   {asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined
                     ? `${reading.fuelLevelPct.toFixed(0)}%`
-                    : 'Not measured'}
+                    : t('common.not_measured', 'Not measured')}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('fuelLevel') ? t('asset_detail.overview.fuel_gauge', 'Fuel gauge') : t('common.not_available', 'Not available')}
@@ -659,12 +689,12 @@ export default function AssetDetailPage() {
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_rpm', 'Engine RPM')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('rpm') && reading?.fuelRateLph !== undefined
-                    ? `${Math.floor(Math.random() * 3000)} rpm`
-                    : 'Not measured'}
+                  {reading?.rpm !== undefined ? `${Math.round(reading.rpm)} rpm` : t('common.not_measured', 'Not measured')}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('rpm') ? t('asset_detail.overview.live_value', 'Live value') : t('common.not_available', 'Not available')}
+                  {asset.canProfile.supported.includes('rpm') && reading?.rpm !== undefined
+                    ? t('asset_detail.overview.live_value', 'Live value')
+                    : t('common.not_available', 'Not available')}
                 </div>
               </div>
             </div>
@@ -727,20 +757,22 @@ export default function AssetDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reading ? (
-                    <tr className="border-b border-line">
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
-                      </td>
-                      <td className="px-3 py-2 font-mono">{reading.speedKmh} km/h</td>
-                      <td className="px-3 py-2">{reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
-                      <td className="px-3 py-2 font-mono">{reading.heading}°</td>
-                      {asset.canProfile.supported.includes('fuelLevel') && (
-                        <td className="px-3 py-2 font-mono">
-                          {reading.fuelLevelPct !== undefined ? `${reading.fuelLevelPct.toFixed(0)}%` : '—'}
+                  {historyRows.length > 0 ? (
+                    historyRows.map(r => (
+                      <tr key={r.deviceTime} className="border-b border-line">
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {clock.formatDubaiDateTime(new Date(r.deviceTime).getTime())}
                         </td>
-                      )}
-                    </tr>
+                        <td className="px-3 py-2 font-mono">{r.speedKmh.toFixed(0)} km/h</td>
+                        <td className="px-3 py-2">{r.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
+                        <td className="px-3 py-2 font-mono">{Math.round(r.heading)}°</td>
+                        {asset.canProfile.supported.includes('fuelLevel') && (
+                          <td className="px-3 py-2 font-mono">
+                            {r.fuelLevelPct !== undefined ? `${r.fuelLevelPct.toFixed(0)}%` : '—'}
+                          </td>
+                        )}
+                      </tr>
+                    ))
                   ) : (
                     <tr>
                       <td colSpan={5} className="px-3 py-4 text-center text-grey-500">{t('common.no_data', 'No data')}</td>
@@ -754,11 +786,35 @@ export default function AssetDetailPage() {
       )}
 
       {activeTab === 'trips' && (
-        <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.trips', 'Trips')}</div>
-          <div className="text-sm text-grey-500">
-            {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
-          </div>
+        <div className="bg-surface border border-line rounded-lg overflow-hidden">
+          <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.trips', 'Trips')}</div>
+          {recentTrips.length === 0 ? (
+            <div className="p-4 text-sm text-grey-500">
+              {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
+            </div>
+          ) : (
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-paper-2 text-grey-500">
+                  <th className="px-3 py-2 text-left font-medium">{t('asset_detail.trips.start', 'Start')}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t('asset_detail.trips.end', 'End')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.distance', 'Distance')}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.top_speed', 'Top speed')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTrips.map(tr => (
+                  <tr key={tr.startMs} className="bg-paper hover:bg-paper-2">
+                    <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{clock.formatDubaiDateTime(tr.startMs)}</td>
+                    <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{clock.formatDubaiDateTime(tr.endMs)}</td>
+                    <td className="px-3 py-2 border-b border-line text-right font-mono text-ink">{tr.distanceKm.toFixed(1)} km</td>
+                    <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{tr.maxSpeedKmh.toFixed(0)} km/h</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="px-3 py-2 text-[11px] text-grey-500">{t('asset_detail.trips_rule', 'A trip starts when ignition is on and speed exceeds 3 km/h, and ends after 5 minutes stopped.')}</div>
         </div>
       )}
 
@@ -770,19 +826,48 @@ export default function AssetDetailPage() {
               {t('asset_detail.no_can_tier1', "Tier 1 assets don't have CAN data available.")}
             </div>
           ) : (
-            <div className="text-sm text-grey-500">
-              {t('asset_detail.engine_fuel_stub', 'Engine & fuel data for this asset.')}
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: t('asset_detail.engine.fuel_level', 'Fuel level'), value: asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined ? `${reading.fuelLevelPct.toFixed(0)}%` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.fuel_gauge', 'Fuel gauge') },
+                { label: t('asset_detail.engine.fuel_rate', 'Fuel rate'), value: reading?.fuelRateLph !== undefined ? `${reading.fuelRateLph.toFixed(1)} L/h` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
+                { label: t('asset_detail.engine.coolant', 'Coolant'), value: reading?.coolantC !== undefined ? `${reading.coolantC.toFixed(0)} °C` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
+                { label: t('asset_detail.engine.load', 'Engine load'), value: reading?.engineLoadPct !== undefined ? `${reading.engineLoadPct.toFixed(0)}%` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
+                { label: t('asset_detail.engine.rpm', 'Engine RPM'), value: reading?.rpm !== undefined ? `${Math.round(reading.rpm)} rpm` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
+                { label: t('asset_detail.engine.can_odo', 'CAN odometer'), value: reading?.canOdometerKm !== undefined ? `${reading.canOdometerKm.toFixed(0)} km` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
+              ].map(cell => (
+                <div key={cell.label} className="border border-line rounded-lg p-3">
+                  <div className="text-xs text-grey-500 font-medium uppercase">{cell.label}</div>
+                  <div className="text-lg font-semibold text-ink mt-1 font-mono">{cell.value}</div>
+                  <div className="text-xs text-grey-500 mt-1">{cell.source}</div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
       {activeTab === 'driving' && (
-        <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.driving_events', 'Driving events')}</div>
-          <div className="text-sm text-grey-500">
-            No driving events recorded yet.
-          </div>
+        <div className="bg-surface border border-line rounded-lg overflow-hidden">
+          <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.driving_events', 'Driving events')}</div>
+          {drivingEvents.length === 0 ? (
+            <div className="p-4 text-sm text-grey-500">{t('asset_detail.driving_none', 'No driving events recorded yet.')}</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {drivingEvents.map(ev => (
+                <div key={ev.id} className="px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-ink">{t(`alerts.words.${ev.type}`, ev.typeWords)}</div>
+                    <div className="text-xs text-grey-500">
+                      {clock.formatDubaiDateTime(typeof ev.openedAt === 'number' ? ev.openedAt : new Date(ev.openedAt).getTime())}
+                    </div>
+                  </div>
+                  <Badge variant={ev.status === 'closed' ? 'grey' : 'red'}>
+                    {t(`alerts.types.${ev.type}`, ev.typeLabel)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -995,11 +1080,35 @@ export default function AssetDetailPage() {
       )}
 
       {activeTab === 'alerts' && (
-        <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.alerts', 'Alerts')}</div>
-          <div className="text-sm text-grey-500">
-            No alerts for this asset.
-          </div>
+        <div className="bg-surface border border-line rounded-lg overflow-hidden">
+          <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.alerts', 'Alerts')}</div>
+          {assetAlerts.length === 0 ? (
+            <div className="p-4 text-sm text-grey-500">{t('asset_detail.alerts_none', 'No alerts for this asset.')}</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {assetAlerts.map(al => (
+                <div key={al.id} className="px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-ink">{t(`alerts.words.${al.type}`, al.typeWords)}</div>
+                    <div className="text-xs text-grey-500">
+                      {clock.formatDubaiDateTime(typeof al.openedAt === 'number' ? al.openedAt : new Date(al.openedAt).getTime())}
+                      {al.acknowledgedBy && ` · ${t('alerts.acknowledged_by', 'Acknowledged by {name} at {at}', { name: al.acknowledgedBy, at: al.acknowledgedAt ? clock.formatDubaiTime(typeof al.acknowledgedAt === 'string' ? new Date(al.acknowledgedAt).getTime() : al.acknowledgedAt) : '' })}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={al.status === 'open' ? 'red' : al.status === 'acknowledged' ? 'grey' : 'green'}>
+                      {t(`alerts.types.${al.type}`, al.typeLabel)}
+                    </Badge>
+                    {al.status === 'open' && canAcknowledgeAlerts && (
+                      <Button size="sm" variant="secondary" onClick={() => { acknowledgeAlert(session, al.id); setRequestVersion(v => v + 1); }}>
+                        {t('alerts.acknowledge', 'Acknowledge')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
