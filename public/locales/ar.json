@@ -919,7 +919,29 @@
       "basis": "الأساس",
       "status": "الحالة"
     },
-    "phase_gate": "الصيانة متاحة في المراحل اللاحقة."
+    "phase_gate": "الصيانة متاحة في المراحل اللاحقة.",
+    "log_service_title": "تسجيل صيانة — {code}",
+    "log_service_reset_note": "تسجيل الصيانة يعيد تعيين الخطة: القراءة التي تدخلها هنا تصبح نقطة البداية الجديدة.",
+    "reading_label": "القراءة الحالية",
+    "date_label": "تاريخ الخدمة",
+    "notes_label": "ملاحظات",
+    "notes_placeholder": "تم استبدال الزيت والفلاتر...",
+    "cost_label": "التكلفة (درهم إماراتي)",
+    "confirm_log": "تسجيل الصيانة",
+    "confirm_log_success": "تم تسجيل الصيانة وإعادة تعيين الخطة.",
+    "plan_title_new": "خطة صيانة جديدة — {code}",
+    "plan_title_edit": "تعديل خطة الصيانة — {code}",
+    "plan_name_label": "اسم الخطة",
+    "plan_name_placeholder": "مثال: خدمة 500 ساعة",
+    "plan_basis_label": "طريقة الحساب",
+    "plan_interval_label": "فترة الصيانة",
+    "plan_due_soon_label": "عتبة الاستحقاق قريباً",
+    "plan_due_soon_hint": "الاستحقاق قريباً عندما يكون المتبقي أقل من هذا الرقم.",
+    "plan_last_done_value": "القراءة عند آخر خدمة",
+    "plan_last_done_date": "تاريخ آخر خدمة",
+    "plan_save": "حفظ الخطة",
+    "plan_saved_success": "تم حفظ الخطة.",
+    "tier_note": "يمكن التخطيط للمعدات ذات التتبع فقط بالمسافة أو الأيام."
   },
   "cost": {
     "title": "التكلفة والعائد",
@@ -951,6 +973,24 @@
       "payback": "فترة الاسترداد"
     },
     "not_enough_data": "لا توجد بيانات كافية",
-    "phase_gate": "التكلفة والعائد متاحة في المراحل اللاحقة."
+    "phase_gate": "التكلفة والعائد متاحة في المراحل اللاحقة.",
+    "roi_drawer_title": "العائد على الاستثمار (ROI) — {code}",
+    "roi_cumulative": "الإيرادات التراكمية مقابل التكلفة",
+    "roi_calc": "حساب العائد على الاستثمار",
+    "roi_revenue_to_date": "إيرادات التأجير حتى الآن",
+    "roi_cost_to_date": "التكلفة الإجمالية حتى الآن",
+    "roi_net": "الصافي (الإيرادات - التكلفة)",
+    "roi_purchase_value": "قيمة الشراء",
+    "roi_percentage": "عائد الاستثمار",
+    "roi_payback": "استرداد رأس المال",
+    "roi_payback_months": "الاسترداد المقدر خلال {months} شهراً بالمعدل الحالي",
+    "roi_edit_profile": "تعديل ملف التكلفة",
+    "roi_profile_title": "ملف التكلفة — {code}",
+    "roi_profile_purchase": "قيمة الشراء (درهم إماراتي)",
+    "roi_profile_finance": "التمويل الشهري (درهم إماراتي)",
+    "roi_profile_insurance": "التأمين الشهري (درهم إماراتي)",
+    "roi_profile_operator": "تكلفة المشغل في الساعة (درهم إماراتي)",
+    "roi_profile_save": "حفظ ملف التكلفة",
+    "roi_profile_saved": "تم حفظ ملف التكلفة."
   }
 }

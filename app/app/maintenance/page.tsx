@@ -371,6 +371,7 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
   onClose: () => void;
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
+  const t = useT();
   const plan = snapshot.plan;
   const asset = snapshot.asset;
   const meter = currentMeter(plan, asset);
@@ -381,7 +382,7 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
   const task = openTasks(session).find(t => t.assetId === asset.id);
 
   return (
-    <Sheet open onClose={onClose} title={`Log service — ${asset.code}`} width="md">
+    <Sheet open onClose={onClose} title={t('maintenance.log_service_title', `Log service — ${asset.code}`).replace('{code}', asset.code)} width="md">
       <div className="space-y-4">
         <div className="text-sm text-grey-700">
           {plan.name} · <SourceLabel source={plan.basis === 'km'
@@ -389,10 +390,10 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
             : plan.hoursSource === 'estimated' ? 'Estimated' : 'ECU'} inline />
         </div>
         <p className="text-xs text-grey-500">
-          Logging a service resets the plan: the reading you enter here becomes the new starting point.
+          {t('maintenance.log_service_reset_note', 'Logging a service resets the plan: the reading you enter here becomes the new starting point.')}
         </p>
         <label className="text-xs text-grey-500 block">
-          Date
+          {t('maintenance.date_label', 'Date')}
           <input
             type="date"
             value={doneAt}
@@ -401,7 +402,7 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
           />
         </label>
         <label className="text-xs text-grey-500 block">
-          Meter reading ({plan.basis === 'km' ? 'km' : plan.hoursSource ? 'hours' : 'km'}) — {meter.source}
+          {t('maintenance.reading_label', 'Meter reading')} ({plan.basis === 'km' ? 'km' : plan.hoursSource ? 'hours' : 'km'}) — {meter.source}
           <input
             value={value}
             onChange={e => setValue(e.target.value)}
@@ -411,17 +412,17 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
           <span className="text-[11px] text-grey-500">Prefilled from the current reading — edit it if the hour meter reads differently.</span>
         </label>
         <label className="text-xs text-grey-500 block">
-          Notes
+          {t('maintenance.notes_label', 'Notes')}
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
             rows={2}
-            placeholder="What was done?"
+            placeholder={t('maintenance.notes_placeholder', 'What was done?')}
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           />
         </label>
         <label className="text-xs text-grey-500 block">
-          Cost (AED)
+          {t('maintenance.cost_label', 'Cost (AED)')}
           <input
             value={cost}
             onChange={e => setCost(e.target.value)}
@@ -446,12 +447,12 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
                 costAed: Number(cost || 0),
                 taskId: task?.id,
               });
-              onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+              onResult(result.ok ? 'ok' : 'error', result.ok ? t('maintenance.confirm_log_success', result.message!) : result.error!);
             }}
           >
-            Log service
+            {t('maintenance.confirm_log', 'Log service')}
           </Button>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
         </div>
       </div>
     </Sheet>
@@ -466,6 +467,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
   onClose: () => void;
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
+  const t = useT();
   const owned = seed.assets.filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
   const [assetId, setAssetId] = useState(snapshot?.asset.id ?? owned[0]?.id ?? '');
   const [name, setName] = useState(snapshot?.plan.name ?? '');
@@ -485,10 +487,10 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
   const kmSource = basis === 'km' ? (canUseCanOdometer ? 'can' : 'gps') : undefined;
 
   return (
-    <Sheet open onClose={onClose} title={snapshot ? `Edit plan — ${snapshot.asset.code}` : 'New service plan'} width="md">
+    <Sheet open onClose={onClose} title={snapshot ? t('maintenance.plan_title_edit', `Edit plan — ${snapshot.asset.code}`).replace('{code}', snapshot.asset.code) : t('maintenance.plan_title_new', 'New service plan')} width="md">
       <div className="space-y-4">
         <label className="text-xs text-grey-500 block">
-          Asset
+          {t('settings.assets.columns.asset', 'Asset')}
           <select
             value={assetId}
             onChange={e => setAssetId(e.target.value)}
@@ -499,16 +501,16 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
           </select>
         </label>
         <label className="text-xs text-grey-500 block">
-          Plan name
+          {t('maintenance.plan_name_label', 'Plan name')}
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="e.g. 500 h service"
+            placeholder={t('maintenance.plan_name_placeholder', 'e.g. 500 h service')}
             className="block mt-1 w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
           />
         </label>
         <label className="text-xs text-grey-500 block">
-          Basis
+          {t('maintenance.plan_basis_label', 'Basis')}
           <select
             value={basis}
             onChange={e => setBasis(e.target.value as typeof basis)}
@@ -532,7 +534,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
           </p>
         )}
         <label className="text-xs text-grey-500 block">
-          Interval ({basis === 'days' ? 'days' : basis === 'km' ? 'km' : 'hours'})
+          {t('maintenance.plan_interval_label', 'Interval')} ({basis === 'days' ? 'days' : basis === 'km' ? 'km' : 'hours'})
           <input
             value={interval}
             onChange={e => setInterval(e.target.value)}
@@ -542,7 +544,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-grey-500 block">
-            Last done at (reading)
+            {t('maintenance.plan_last_done_value', 'Last done at (reading)')}
             <input
               value={lastDoneValue}
               onChange={e => setLastDoneValue(e.target.value)}
@@ -551,7 +553,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
             />
           </label>
           <label className="text-xs text-grey-500 block">
-            Last done date
+            {t('maintenance.plan_last_done_date', 'Last done date')}
             <input
               type="date"
               value={lastDoneAt}
@@ -561,7 +563,8 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
           </label>
         </div>
         <p className="text-[11px] text-grey-500">
-          Due soon starts at 80 % of the interval unless you set your own threshold. {tier === 1 ? 'A tracker-only asset can only be planned by distance or days.' : ''}
+          {t('maintenance.plan_due_soon_hint', 'Due soon starts at 80 % of the interval unless you set your own threshold.')}
+          {' '}{tier === 1 ? t('maintenance.tier_note', 'A tracker-only asset can only be planned by distance or days.') : ''}
         </p>
         <div className="flex gap-2">
           <Button
@@ -577,12 +580,12 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
                 lastDoneAt: new Date(`${lastDoneAt}T12:00:00+04:00`).getTime(),
                 lastDoneValue: Number(lastDoneValue || 0),
               });
-              onResult(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
+              onResult(result.ok ? 'ok' : 'error', result.ok ? t('maintenance.plan_saved_success', result.message!) : result.error!);
             }}
           >
-            {snapshot ? 'Save plan' : 'Create plan'}
+            {t('maintenance.plan_save', snapshot ? 'Save plan' : 'Create plan')}
           </Button>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
         </div>
       </div>
     </Sheet>
