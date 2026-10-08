@@ -126,8 +126,9 @@ export default function GeofencesPage() {
               <h2 className="text-sm font-medium text-ink mb-3">{t('geofences.create', 'Create geofence')}</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('geofences.name', 'Name')}</label>
+                  <label htmlFor="gf-name" className="text-xs text-grey-500 font-medium">{t('geofences.name', 'Name')}</label>
                   <input
+                    id="gf-name"
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
@@ -150,8 +151,9 @@ export default function GeofencesPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="text-xs text-grey-500 font-medium">{t('geofences.center_lat', 'Centre latitude')}</label>
+                    <label htmlFor="gf-lat" className="text-xs text-grey-500 font-medium">{t('geofences.center_lat', 'Centre latitude')}</label>
                     <input
+                      id="gf-lat"
                       type="text"
                       value={centerLat}
                       onChange={e => setCenterLat(e.target.value)}
@@ -159,8 +161,9 @@ export default function GeofencesPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-grey-500 font-medium">{t('geofences.center_lng', 'Centre longitude')}</label>
+                    <label htmlFor="gf-lng" className="text-xs text-grey-500 font-medium">{t('geofences.center_lng', 'Centre longitude')}</label>
                     <input
+                      id="gf-lng"
                       type="text"
                       value={centerLng}
                       onChange={e => setCenterLng(e.target.value)}
@@ -168,8 +171,9 @@ export default function GeofencesPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-grey-500 font-medium">{t('geofences.radius', 'Radius (m)')}</label>
+                    <label htmlFor="gf-radius" className="text-xs text-grey-500 font-medium">{t('geofences.radius', 'Radius (m)')}</label>
                     <input
+                      id="gf-radius"
                       type="text"
                       value={radiusM}
                       onChange={e => setRadiusM(e.target.value)}
