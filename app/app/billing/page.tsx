@@ -257,7 +257,7 @@ export default function BillingPage() {
             const wb = XLSX.utils.book_new();
             const sheet = XLSX.utils.json_to_sheet(rows);
             XLSX.utils.book_append_sheet(wb, sheet, 'Subscription');
-            const dateStr = new Date().toISOString().slice(0, 10);
+            const dateStr = clock.dubaiNow().toISOString().slice(0, 10);
             const filename = `Kasper_GPS_subscription_${myTenantId}_${dateStr}.xlsx`;
             XLSX.writeFile(wb, filename);
             showToast(`Downloaded ${filename}`);

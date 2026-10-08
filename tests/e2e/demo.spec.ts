@@ -16,7 +16,7 @@ test('demo step 1: sign-in and demo bar', async ({ page }) => {
   await expect(page.locator('h1:has-text("Fleet")')).toBeVisible();
 
   // Demo bar: role switcher
-  const demoBar = page.locator('[data-testid="demo-bar"], .demo-bar, [class*="demo"], [class*="bar"]');
+  const _demoBar = page.locator('[data-testid="demo-bar"], .demo-bar, [class*="demo"], [class*="bar"]');
   // Phase toggle: verify fleet page shows Phase 2 content when switched
   await setPhase(page, 'phase2');
   await expect(page.locator('h1:has-text("Cost")')).not.toBeVisible({ timeout: 5000 });
