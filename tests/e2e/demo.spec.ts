@@ -18,7 +18,7 @@ test('demo step 1: sign-in and demo bar', async ({ page }) => {
   // Demo bar: role switcher
   const demoBar = page.locator('[data-testid="demo-bar"], .demo-bar, [class*="demo"], [class*="bar"]');
   // Phase toggle: verify fleet page shows Phase 2 content when switched
-  await setPhase(page, 'day_two');
+  await setPhase(page, 'phase2');
   await expect(page.locator('h1:has-text("Cost")')).not.toBeVisible({ timeout: 5000 });
   await setPhase(page, 'day_one');
 });
@@ -40,7 +40,7 @@ test('demo step 2: fleet page, map, filters, asset detail', async ({ page }) => 
   }
 
   // Tier filter
-  const tierFilter = page.locator('select').filter({ has_text: 'All tiers' });
+  const tierFilter = page.locator('select').filter({ hasText: 'All tiers' });
   if (await tierFilter.isVisible()) {
     await tierFilter.selectOption('Tier 3');
     await waitForToast(page);
@@ -100,7 +100,7 @@ test('demo step 3: alerts — view types, acknowledge, filter', async ({ page })
 
 test('demo step 4: reports — Excel + PDF downloads, phase gating', async ({ page }) => {
   await signInAs(page, 'khalid@emiratesearth.ae');
-  await setPhase(page, 'day_two');
+  await setPhase(page, 'phase2');
   await goto(page, '/app/reports');
 
   await expect(page.locator('h1:has-text("Reports")')).toBeVisible();
@@ -143,7 +143,7 @@ test('demo step 4: reports — Excel + PDF downloads, phase gating', async ({ pa
 
 test('demo step 5: cost and maintenance — Phase 2', async ({ page }) => {
   await signInAs(page, 'khalid@emiratesearth.ae');
-  await setPhase(page, 'day_two');
+  await setPhase(page, 'phase2');
 
   // Cost page
   await goto(page, '/app/cost');
@@ -160,7 +160,7 @@ test('demo step 5: cost and maintenance — Phase 2', async ({ page }) => {
 
 test('demo step 6: geofences — list, map overlay, legend', async ({ page }) => {
   await signInAs(page, 'khalid@emiratesearth.ae');
-  await setPhase(page, 'day_two');
+  await setPhase(page, 'phase2');
   await goto(page, '/app/geofences');
 
   await expect(page.locator('h1:has-text("Geofences")')).toBeVisible();

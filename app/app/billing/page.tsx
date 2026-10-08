@@ -252,7 +252,7 @@ export default function BillingPage() {
               { Tier: 'Tier 1', Rate: 'AED 75/tracker-month', Count: t1, Total: t1 * 75 },
               { Tier: 'Tier 2', Rate: 'AED 110/tracker-month', Count: t2, Total: t2 * 110 },
               { Tier: 'Tier 3', Rate: 'AED 165/tracker-month', Count: t3, Total: t3 * 165 },
-              { Tier: 'Total', Rate: '', Count: t1 + t2 + t3, Total },
+              { Tier: 'Total', Rate: '', Count: t1 + t2 + t3, total },
             ];
             const wb = XLSX.utils.book_new();
             const sheet = XLSX.utils.json_to_sheet(rows);

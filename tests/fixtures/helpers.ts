@@ -53,12 +53,14 @@ export async function goto(page: Page, path: string) {
 }
 
 /** Wait for a toast message to appear. */
-export async function waitForToast(page: Page, text: string, timeout = 3000) {
+export async function waitForToast(page: Page, text?: string, timeout = 3000) {
   const toast = page.locator(
     `div[class*="bottom-4"][class*="right-4"]`
   );
   await toast.waitFor({ state: 'visible', timeout });
-  await expect(toast).toContainText(text);
+  if (text) {
+    await expect(toast).toContainText(text);
+  }
 }
 
 /** Set the demo phase via the demo bar. */
