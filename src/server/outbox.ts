@@ -6,6 +6,7 @@ import type { Alert, ReportRun, Session } from '@/domain/types';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { actorName } from '@/server/audit';
+import { hasRole } from '@/server/capabilities';
 
 export interface OutboxItem {
   id: string;
@@ -45,7 +46,7 @@ function reportItem(run: ReportRun): OutboxItem {
 function alertItem(alert: Alert): OutboxItem | null {
   const asset = seed.assets.find(a => a.id === alert.assetId);
   if (!asset) return null;
-  const admins = seed.users.filter(u => u.tenantId === asset.ownerTenantId && u.role === 'tenant_admin');
+  const admins = seed.users.filter(u => u.tenantId === asset.ownerTenantId && hasRole(u, 'tenant_admin'));
   const toAlert = seed.alerts.filter(a => a.id === alert.id);
   const owner = admins[0];
   return {

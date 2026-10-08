@@ -8,6 +8,7 @@ import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
 import { canEndAccess, hasCapability } from '@/server/access';
+import { hasRole } from '@/server/capabilities';
 import { recordAuditForSession } from '@/server/audit';
 import { revokeLinksForBooking } from '@/server/tracking-links';
 
@@ -53,7 +54,7 @@ export function overlappingBooking(assetId: string, startMs: number, endMs: numb
  */
 export function canManageBookings(session: Session, asset: Asset): boolean {
   if (hasCapability(session, 'console.bookings.manage')) return true;
-  return session.role === 'tenant_admin' && session.tenantId === asset.ownerTenantId;
+  return hasRole(session, 'tenant_admin') && session.tenantId === asset.ownerTenantId;
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Badge, Table, Panel, PanelHeader } from '@/components/ui';
 import type { Capability } from '@/server/capabilities';
+import { isKasperStaff } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
 
@@ -92,7 +93,7 @@ export default function DevAccessPage() {
     tenantId: selectedUser.tenantId,
     siteIds: selectedUser.siteIds,
     role: selectedUser.role,
-    isKasper: selectedUser.role === 'kasper_admin' || selectedUser.role === 'kasper_ops',
+    isKasper: isKasperStaff(selectedUser.role),
   };
 
   const filteredCaps = capabilityQuery

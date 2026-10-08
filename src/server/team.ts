@@ -9,7 +9,7 @@ import { seed } from '@/server/seed/data';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
-import { hasCompanyCapability } from '@/server/capabilities';
+import { hasCompanyCapability, hasRole } from '@/server/capabilities';
 
 let userSeq = 900;
 
@@ -32,7 +32,7 @@ function canManageUser(session: Session, user: User): boolean {
 function activeAdminsFor(tenantId: string | null, excludingUserId?: string): User[] {
   return seed.users.filter(u =>
     u.tenantId === tenantId &&
-    u.role === 'tenant_admin' &&
+    hasRole(u, 'tenant_admin') &&
     u.status === 'active' &&
     u.id !== excludingUserId
   );
@@ -74,7 +74,7 @@ export function createUser(session: Session, input: CreateUserInput): OpResult<U
   recordAuditForSession(session, {
     action: 'user.create',
     tenantId: input.tenantId,
-    detail: `${name} (${input.role === 'tenant_admin' ? 'Tenant Admin' : input.role === 'site_user' ? 'Site User' : input.role}) invited`,
+    detail: `${name} (${hasRole(input, 'tenant_admin') ? 'Tenant Admin' : hasRole(input, 'site_user') ? 'Site User' : input.role}) invited`,
   });
 
   return ok(user, `${name} invited — they can sign in with any password in the demo.`);
@@ -103,8 +103,8 @@ export function updateUserRole(session: Session, userId: string, nextRole: Role)
   if (!canManageUser(session, user)) return fail('You can\u2019t change this user\u2019s role.');
   if (nextRole !== 'tenant_admin' && nextRole !== 'site_user') return fail('Companies can only have Tenant Admins and Site Users.');
   const label = nextRole === 'tenant_admin' ? 'a Tenant Admin' : 'a Site User';
-  if (user.role === nextRole) return ok(user, `${user.name} is already ${label}.`);
-  if (user.role === 'tenant_admin' && nextRole === 'site_user') {
+  if (hasRole(user, nextRole)) return ok(user, `${user.name} is already ${label}.`);
+  if (hasRole(user, 'tenant_admin') && nextRole === 'site_user') {
     if (activeAdminsFor(user.tenantId, user.id).length === 0) {
       return fail('Every company needs at least one Tenant Admin.');
     }
@@ -124,7 +124,7 @@ export function deactivateUser(session: Session, userId: string): OpResult<User>
   if (!user) return fail('User not found.');
   if (!canManageUser(session, user)) return fail('You can\u2019t deactivate this user.');
   if (user.status === 'deactivated') return fail(`${user.name} is already deactivated.`);
-  if (user.role === 'tenant_admin' && activeAdminsFor(user.tenantId, user.id).length === 0) {
+  if (hasRole(user, 'tenant_admin') && activeAdminsFor(user.tenantId, user.id).length === 0) {
     return fail('Every company needs at least one Tenant Admin.');
   }
   if (session.userId === user.id) return fail('You can\u2019t deactivate your own account.');

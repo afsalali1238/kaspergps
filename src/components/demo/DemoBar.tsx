@@ -13,6 +13,7 @@ import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { resolveEtaForLink } from '@/server/links';
 import { OFFLINE_AFTER_SEC } from '@/config/thresholds';
 import type { Session } from '@/domain/types';
+import { isKasperStaff } from '@/server/capabilities';
 import { FeaturesPanel } from './FeaturesPanel';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 
@@ -123,7 +124,7 @@ function buildSessionFor(userId: string): Session | null {
     tenantId: user.tenantId,
     siteIds: user.siteIds,
     role: user.role,
-    isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
+    isKasper: isKasperStaff(user.role),
   };
 }
 
@@ -292,7 +293,7 @@ export function DemoBar() {
 
   // Group users by company
   const usersByCompany = [
-    { name: 'Kasper', users: seed.users.filter(u => u.role === 'kasper_admin' || u.role === 'kasper_ops') },
+    { name: 'Kasper', users: seed.users.filter(u => isKasperStaff(u.role)) },
     { name: 'Al Noor Transport', users: seed.users.filter(u => u.tenantId === 't-alnoor') },
     { name: 'Emirates Earthmovers', users: seed.users.filter(u => u.tenantId === 't-emirates') },
     { name: 'Gulf Lift Rentals', users: seed.users.filter(u => u.tenantId === 't-gulflift') },

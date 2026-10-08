@@ -6,6 +6,7 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasRole } from '@/server/capabilities';
 import {
   getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
 } from '@/server/muc';
@@ -301,8 +302,8 @@ export default function CertificatesPage() {
 
   if (!session) return null;
 
-  const isKasperAdmin = session.isKasper && session.role === 'kasper_admin';
-  const isTenantAdmin = session.role === 'tenant_admin';
+  const isKasperAdmin = hasRole(session, 'kasper_admin');
+  const isTenantAdmin = hasRole(session, 'tenant_admin');
   const canIssue = isKasperAdmin || isTenantAdmin;
 
   const myTier3 = tier3Assets.filter(a =>

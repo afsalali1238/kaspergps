@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useStore } from '@/store';
-import { anyAssetHasFeature, visibleAssetIds } from '@/server/access';
+import { anyAssetHasFeature, visibleAssetIds, hasCapability } from '@/server/access';
+import type { Capability } from '@/server/capabilities';
 import { seed } from '@/server/seed/data';
 import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
 import * as clock from '@/lib/clock';
@@ -18,7 +19,7 @@ interface NavItem {
   /** ar.json key; `label` is the English fallback. */
   labelKey: string;
   label: string;
-  capability: string;
+  capability: Capability;
   phase: 'day_one' | 'phase2' | 'later';
   featureKey?: string;
   icon: React.ReactNode;
@@ -130,7 +131,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const currentPhase = store.getState().demoSwitches.phase;
 
   const visibleNavItems = navItems.filter(item => {
-    const hasCap = session ? session.role === 'kasper_admin' || session.role === 'kasper_ops' || (item.capability === 'asset.view') : true;
+    // §11 nav rule: each item appears only if the user has the capability.
+    const hasCap = session ? hasCapability(session, item.capability) : true;
     if (!hasCap) return false;
     if (item.phase === 'phase2' && currentPhase === 'day_one') return false;
     if (item.phase === 'later' && currentPhase !== 'later') return false;

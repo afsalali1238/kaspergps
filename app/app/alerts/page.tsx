@@ -9,6 +9,7 @@ import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible } from '@/server/access';
+import { hasCapability } from '@/server/access';
 import type { AlertType } from '@/domain/types';
 import { useT } from '@/i18n';
 
@@ -146,7 +147,7 @@ export default function AlertsPage() {
   }, [alerts, alertFilter, _statusFilter]);
 
   const openCount = useMemo(() => alerts.filter(a => a.status === 'open').length, [alerts]);
-  const canAcknowledge = session?.isKasper || session?.role === 'tenant_admin';
+  const canAcknowledge = session ? hasCapability(session, 'alert.acknowledge') : false;
 
   if (!session) return null;
 

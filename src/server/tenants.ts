@@ -9,6 +9,7 @@ import { seed } from '@/server/seed/data';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability } from '@/server/access';
+import { hasRole } from '@/server/capabilities';
 import * as clock from '@/lib/clock';
 
 let tenantSeq = 100;
@@ -93,7 +94,7 @@ export function setTenantStatus(session: Session, tenantId: string, status: Tena
   if (!canManageTenants(session)) return fail('Only Kasper Admin can change a company\u2019s status.');
   if (tenant.status === status) return ok(tenant, `${tenant.name} is already ${status}.`);
   if (status === 'suspended') {
-    const admins = seed.users.filter(u => u.tenantId === tenantId && u.role === 'tenant_admin' && u.status === 'active');
+    const admins = seed.users.filter(u => u.tenantId === tenantId && hasRole(u, 'tenant_admin') && u.status === 'active');
     if (admins.length === 0) {
       return fail('This company has no active Tenant Admin — suspend it only after adding one.');
     }

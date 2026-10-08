@@ -7,6 +7,7 @@ import {
 } from '@/components/ui';
 import { seed } from '@/server/seed/data';
 import { useStore } from '@/store';
+import { hasRole } from '@/server/capabilities';
 import { useT, useHref } from '@/i18n';
 
 type T = (key: string, fallback: string) => string;
@@ -196,7 +197,7 @@ export default function SettingsPage() {
             </table>
           </div>
 
-          {myUsers.filter(u => u.role === 'tenant_admin' && u.status === 'active').length < 1 && myUsers.length > 0 && (
+          {myUsers.filter(u => hasRole(u, 'tenant_admin') && u.status === 'active').length < 1 && myUsers.length > 0 && (
             <div className="bg-yellow/10 border border-yellow/30 text-yellow-dark text-sm px-4 py-3 rounded-lg mt-4">
               {t('settings.users.last_admin', 'Every company needs at least one Tenant Admin.')}
             </div>

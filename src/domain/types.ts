@@ -1,5 +1,6 @@
 // Domain types for Kasper GPS Dashboard
-// Branding: "Asset" not "device"; "Tracker" not "device"; "Kasper" not "Dozr"
+// Branding: say "Asset", "Tracker", "CAN adapter" and "Kasper" — see the words
+// table in the build prompt.
 
 export type TenantType = 'vendor' | 'client' | 'both';
 export type Role = 'kasper_admin' | 'kasper_ops' | 'tenant_admin' | 'site_user';

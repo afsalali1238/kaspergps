@@ -6,6 +6,7 @@ import type { Session } from '@/domain/types';
 import { seed } from '@/server/seed/data';
 import { computeStatus } from '@/server/telemetry/simulator';
 import { hasCapability } from '@/server/access';
+import { isKasperStaff } from '@/server/capabilities';
 import * as clock from '@/lib/clock';
 
 export interface ApiResult<T> {
@@ -50,7 +51,7 @@ function buildSession(user: typeof seed.users[0]): Session {
     tenantId: user.tenantId,
     siteIds: user.siteIds,
     role: user.role,
-    isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
+    isKasper: isKasperStaff(user.role),
   };
 }
 
