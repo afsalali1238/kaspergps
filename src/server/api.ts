@@ -16,33 +16,56 @@ export interface ApiResult<T> {
 }
 
 // Auth
-export async function signIn(email: string, _password: string): Promise<ApiResult<{ session: Session }>> {
-  const user = db.getState().users.find(u => u.email === email);
+
+export interface SignInResult {
+  session: Session;
+  /** Shown once after the first sign-in of an invited user. */
+  notice?: string;
+}
+
+/**
+ * Sign-in for an email and password. The password is not checked (any password
+ * works in the demo), but an empty field is refused like a wrong password.
+ */
+export async function signIn(email: string, password: string): Promise<ApiResult<SignInResult>> {
+  const address = email.trim().toLowerCase();
+  if (!address || !password) {
+    return { success: false, error: 'Email or password is incorrect.' };
+  }
+  const user = db.getState().users.find(u => u.email.toLowerCase() === address);
+  if (!user) {
+    return { success: false, error: "You don't have an account. Please contact your administrator." };
+  }
+  return signInAs(user.id);
+}
+
+/**
+ * The sign-in checks for one user: the same for the sign-in form and the demo
+ * bar's View as. A deactivated user or a suspended company is refused. An
+ * invited user becomes active on first sign-in.
+ */
+export function signInAs(userId: string): ApiResult<SignInResult> {
+  const user = db.getState().users.find(u => u.id === userId);
   if (!user) {
     return { success: false, error: "You don't have an account. Please contact your administrator." };
   }
   if (user.status === 'deactivated') {
     return { success: false, error: 'Your account is no longer active. Contact your company admin.' };
   }
-  if (user.status === 'invited') {
-    // Activate on sign in
-    user.status = 'active';
-    touch('users');
-    return {
-      success: true,
-      data: {
-        session: buildSession(user),
-      },
-    };
-  }
   const tenant = user.tenantId ? db.getState().tenants.find(t => t.id === user.tenantId) : null;
   if (tenant && tenant.status === 'suspended') {
     return { success: false, error: "Your company's account is suspended. Contact Kasper." };
   }
-  return {
-    success: true,
-    data: { session: buildSession(user) },
-  };
+  if (user.status === 'invited') {
+    user.status = 'active';
+    touch('users');
+    const first = user.name.split(' ')[0];
+    return {
+      success: true,
+      data: { session: buildSession(user), notice: `Welcome to Kasper, ${first}.` },
+    };
+  }
+  return { success: true, data: { session: buildSession(user) } };
 }
 
 function buildSession(user: DbRow<'users'>): Session {

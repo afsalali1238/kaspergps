@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Button, Badge, StatusBadge, TierChip, Table } from '@/components/ui';
-import { db, useDb, type DbRow } from '@/server/db';
+import { useDb, type DbRow, type DbState } from '@/server/db';
+import { storeActions } from '@/hooks';
 import type { AssetStatus } from '@/domain/types';
 import * as clock from '@/lib/clock';
 import { hasFeature } from '@/domain/features';
@@ -20,10 +21,10 @@ interface SeedRow {
   features: string[];
 }
 
-function computeStatus(asset: DbRow<'assets'>) {
-  const tracker = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
+function computeStatus(asset: DbRow<'assets'>, data: Pick<DbState, 'pairings' | 'trackers'>) {
+  const tracker = data.pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!tracker) return 'no_tracker';
-  const tr = db.getState().trackers.find(t => t.id === tracker.trackerId);
+  const tr = data.trackers.find(t => t.id === tracker.trackerId);
   if (!tr) return 'no_tracker';
   // Simplified
   return 'live';
@@ -34,7 +35,7 @@ export default function DevSeedPage() {
   const assetRows: SeedRow[] = seed.assets.map(a => {
     const tracker = seed.pairings.find(p => p.assetId === a.id && p.to === null);
     const tr = tracker ? seed.trackers.find(t => t.id === tracker.trackerId) : null;
-    const status = tr && tr.stockStatus === 'paired' ? computeStatus(a) : 'no_tracker';
+    const status = tr && tr.stockStatus === 'paired' ? computeStatus(a, seed) : 'no_tracker';
     const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
     const owner = seed.tenants.find(t => t.id === a.ownerTenantId)?.name ?? '';
     const hasCan = a.canProfile.adapter !== 'none';
@@ -91,7 +92,7 @@ export default function DevSeedPage() {
             <h1 className="text-2xl font-bold text-ink">Seed Data</h1>
             <p className="text-sm text-grey-500 mt-1">All seed tables with computed status and tier.</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => clock.resetOffset()}>Reset clock</Button>
+          <Button variant="secondary" size="sm" onClick={() => storeActions.resetClock()}>Reset clock</Button>
         </div>
 
         <h2 className="text-lg font-semibold text-ink mb-3">Clock: {clock.formatDubaiDate(clock.now())} {clock.formatDubaiTime(clock.now())}</h2>

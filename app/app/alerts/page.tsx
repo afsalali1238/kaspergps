@@ -9,19 +9,18 @@ import clsx from 'clsx';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useStore } from '@/store';
 import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView } from '@/server/alerts';
 import { hasCapability, visibleAssetIds } from '@/server/access';
 import { useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 export default function AlertsPage() {
   const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
   const [alertFilter, setAlertFilter] = useState<'unacknowledged' | 'acknowledged' | 'all'>('unacknowledged');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [siteFilter, setSiteFilter] = useState<string>('all');

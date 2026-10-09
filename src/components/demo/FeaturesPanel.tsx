@@ -2,12 +2,12 @@
 
 import React, { useMemo } from 'react';
 import clsx from 'clsx';
-import { useStore } from '@/store';
 import { useDb } from '@/server/db';
 import { hasCapability, isFeatureVisible, getRelationship } from '@/server/access';
 import { reasonFor } from '@/server/capability-reasons';
 import { FEATURES } from '@/domain/features';
 import type { Capability } from '@/server/capabilities';
+import { useSession, useSwitches, useSelectedAssetId } from '@/hooks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -49,11 +49,11 @@ const ALL_CAPABILITIES: Capability[] = [
 
 export function FeaturesPanel() {
   const seed = useDb(s => s);
-  const session = useStore.getState().session;
-  const selectedAssetId = useStore.getState().selectedAssetId;
-  const showHidden = useStore.getState().demoSwitches.showHidden;
-  const phase = useStore.getState().demoSwitches.phase;
-  const salesView = useStore.getState().demoSwitches.salesView;
+  const session = useSession();
+  const selectedAssetId = useSelectedAssetId();
+  const { showHidden } = useSwitches();
+  const { phase } = useSwitches();
+  const { salesView } = useSwitches();
 
   const user = session?.user;
   const asset = selectedAssetId ? seed.assets.find(a => a.id === selectedAssetId) : null;

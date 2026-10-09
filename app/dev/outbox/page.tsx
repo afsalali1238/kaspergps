@@ -6,13 +6,13 @@
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
 import { outboxForSession, outboxItems } from '@/server/outbox';
-import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 type Kind = 'all' | 'report' | 'alert';
 
 export default function OutboxPage() {
-  const session = useStore.getState().session;
+  const session = useSession();
   const [kind, setKind] = useState<Kind>('all');
   const [version, setVersion] = useState(0);
 

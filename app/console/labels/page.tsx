@@ -5,7 +5,7 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useSession } from '@/hooks';
 
 interface Label {
   id: string;
@@ -23,8 +23,7 @@ const LABELS: Label[] = [
 
 export default function LabelsPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [searchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);

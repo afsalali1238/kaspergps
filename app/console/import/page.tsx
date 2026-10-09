@@ -5,12 +5,12 @@ import {
   Button, Badge, EmptyState,
   Tabs,
 } from '@/components/ui';
-import { db, useDb, append, nextNumber } from '@/server/db';
-import { useStore } from '@/store';
+import { useDb, append, nextRowNumber } from '@/server/db';
 import { hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
 import type { AssetClass, Role, SimBehaviour } from '@/domain/types';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ function AssetsImporter() {
       const tenant = tenants.find(t => t.name.toLowerCase() === cells[8].trim().toLowerCase())!;
       const site = sites.find(s => s.name.toLowerCase() === cells[9].trim().toLowerCase())!;
       append('assets', {
-        id: `asset-import-${nextNumber('asset-import-', db.getState().assets)}`,
+        id: `asset-import-${nextRowNumber('assets', 'asset-import-')}`,
         code: cells[0].trim(), name: cells[1].trim(), type: cells[2].trim(),
         assetClass: cells[3].trim() as AssetClass,
         make: cells[4].trim(), model: cells[5].trim(), year: Number(cells[6]) || 0,
@@ -216,7 +216,7 @@ function TrackersImporter() {
     const valid = rows.filter(r => r.errors.length === 0);
     const importedAt = new Date(clock.now()).toISOString();
     for (const row of valid) append('trackers', {
-      id: `tracker-import-${nextNumber('tracker-import-', db.getState().trackers)}`, assetId: null, imei: row.imei,
+      id: `tracker-import-${nextRowNumber('trackers', 'tracker-import-')}`, assetId: null, imei: row.imei,
       model: 'FMC130', simIccid: row.iccid, firmware: '03.29.00.Rev.03',
       pingIntervalSec: 30, sleepMode: 'off', stockStatus: 'in_stock',
       registeredAt: importedAt, registeredBy: 'csv-import',
@@ -301,7 +301,7 @@ function AdaptersImporter() {
     const valid = rows.filter(r => r.errors.length === 0);
     const importedAt = new Date(clock.now()).toISOString();
     for (const row of valid) append('adapters', {
-      id: `adapter-import-${nextNumber('adapter-import-', db.getState().adapters)}`, serial: row.serial,
+      id: `adapter-import-${nextRowNumber('adapters', 'adapter-import-')}`, serial: row.serial,
       model: row.model as 'LVCAN200' | 'ALL-CAN300', status: 'in_stock',
       assetId: null, registeredAt: importedAt,
     });
@@ -395,7 +395,7 @@ function UsersImporter() {
       const tenant = tenants.find(t => t.name.toLowerCase() === cells[3].trim().toLowerCase())!;
       const siteNames = cells[4].split(/[;|]/).map(v => v.trim().toLowerCase()).filter(Boolean);
       append('users', {
-        id: `user-import-${nextNumber('user-import-', db.getState().users)}`, name: cells[0].trim(), email: cells[1].trim(),
+        id: `user-import-${nextRowNumber('users', 'user-import-')}`, name: cells[0].trim(), email: cells[1].trim(),
         role: cells[2].trim() as Role, tenantId: tenant.id,
         siteIds: seed.sites.filter(site => site.tenantId === tenant.id && siteNames.includes(site.name.toLowerCase())).map(site => site.id),
         status: 'active',
@@ -465,8 +465,7 @@ const importerTabs: { id: string; label: string; cap: Capability }[] = [
 ];
 
 export default function ConsoleImportPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [activeTab, setActiveTab] = useState('assets');
 

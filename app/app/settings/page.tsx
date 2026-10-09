@@ -6,9 +6,13 @@ import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
 import { useT, useHref } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
+import { createUser } from '@/server/team';
+import type { Role } from '@/domain/types';
+
+const EMPTY_INVITE = { name: '', email: '', role: 'tenant_admin' as Role, siteId: '' };
 
 type T = (key: string, fallback: string) => string;
 
@@ -32,14 +36,16 @@ export default function SettingsPage() {
   const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [activeTab, setActiveTab] = useState('users');
   const [showInvite, setShowInvite] = useState(false);
   const [showAddSite, setShowAddSite] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [invite, setInvite] = useState(EMPTY_INVITE);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
 
   if (!session) return null;
 
@@ -67,10 +73,22 @@ export default function SettingsPage() {
     userCount: myUsers.filter(u => u.siteIds.includes(s.id)).length,
   }));
 
-  // Existing emails for duplicate check
-  const existingEmails = new Set(seed.users.map(u => u.email.toLowerCase()));
-
+  // Sends the invite through the same rules as the console (name, email, duplicate).
   const handleInvite = () => {
+    const result = createUser(session, {
+      tenantId: session.tenantId ?? '',
+      name: invite.name,
+      email: invite.email,
+      role: invite.role,
+      siteIds: invite.siteId ? [invite.siteId] : [],
+    });
+    if (!result.ok) {
+      setInviteError(result.error ?? 'The invite could not be sent.');
+      return;
+    }
+    setInvite(EMPTY_INVITE);
+    setInviteError(null);
+    setInviteNotice(result.message ?? null);
     setShowInvite(false);
   };
 
@@ -98,10 +116,14 @@ export default function SettingsPage() {
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-ink">{t('settings.users.title', 'Users')}</h2>
-            <Button size="sm" onClick={() => setShowInvite(!showInvite)}>
+            <Button size="sm" onClick={() => { setInviteError(null); setShowInvite(!showInvite); }}>
               {showInvite ? t('common.cancel', 'Cancel') : t('settings.users.invite', 'Invite user')}
             </Button>
           </div>
+
+          {inviteNotice && (
+            <p role="status" className="text-xs text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2 mb-3">{inviteNotice}</p>
+          )}
 
           {showInvite && (
             <div className="bg-paper-2 rounded-lg p-4 border border-line space-y-3 mb-4">
@@ -111,6 +133,9 @@ export default function SettingsPage() {
                   <label className="text-xs text-grey-500 font-medium">{t('settings.users.name', 'Name')}</label>
                   <input
                     type="text"
+                    aria-label="Full name"
+                    value={invite.name}
+                    onChange={e => setInvite({ ...invite, name: e.target.value })}
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.users.full_name', 'Full name')}
                   />
@@ -119,20 +144,33 @@ export default function SettingsPage() {
                   <label className="text-xs text-grey-500 font-medium">{t('settings.users.email', 'Email')}</label>
                   <input
                     type="email"
+                    aria-label="Email"
+                    value={invite.email}
+                    onChange={e => setInvite({ ...invite, email: e.target.value })}
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder="user@company.com"
                   />
                 </div>
                 <div>
                   <label className="text-xs text-grey-500 font-medium">{t('settings.users.role', 'Role')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <select
+                    aria-label="Role"
+                    value={invite.role}
+                    onChange={e => setInvite({ ...invite, role: e.target.value as Role })}
+                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                  >
                     <option value="tenant_admin">{t('settings.users.tenant_admin', 'Tenant Admin')}</option>
                     <option value="site_user">{t('settings.users.site_user', 'Site User')}</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <select
+                    aria-label="Sites"
+                    value={invite.siteId}
+                    onChange={e => setInvite({ ...invite, siteId: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                  >
                     <option value="">{t('settings.users.sites_hint', 'Pick at least one site (Site User only)')}</option>
                     {mySites.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -140,8 +178,8 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-              {existingEmails.has('') && (
-                <p className="text-xs text-red">{t('settings.users.duplicate', 'This email already has an account.')}</p>
+              {inviteError && (
+                <p role="alert" className="text-xs text-red">{inviteError}</p>
               )}
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleInvite}>{t('settings.users.send_invite', 'Send invite')}</Button>

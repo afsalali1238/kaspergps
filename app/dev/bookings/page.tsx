@@ -4,14 +4,14 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
-import { db, useDb } from '@/server/db';
+import { useDb, type DbState } from '@/server/db';
 import * as clock from '@/lib/clock';
 import type { Session, Booking } from '@/domain/types';
 import {
   cancelBooking, closeBooking, extendBooking, shortenBooking,
 } from '@/server/bookings';
+import { useSession } from '@/hooks';
 
 function bookingStatusWords(booking: Booking): string {
   const start = new Date(booking.start).getTime();
@@ -31,9 +31,9 @@ function formatBookingTime(ms: string | number): string {
   return `${clock.formatDubaiDate(time)} ${clock.formatDubaiTime(time)}`;
 }
 
-function canModifyBooking(session: Session, booking: Booking): boolean {
+function canModifyBooking(session: Session, booking: Booking, assets: DbState['assets']): boolean {
   // Owner tenant admin or Kasper can modify bookings
-  const asset = db.getState().assets.find(a => a.id === booking.assetId);
+  const asset = assets.find(a => a.id === booking.assetId);
   if (!asset) return false;
   if (session.isKasper) return true;
   if (hasRole(session, 'tenant_admin') && asset.ownerTenantId === session.tenantId) return true;
@@ -42,14 +42,12 @@ function canModifyBooking(session: Session, booking: Booking): boolean {
 
 export default function BookingsSimulatorPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [version, setVersion] = useState(0);
   const bookings = seed.bookings;
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [_phase] = useState<'day_one' | 'phase2' | 'later'>(store.getState().demoSwitches.phase);
   const [toast, setToast] = useState<string | null>(null);
 
   // Filter bookings the user can see
@@ -84,7 +82,7 @@ export default function BookingsSimulatorPage() {
   };
 
   const handleExtend = (booking: Booking) => {
-    if (!canModifyBooking(session!, booking)) {
+    if (!canModifyBooking(session!, booking, seed.assets)) {
       showToast('You do not have permission to modify this booking.');
       return;
     }
@@ -92,7 +90,7 @@ export default function BookingsSimulatorPage() {
   };
 
   const handleShorten = (booking: Booking) => {
-    if (!canModifyBooking(session!, booking)) {
+    if (!canModifyBooking(session!, booking, seed.assets)) {
       showToast('You do not have permission to modify this booking.');
       return;
     }
@@ -100,7 +98,7 @@ export default function BookingsSimulatorPage() {
   };
 
   const handleCancel = (booking: Booking) => {
-    if (!canModifyBooking(session!, booking)) {
+    if (!canModifyBooking(session!, booking, seed.assets)) {
       showToast('You do not have permission to modify this booking.');
       return;
     }
@@ -108,7 +106,7 @@ export default function BookingsSimulatorPage() {
   };
 
   const handleClose = (booking: Booking) => {
-    if (!canModifyBooking(session!, booking)) {
+    if (!canModifyBooking(session!, booking, seed.assets)) {
       showToast('You do not have permission to modify this booking.');
       return;
     }
@@ -229,7 +227,7 @@ export default function BookingsSimulatorPage() {
                         </div>
                       )}
                     </div>
-                    {canModifyBooking(session!, booking) && (
+                    {canModifyBooking(session!, booking, seed.assets) && (
                       <div className="flex gap-1">
                         <button
                           onClick={e => { e.stopPropagation(); handleExtend(booking); }}
@@ -288,7 +286,7 @@ export default function BookingsSimulatorPage() {
                         Starts {formatBookingTime(booking.start)}
                       </div>
                     </div>
-                    {canModifyBooking(session!, booking) && (
+                    {canModifyBooking(session!, booking, seed.assets) && (
                       <button
                         onClick={() => handleCancel(booking)}
                         className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
@@ -326,7 +324,7 @@ export default function BookingsSimulatorPage() {
                         {formatBookingTime(booking.start)} – {formatBookingTime(booking.end)}
                       </div>
                     </div>
-                    {canModifyBooking(session!, booking) && booking.status !== 'closed' && (
+                    {canModifyBooking(session!, booking, seed.assets) && booking.status !== 'closed' && (
                       <button
                         onClick={() => handleClose(booking)}
                         className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"

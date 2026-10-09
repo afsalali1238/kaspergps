@@ -4,10 +4,10 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
 import { hasRole } from '@/server/capabilities';
+import { useSession } from '@/hooks';
 
 interface NavItem {
   href: string;
@@ -94,8 +94,7 @@ const navItems: NavItem[] = [
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   // Spec 11.9: customers get "Page not found" on every /console route — the
   // console never renders for them, and never redirects to the app either.

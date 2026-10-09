@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { useStore } from '@/store';
 import { anyAssetHasFeature, visibleAssetIds, hasCapability } from '@/server/access';
 import type { Capability } from '@/server/capabilities';
 import { useDb } from '@/server/db';
@@ -14,6 +13,7 @@ import { SearchCommand } from '@/components/layout/SearchCommand';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
+import { useSession, useSwitches } from '@/hooks';
 
 interface NavItem {
   href: string;
@@ -119,8 +119,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const t = useT();
   const pathname = stripLocale(usePathname() ?? '');
   const router = useRouter();
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
+  const currentPhase = useSwitches().phase;
   const tenantRows = useDb(s => s.tenants);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -128,11 +128,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [, setBellVersion] = useState(0);
 
   const notifications = bellNotifications(session);
-  const openAlerts = session ? bellAlerts(session, store.getState().demoSwitches.phase) : [];
+  const openAlerts = session ? bellAlerts(session, currentPhase) : [];
   const unread = bellUnreadCount(session);
   const bellCount = unread + openAlerts.length;
 
-  const currentPhase = store.getState().demoSwitches.phase;
 
   const visibleNavItems = navItems.filter(item => {
     // §11 nav rule: each item appears only if the user has the capability.
@@ -351,52 +350,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left nav (desktop) */}
-        {!showMobileNav && (
-          <nav className="w-56 bg-surface border-e border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
-            <div className="flex flex-col gap-0.5 p-2">
-              {visibleNavItems.map(item => {
-                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
-                return (
-                  <Link
-                    key={item.href}
-                    href={href(item.href)}
-                    className={clsx(
-                      'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
-                        : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
-                    )}
-                  >
-                    {item.icon}
-                    {t(item.labelKey, item.label)}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Settings */}
-            {session && (
-              <div className="mt-auto border-t border-line p-2">
+        {/* Left nav (desktop). Shown to customers too: on a wide screen the bottom bar is hidden, so this is their only nav. */}
+        <nav className="w-56 bg-surface border-e border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
+          <div className="flex flex-col gap-0.5 p-2">
+            {visibleNavItems.map(item => {
+              const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
+              return (
                 <Link
-                  href={href('/app/settings')}
+                  key={item.href}
+                  href={href(item.href)}
                   className={clsx(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    pathname === '/app/settings'
+                    isActive
                       ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
                       : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
                   )}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {t('shell.settings', 'Settings')}
+                  {item.icon}
+                  {t(item.labelKey, item.label)}
                 </Link>
-              </div>
-            )}
-          </nav>
-        )}
+              );
+            })}
+          </div>
+
+          {/* Settings */}
+          {session && (
+            <div className="mt-auto border-t border-line p-2">
+              <Link
+                href={href('/app/settings')}
+                className={clsx(
+                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  pathname === '/app/settings'
+                    ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
+                    : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
+                )}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t('shell.settings', 'Settings')}
+              </Link>
+            </div>
+          )}
+        </nav>
 
         {/* Mobile bottom nav */}
         {showMobileNav && (
@@ -427,7 +424,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 sm:pb-6">
-          {children}
+          {/* Keyed by user: a switch of user remounts the page, so no state
+              from the previous user's screen survives it. */}
+          <div key={session?.userId ?? 'signed-out'}>{children}</div>
         </main>
       </div>
     </div>

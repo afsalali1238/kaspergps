@@ -2,20 +2,19 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { useStore } from '@/store';
 import {
   actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName,
 } from '@/server/audit';
 import * as clock from '@/lib/clock';
 import { hasCapability } from '@/server/access';
+import { useSession } from '@/hooks';
 
 function formatTs(ts: string | number): string {
   return clock.formatDubaiDateTime(typeof ts === 'number' ? ts : new Date(ts).getTime());
 }
 
 export default function AuditLogPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [person, setPerson] = useState('');
   const [tenant, setTenant] = useState('');

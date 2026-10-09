@@ -5,7 +5,7 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useSession } from '@/hooks';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -19,8 +19,7 @@ function roleLabel(role: string): string {
 
 export default function UsersPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);

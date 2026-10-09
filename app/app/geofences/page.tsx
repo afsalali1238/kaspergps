@@ -7,7 +7,6 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useStore } from '@/store';
 import { useDb } from '@/server/db';
 import { isAssetVisible, hasCapability } from '@/server/access';
 import {
@@ -15,6 +14,7 @@ import {
 } from '@/server/geofences';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 function kindLabel(kind: string, t: (k: string, f: string) => string): string {
   switch (kind) {
@@ -29,9 +29,8 @@ function kindLabel(kind: string, t: (k: string, f: string) => string): string {
 export default function GeofencesPage() {
   const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [version, setVersion] = useState(0);

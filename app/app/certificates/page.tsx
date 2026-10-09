@@ -5,7 +5,6 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import { hasRole } from '@/server/capabilities';
 import {
   getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
@@ -16,6 +15,7 @@ import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 function formatTs(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
@@ -266,9 +266,8 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 export default function CertificatesPage() {
   const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
   const [selectedMuc, setSelectedMuc] = useState<string | null>(null);
   const [showIssue, setShowIssue] = useState(false);
   const [version, setVersion] = useState(0);

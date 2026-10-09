@@ -9,7 +9,6 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge,
 } from '@/components/ui';
-import { useStore } from '@/store';
 import { useDb } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
@@ -28,6 +27,7 @@ import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
 import { canManageMaintenance, planSnapshot, plansForAsset, serviceHistory } from '@/server/maintenance';
 import { useT, useHref } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,7 +73,7 @@ function SharePanel({ asset, onClose, onDone, onError }: {
   onError: (message: string) => void;
 }) {
   const seed = useDb(s => s);
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const t = useT();
   const options = expiryOptions(asset.id);
   const [optionKey, setOptionKey] = useState(String(options[0]?.bookingId ?? 'none'));
@@ -243,9 +243,8 @@ export default function AssetDetailPage() {
   const href = useHref();
   const params = useParams();
   const assetId = params.id as string;
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [breakdown, setBreakdown] = useState<EcuBreakdown | null>(null);

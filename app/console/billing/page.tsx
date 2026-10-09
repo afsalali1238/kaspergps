@@ -8,7 +8,6 @@
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import {
   aed, canRecordPayment, generateStatement, invoiceStatusLabel, invoiceView, issuedInvoices,
@@ -18,6 +17,7 @@ import {
 import { recordAuditForSession } from '@/server/audit';
 import { downloadBoth, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 type StatementRow = ReturnType<typeof lastMonthStatements>[number];
 
@@ -34,8 +34,7 @@ function formatDay(ts: string | number): string {
 
 export default function ConsoleBillingPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [version, setVersion] = useState(0);
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);

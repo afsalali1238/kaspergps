@@ -6,14 +6,15 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { db, useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useDb, type DbState } from '@/server/db';
+import { tierForAsset } from '@/domain/features';
 import { hasCapability } from '@/server/access';
 import { hasRole } from '@/server/capabilities';
 import { canManageBookings, extendBooking, shortenBooking } from '@/server/bookings';
 import { deactivateUser, reactivateUser, updateUserName, updateUserRole } from '@/server/team';
 import { suspendTenant, unsuspendTenant, updateTenant } from '@/server/tenants';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -39,11 +40,10 @@ function tenantTypeLabel(type: string): string {
   return labels[type] ?? type;
 }
 
-function hardwareMix(tenantId: string): string {
-  const assets = db.getState().assets.filter(a => a.ownerTenantId === tenantId);
-  const t1 = assets.filter(a => a.canProfile.adapter === 'none' || a.canProfile.adapter === 'LVCAN200').length;
-  const t3 = assets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
-  return `T1 ${t1} · T3 ${t3}`;
+function hardwareMix(allAssets: DbState['assets'], tenantId: string): string {
+  const assets = allAssets.filter(a => a.ownerTenantId === tenantId);
+  const count = (tier: 1 | 2 | 3) => assets.filter(a => tierForAsset(a) === tier).length;
+  return `T1 ${count(1)} · T2 ${count(2)} · T3 ${count(3)}`;
 }
 
 // ── Tab components ─────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ function TenantOverview({ tenantId }: { tenantId: string }) {
           { label: 'Users', value: users.length },
           { label: 'Open requests', value: openRequests.length },
           { label: 'Active bookings', value: activeBookings.length },
-          { label: 'Hardware mix', value: hardwareMix(tenant.id) },
+          { label: 'Hardware mix', value: hardwareMix(seed.assets, tenant.id) },
         ].map(stat => (
           <div key={stat.label} className="bg-surface border border-line rounded-lg p-3">
             <div className="text-xs text-grey-500">{stat.label}</div>
@@ -191,8 +191,7 @@ function TenantSites({ tenantId }: { tenantId: string }) {
 
 function TenantUsers({ tenantId }: { tenantId: string }) {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
   const users = seed.users.filter(u => u.tenantId === tenantId);
   const activeAdmins = users.filter(u => hasRole(u, 'tenant_admin') && u.status === 'active');
   const [editing, setEditing] = useState<string | null>(null);
@@ -442,8 +441,7 @@ function TenantAssets({ tenantId }: { tenantId: string }) {
 
 function TenantBookings({ tenantId }: { tenantId: string }) {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
   const bookings = seed.bookings.filter(b => b.ownerTenantId === tenantId);
   const assets = seed.assets.filter(a => a.ownerTenantId === tenantId);
   const [changing, setChanging] = useState<{ id: string; mode: 'extend' | 'shorten' } | null>(null);
@@ -733,8 +731,7 @@ const tenantTabs = [
 export default function TenantPage() {
   const seed = useDb(s => s);
   const params = useParams();
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [activeTab, setActiveTab] = useState('overview');
   const [editing, setEditing] = useState(false);

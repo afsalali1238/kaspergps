@@ -5,12 +5,12 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
 import type { Booking } from '@/domain/types';
 import {
   cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking,
 } from '@/server/bookings';
+import { useSession } from '@/hooks';
 
 function bookingStatusWords(booking: Booking): string {
   const start = new Date(booking.start).getTime();
@@ -39,8 +39,7 @@ function toLocalInput(ms: number): string {
 
 export default function ConsoleBookingsPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
@@ -296,7 +295,7 @@ function CreateBookingForm({ onCancel, onDone, onError }: {
   onError: (message: string) => void;
 }) {
   const seed = useDb(s => s);
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [assetId, setAssetId] = useState(seed.assets[0]?.id ?? '');
   const [renterTenantId, setRenterTenantId] = useState('');
   const [renterSiteId, setRenterSiteId] = useState('');

@@ -5,7 +5,6 @@ import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
 import type { Asset, CanAdapter } from '@/domain/types';
 import {
@@ -14,6 +13,7 @@ import {
   stockAdapters,
 } from '@/server/adapters';
 import { currentTrackerForAsset } from '@/server/trackers';
+import { useSession } from '@/hooks';
 
 function adapterModelLabel(model: string): string {
   return model;
@@ -34,8 +34,7 @@ function tierOf(asset: Asset): 1 | 2 | 3 {
 
 export default function AdaptersPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -277,7 +276,7 @@ function RegisterAdapterForm({ serials, onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [serial, setSerial] = useState('');
   const [model, setModel] = useState<CanAdapter['model']>('ALL-CAN300');
 

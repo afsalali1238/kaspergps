@@ -5,9 +5,9 @@ import Link from 'next/link';
 import {
   Button, Badge, TierChip, EmptyState,
 } from '@/components/ui';
-import { db, useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useDb, type DbState } from '@/server/db';
 import type { Asset } from '@/domain/types';
+import { useSession } from '@/hooks';
 
 function adapterLabel(adapter: string): string {
   const labels: Record<string, string> = {
@@ -18,22 +18,21 @@ function adapterLabel(adapter: string): string {
   return labels[adapter] ?? adapter;
 }
 
-function assetStatus(asset: Asset): string {
-  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
+function assetStatus(asset: Asset, data: Pick<DbState, 'pairings' | 'trackers'>): string {
+  const pairing = data.pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!pairing) return 'No tracker';
-  const tracker = db.getState().trackers.find(t => t.id === pairing.trackerId);
+  const tracker = data.trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'No tracker';
   return 'Fitted';
 }
 
-function activeBooking(asset: Asset): string | null {
-  return db.getState().bookings.find(b => b.assetId === asset.id && b.status === 'active')?.reference ?? null;
+function activeBooking(asset: Asset, data: Pick<DbState, 'bookings'>): string | null {
+  return data.bookings.find(b => b.assetId === asset.id && b.status === 'active')?.reference ?? null;
 }
 
 export default function AssetsPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<1 | 2 | 3 | 'all'>('all');
@@ -55,7 +54,7 @@ export default function AssetsPage() {
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       if (tierFilter !== 'all' && tier !== tierFilter) return false;
       if (classFilter && a.assetClass !== classFilter) return false;
-      const hasTracker = assetStatus(a) === 'Fitted';
+      const hasTracker = assetStatus(a, seed) === 'Fitted';
       if (noTrackerFilter && hasTracker) return false;
       if (retiredFilter && !a.retiredAt) return false;
       return true;
@@ -248,8 +247,8 @@ export default function AssetsPage() {
           const tier = asset.canProfile.adapter === 'ALL-CAN300' ? 3 : asset.canProfile.adapter === 'LVCAN200' ? 2 : 1;
           const owner = seed.tenants.find(t => t.id === asset.ownerTenantId);
           const site = seed.sites.find(s => s.id === asset.homeSiteId);
-          const booking = activeBooking(asset);
-          const status = assetStatus(asset);
+          const booking = activeBooking(asset, seed);
+          const status = assetStatus(asset, seed);
 
           return (
             <div

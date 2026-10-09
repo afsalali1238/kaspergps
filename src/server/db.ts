@@ -177,6 +177,14 @@ export function touch(...keys: CollectionKey[]): void {
  * stored rows means ids stay unique after a reload, when in-memory counters
  * would start again at zero.
  */
+/**
+ * The next id number for `prefix` in a live collection, read from the db at
+ * call time. Import handlers use it so an id is never reused after a reload.
+ */
+export function nextRowNumber(key: CollectionKey, prefix: string, floor = 0): number {
+  return nextNumber(prefix, db.getState()[key] as readonly { id: string }[], floor);
+}
+
 export function nextNumber(prefix: string, rows: readonly { id: string }[], floor = 0): number {
   let max = floor;
   for (const row of rows) {

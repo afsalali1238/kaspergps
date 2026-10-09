@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import {
-  db, append, removeWhere, touch, nextNumber, freshDbState, resetDb, DB_VERSION, DB_STORAGE_KEY, type DbRow,
+  db, append, removeWhere, touch, nextNumber, nextRowNumber, freshDbState, resetDb, DB_VERSION, DB_STORAGE_KEY, type DbRow,
 } from '@/server/db';
 import * as seedData from '@/server/seed/data';
 
@@ -83,5 +83,21 @@ describe('db: store behaviour', () => {
     expect(nextNumber('tr-new-', rows)).toBe(10);
     expect(nextNumber('tr-new-', [], 100)).toBe(101);
     expect(nextNumber('tr-new-', rows, 20)).toBe(21);
+  });
+});
+
+describe('db: nextRowNumber reads the live collection', () => {
+  beforeEach(() => {
+    resetDb();
+  });
+
+  it('counts past the rows already stored, so an import never reuses an id', () => {
+    const start = nextRowNumber('assets', 'asset-import-');
+    append('assets', { ...db.getState().assets[0], id: `asset-import-${start}` });
+    expect(nextRowNumber('assets', 'asset-import-')).toBe(start + 1);
+  });
+
+  it('starts at the floor when nothing has that prefix yet', () => {
+    expect(nextRowNumber('trackers', 'tracker-import-', 5)).toBe(6);
   });
 });

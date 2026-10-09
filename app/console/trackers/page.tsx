@@ -4,8 +4,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { db, useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useDb } from '@/server/db';
 import type { Asset, Tracker, TrackerSleepMode } from '@/domain/types';
 import * as clock from '@/lib/clock';
 import {
@@ -14,6 +13,7 @@ import {
   unpairTracker, updateTrackerSettings,
 } from '@/server/trackers';
 import { isValidIccid, isValidImei, ICCID_ERROR, IMEI_ERROR } from '@/domain/tracker-id';
+import { useSession } from '@/hooks';
 
 function stockStatusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -44,10 +44,10 @@ function fmtDay(ts: string | number | null): string {
   return clock.formatDubaiDate(ms);
 }
 
-function currentAssetFor(tracker: Tracker): Asset | null {
+function currentAssetFor(tracker: Tracker, assets: readonly Asset[]): Asset | null {
   const pairing = currentPairingForTracker(tracker.id);
-  if (pairing) return db.getState().assets.find(a => a.id === pairing.assetId) ?? null;
-  if (tracker.assetId) return db.getState().assets.find(a => a.id === tracker.assetId) ?? null;
+  if (pairing) return assets.find(a => a.id === pairing.assetId) ?? null;
+  if (tracker.assetId) return assets.find(a => a.id === tracker.assetId) ?? null;
   return null;
 }
 
@@ -55,8 +55,7 @@ const SLEEP_MODES: TrackerSleepMode[] = ['off', 'deep', 'gps'];
 
 export default function TrackersPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [stockFilter, setStockFilter] = useState<string | null>(null);
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
@@ -87,7 +86,7 @@ export default function TrackersPage() {
   const filteredTrackers = seed.trackers.filter(t => {
     if (stockFilter && t.stockStatus !== stockFilter) return false;
     if (tenantFilter) {
-      const asset = currentAssetFor(t);
+      const asset = currentAssetFor(t, seed.assets);
       const tenant = asset ? seed.tenants.find(x => x.id === asset.ownerTenantId)?.name : null;
       if (tenant !== tenantFilter) return false;
     }
@@ -99,15 +98,15 @@ export default function TrackersPage() {
   });
 
   const stockOptions = ['in_stock', 'paired', 'faulty', 'retired'];
-  const tenantOptions = useMemo(() => {
+  const tenantOptions = (() => {
     const tenants = new Set<string>();
     seed.trackers.forEach(t => {
-      const asset = currentAssetFor(t);
+      const asset = currentAssetFor(t, seed.assets);
       const tenant = asset ? seed.tenants.find(x => x.id === asset.ownerTenantId)?.name : null;
       if (tenant) tenants.add(tenant);
     });
     return [...tenants];
-  }, [version]);
+  })();
 
   return (
     <div className="space-y-4 p-4" key={version}>
@@ -212,7 +211,7 @@ function RegisterOneForm({ onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [imei, setImei] = useState('');
   const [simIccid, setSimIccid] = useState('');
   const [firmware, setFirmware] = useState('03.29.00.Rev.03');
@@ -313,7 +312,7 @@ interface PreviewRow {
   added?: boolean;
 }
 
-function previewRows(text: string): PreviewRow[] {
+function previewRows(text: string, registered: readonly { imei: string }[]): PreviewRow[] {
   const seen = new Set<string>();
   return text
     .split('\n')
@@ -325,7 +324,7 @@ function previewRows(text: string): PreviewRow[] {
       const simIccid = rawSim.replace(/\D/g, '');
       let error: string | null = null;
       if (!/^\d{15}$/.test(imei) || !isValidImei(imei)) error = IMEI_ERROR;
-      else if (db.getState().trackers.some(t => t.imei === imei)) error = 'Already registered.';
+      else if (registered.some(t => t.imei === imei)) error = 'Already registered.';
       else if (seen.has(imei)) error = 'Duplicate in this file.';
       else if (!isValidIccid(simIccid)) error = ICCID_ERROR;
       if (!error) seen.add(imei);
@@ -338,9 +337,10 @@ function RegisterManyForm({ onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [text, setText] = useState('');
-  const rows = useMemo(() => previewRows(text), [text]);
+  const trackerRows = useDb(s => s.trackers);
+  const rows = useMemo(() => previewRows(text, trackerRows), [text, trackerRows]);
   const validCount = rows.filter(r => !r.error).length;
   const skipped = rows.length - validCount;
 
@@ -435,13 +435,13 @@ function TrackerRow({ tracker, onToast, onChanged }: {
   onChanged: () => void;
 }) {
   const seed = useDb(s => s);
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [panel, setPanel] = useState<'none' | 'pair' | 'move' | 'faulty' | 'settings' | 'history'>('none');
   const [faultyNote, setFaultyNote] = useState('');
   const [ping, setPing] = useState(String(tracker.pingIntervalSec));
   const [sleepMode, setSleepMode] = useState<TrackerSleepMode>(tracker.sleepMode);
 
-  const asset = currentAssetFor(tracker);
+  const asset = currentAssetFor(tracker, seed.assets);
   const tenant = asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null;
   const history = pairingHistory(tracker.id);
 

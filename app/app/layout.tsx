@@ -3,11 +3,10 @@
 import React from 'react';
 import { ToastProvider } from '@/components/ui';
 import { AppShell } from '@/components/layout/AppShell';
-import { useStore } from '@/store';
+import { useSession } from '@/hooks';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   if (!session) {
     return (

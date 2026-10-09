@@ -10,14 +10,14 @@ import {
   TierChip, Badge, EmptyState, Skeleton,
   Button,
 } from '@/components/ui';
-import { useStore } from '@/store';
-import { db, useDb } from '@/server/db';
+import { useDb, type DbState } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship } from '@/server/access';
 import { getReadingForAsset } from '@/server/telemetry/simulator';
 import type { Asset, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';
+import { useSession, useSwitches } from '@/hooks';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,10 +72,10 @@ interface AssetMarker {
   lastReadingMs: number;
 }
 
-function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
-  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
+function computeStatus(asset: Asset, data: Pick<DbState, 'pairings' | 'trackers'>, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
+  const pairing = data.pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!pairing) return 'no_tracker';
-  const tracker = db.getState().trackers.find(t => t.id === pairing.trackerId);
+  const tracker = data.trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'no_tracker';
   const reading = getReadingForAsset(asset);
   if (!reading) return 'no_tracker';
@@ -135,11 +135,10 @@ export default function MapPage() {
   const t = useT();
   const href = useHref();
   const locale = useLocale();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
-  const showHidden = store.getState().demoSwitches.showHidden;
-  const salesView = store.getState().demoSwitches.salesView;
+  const session = useSession();
+  const { phase } = useSwitches();
+  const { showHidden } = useSwitches();
+  const { salesView } = useSwitches();
 
   const [statusFilter, setStatusFilter] = useState<StatusKey | 'all'>('all');
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
@@ -158,7 +157,7 @@ export default function MapPage() {
 
     return seed.assets.filter(a => {
       if (!isAssetVisible(session, a.id)) return false;
-      const status = computeStatus(a);
+      const status = computeStatus(a, seed);
       if (statusFilter !== 'all' && status !== statusFilter) return false;
       if (selectedSite && a.homeSiteId !== selectedSite) return false;
       if (selectedClass && a.assetClass !== selectedClass) return false;
@@ -177,7 +176,7 @@ export default function MapPage() {
       }
       return true;
     }).map(a => {
-      const status = computeStatus(a);
+      const status = computeStatus(a, seed);
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       const site = seed.sites.find(s => s.id === a.homeSiteId);
       const rel = getRelationship(session!, a.id);

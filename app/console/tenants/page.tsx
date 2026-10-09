@@ -5,10 +5,11 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { db, useDb } from '@/server/db';
-import { useStore } from '@/store';
+import { useDb, type DbState } from '@/server/db';
+import { tierForAsset } from '@/domain/features';
 import { createTenant } from '@/server/tenants';
 import type { Tenant } from '@/domain/types';
+import { useSession } from '@/hooks';
 
 function tenantTypeLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -19,17 +20,15 @@ function tenantTypeLabel(type: string): string {
   return labels[type] ?? type;
 }
 
-function hardwareMix(tenant: Tenant): string {
-  const assets = db.getState().assets.filter(a => a.ownerTenantId === tenant.id);
-  const t1 = assets.filter(a => a.canProfile.adapter === 'none' || a.canProfile.adapter === 'LVCAN200').length;
-  const t2 = assets.filter(a => a.canProfile.adapter === 'ALL-CAN300').length;
-  return `T1 ${t1} · T3 ${t2}`;
+function hardwareMix(tenant: Tenant, allAssets: DbState['assets']): string {
+  const assets = allAssets.filter(a => a.ownerTenantId === tenant.id);
+  const count = (tier: 1 | 2 | 3) => assets.filter(a => tierForAsset(a) === tier).length;
+  return `T1 ${count(1)} · T2 ${count(2)} · T3 ${count(3)}`;
 }
 
 export default function TenantsPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -165,7 +164,7 @@ export default function TenantsPage() {
                   {tenant.status}
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-xs text-grey-500">
-                  <span>Hardware: {hardwareMix(tenant)}</span>
+                  <span>Hardware: {hardwareMix(tenant, seed.assets)}</span>
                   <span>Assets: {seed.assets.filter(a => a.ownerTenantId === tenant.id).length}</span>
                   <span>Trackers: {seed.trackers.filter(t => t.assetId && seed.assets.find(a => a.id === t.assetId)?.ownerTenantId === tenant.id).length}</span>
                   <span>Users: {seed.users.filter(u => u.tenantId === tenant.id).length}</span>

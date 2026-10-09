@@ -3,9 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { useDb } from '@/server/db';
-import { useStore } from '@/store';
 import { hasCapability } from '@/server/access';
 import { hasRole, isKasperStaff } from '@/server/capabilities';
+import { useSession } from '@/hooks';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -17,8 +17,7 @@ function roleLabel(role: string): string {
 
 export default function KasperTeamPage() {
   const seed = useDb(s => s);
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

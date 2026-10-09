@@ -107,15 +107,12 @@ describe('architecture: components do not touch data modules (rule 1)', () => {
     expect(offenders).toEqual([]);
   });
 
-  // Ratchet: the shell (AppShell), the demo bar (a dev aid) and app routes still
-  // read the in-memory seed directly. Every file here is a known deviation from
-  // rule 1 recorded in reviews/STATUS-REVIEW.md; the list must only shrink.
+  // Ratchet: app routes still read the in-memory seed directly. Every file here
+  // is a known deviation from rule 1 recorded in reviews/STATUS-REVIEW.md; the
+  // list must only shrink. (F2 moved the shell, the demo bar and the features
+  // panel onto src/hooks, so no component is listed now.)
   // Remove an entry when the file moves onto the API layer — never add one.
-  const KNOWN_DIRECT_DATA_IMPORTS = [
-    'src/components/demo/DemoBar.tsx',
-    'src/components/demo/FeaturesPanel.tsx',
-    'src/components/layout/AppShell.tsx',
-  ];
+  const KNOWN_DIRECT_DATA_IMPORTS: string[] = [];
 
   it('the direct-import ratchet never grows', () => {
     const offenders = srcFiles
@@ -127,5 +124,20 @@ describe('architecture: components do not touch data modules (rule 1)', () => {
     expect(grew).toEqual([]);
     // every pinned file must still be listed (keep the list honest)
     for (const p of offenders) expect(KNOWN_DIRECT_DATA_IMPORTS).toContain(p);
+  });
+});
+
+// ── Rule 5: screens read state through hooks (F2) ──────────────────────────────
+// getState() reads do not re-render when the value changes, so a screen can show
+// stale data after a change. Components and app routes read through @/hooks or
+// useDb (the lint rule in eslint.config.mjs is the first line; this is the backstop).
+
+describe('architecture: no getState() in screens (rule 5)', () => {
+  it('app/ and src/components/ never call getState()', () => {
+    const offenders = files
+      .filter(f => f.path.startsWith('app/') || f.path.startsWith('src/components/'))
+      .filter(f => /\bgetState\b/.test(f.text))
+      .map(f => f.path);
+    expect(offenders).toEqual([]);
   });
 });

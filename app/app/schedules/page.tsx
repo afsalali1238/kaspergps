@@ -7,17 +7,16 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { useStore } from '@/store';
 import { schedulesFor, runDueSchedules, setScheduleActive, deleteSchedule, createSchedule, type ScheduleFrequency } from '@/server/schedules';
 import { reportableAssets, REPORT_TYPES, type ReportTypeId } from '@/server/reports';
 import { hasCapability } from '@/server/access';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession } from '@/hooks';
 
 export default function SchedulesPage() {
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
   const [, setTick] = useState(0);
   const [open, setOpen] = useState(false);
   const [reportType, setReportType] = useState<ReportTypeId>('location_history');
