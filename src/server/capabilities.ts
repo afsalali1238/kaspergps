@@ -157,6 +157,19 @@ export function isKasperStaff(role: Role): boolean {
   return role === 'kasper_admin' || role === 'kasper_ops';
 }
 
+/**
+ * A Site User sees only their sites. The only place the role decides this is
+ * here; everything else asks isSiteScoped. A site-scoped session with no sites
+ * sees nothing — an empty site list never means "all sites".
+ */
+export function isSiteScopedRole(role: Role): boolean {
+  return role === 'site_user';
+}
+
+export function isSiteScoped(session: { role: Role }): boolean {
+  return isSiteScopedRole(session.role);
+}
+
 // ── can() ─────────────────────────────────────────────────────────────────────
 
 /**

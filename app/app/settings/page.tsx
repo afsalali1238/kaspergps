@@ -5,12 +5,12 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { useDb, hasRole, createUser } from '@/server/api';
+import { useDb, hasRole, createUser, updateUserSites } from '@/server/api';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 import type { Role } from '@/domain/types';
 
-const EMPTY_INVITE = { name: '', email: '', role: 'tenant_admin' as Role, siteId: '' };
+const EMPTY_INVITE = { name: '', email: '', role: 'tenant_admin' as Role, siteIds: [] as string[] };
 
 type T = (key: string, fallback: string) => string;
 
@@ -39,6 +39,8 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState('users');
   const [showInvite, setShowInvite] = useState(false);
+  const [editing, setEditing] = useState<{ userId: string; siteIds: string[] } | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [showAddSite, setShowAddSite] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [invite, setInvite] = useState(EMPTY_INVITE);
@@ -78,7 +80,7 @@ export default function SettingsPage() {
       name: invite.name,
       email: invite.email,
       role: invite.role,
-      siteIds: invite.siteId ? [invite.siteId] : [],
+      siteIds: invite.siteIds,
     });
     if (!result.ok) {
       setInviteError(result.error ?? 'The invite could not be sent.');
@@ -161,18 +163,25 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="inv-sites" className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</label>
-                  <select
-                    id="inv-sites"
-                    value={invite.siteId}
-                    onChange={e => setInvite({ ...invite, siteId: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                  >
-                    <option value="">{t('settings.users.sites_hint', 'Pick at least one site (Site User only)')}</option>
+                  <span id="inv-sites-label" className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</span>
+                  <div role="group" aria-labelledby="inv-sites-label" className="mt-1 space-y-1">
                     {mySites.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <label key={s.id} className="flex items-center gap-2 text-sm text-grey-700">
+                        <input
+                          type="checkbox"
+                          checked={invite.siteIds.includes(s.id)}
+                          onChange={e => setInvite({
+                            ...invite,
+                            siteIds: e.target.checked
+                              ? [...invite.siteIds, s.id]
+                              : invite.siteIds.filter(id => id !== s.id),
+                          })}
+                        />
+                        {s.name}
+                      </label>
                     ))}
-                  </select>
+                    <p className="text-[11px] text-grey-500">{t('settings.users.sites_hint', 'Pick at least one site (Site User only)')}</p>
+                  </div>
                 </div>
               </div>
               {inviteError && (
@@ -212,7 +221,15 @@ export default function SettingsPage() {
                     <td className="px-3 py-2 border-b border-line">{userStatusBadge(u.status, t)}</td>
                     <td className="px-3 py-2 text-right border-b border-line">
                       <div className="flex gap-1 justify-end">
-                        <Button variant="secondary" size="sm">{t('common.edit', 'Edit')}</Button>
+                        {hasRole(u, 'site_user') && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => { setEditing({ userId: u.id, siteIds: [...u.siteIds] }); setEditError(null); }}
+                          >
+                            {t('common.edit', 'Edit')}
+                          </Button>
+                        )}
                         {u.status === 'active' ? (
                           <Button variant="danger" size="sm">{t('settings.users.actions.deactivate', 'Deactivate')}</Button>
                         ) : (
@@ -232,6 +249,45 @@ export default function SettingsPage() {
               </tbody>
             </table>
           </div>
+
+          {editing && (() => {
+            const target = myUsers.find(u => u.id === editing.userId);
+            if (!target) return null;
+            const save = () => {
+              const result = updateUserSites(session, target.id, editing.siteIds);
+              if (!result.ok) { setEditError(result.error ?? 'The sites could not be saved.'); return; }
+              setEditing(null);
+              setEditError(null);
+            };
+            return (
+              <div className="bg-paper-2 rounded-lg p-4 border border-line space-y-3 mt-4">
+                <h3 className="text-xs text-grey-500 font-medium">{t('settings.users.edit_sites', 'Sites for {name}', { name: target.name })}</h3>
+                <span id="edit-sites-label" className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</span>
+                <div role="group" aria-labelledby="edit-sites-label" className="space-y-1">
+                  {mySites.map(s => (
+                    <label key={s.id} className="flex items-center gap-2 text-sm text-grey-700">
+                      <input
+                        type="checkbox"
+                        checked={editing.siteIds.includes(s.id)}
+                        onChange={e => setEditing({
+                          ...editing,
+                          siteIds: e.target.checked
+                            ? [...editing.siteIds, s.id]
+                            : editing.siteIds.filter(id => id !== s.id),
+                        })}
+                      />
+                      {s.name}
+                    </label>
+                  ))}
+                </div>
+                {editError && <p role="alert" className="text-xs text-red">{editError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="primary" size="sm" onClick={save}>{t('common.save', 'Save')}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => { setEditing(null); setEditError(null); }}>{t('common.cancel', 'Cancel')}</Button>
+                </div>
+              </div>
+            );
+          })()}
 
           {myUsers.filter(u => hasRole(u, 'tenant_admin') && u.status === 'active').length < 1 && myUsers.length > 0 && (
             <div className="bg-yellow/10 border border-yellow/30 text-yellow-dark text-sm px-4 py-3 rounded-lg mt-4">

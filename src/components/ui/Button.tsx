@@ -14,7 +14,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 
-const variantStyles: Record<ButtonVariant, string> = {
+export const variantStyles: Record<ButtonVariant, string> = {
   primary: 'bg-ink text-white hover:bg-[#1a1b20] active:scale-[0.98]',
   secondary: 'bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 active:scale-[0.98]',
   ghost: 'bg-transparent text-grey-700 hover:bg-paper-2 hover:text-ink',

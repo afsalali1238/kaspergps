@@ -9,7 +9,7 @@ import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 
-import { can, hasRole } from '@/server/capabilities';
+import { can, hasRole, isSiteScopedRole } from '@/server/capabilities';
 
 export function userById(userId: string): User | null {
   return db.getState().users.find(u => u.id === userId) ?? null;
@@ -56,6 +56,7 @@ export function createUser(session: Session, input: CreateUserInput): OpResult<U
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Enter a valid email address.');
   if (db.getState().users.some(u => u.email.toLowerCase() === email)) return fail('This email is already in use.');
   if (!input.tenantId) return fail('Pick a company.');
+  if (isSiteScopedRole(input.role) && (input.siteIds ?? []).length === 0) return fail('Pick at least one site.');
 
   const user: User = {
     id: `u-${nextNumber('u-', db.getState().users, 900)}`,
@@ -108,6 +109,7 @@ export function updateUserRole(session: Session, userId: string, nextRole: Role)
       return fail('Every company needs at least one Tenant Admin.');
     }
   }
+  if (isSiteScopedRole(nextRole) && user.siteIds.length === 0) return fail('Pick at least one site.');
   const before = user.role;
   user.role = nextRole;
   touch('users');
@@ -160,6 +162,7 @@ export function updateUserSites(session: Session, userId: string, siteIds: strin
   if (!canManageUser(session, user)) return fail('You can\u2019t change this user\u2019s sites.');
   if (!hasRole(user, 'site_user')) return fail('Only Site Users are tied to sites.');
   const valid = siteIds.filter(id => db.getState().sites.some(s => s.id === id && s.tenantId === user.tenantId));
+  if (isSiteScopedRole(user.role) && valid.length === 0) return fail('Pick at least one site.');
   user.siteIds = valid;
   touch('users');
   recordAuditForSession(session, {

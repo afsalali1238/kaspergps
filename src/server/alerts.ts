@@ -51,14 +51,33 @@ function toMs(v: string | number): number {
   return typeof v === 'number' ? v : new Date(v).getTime();
 }
 
-function toView(alert: Alert): AlertView {
+/**
+ * The site an alert line names, as this viewer may see it. The owner and Kasper
+ * staff see the asset's home site. A renter sees only the site on their own
+ * rental (H2.7): never the owner's yard.
+ */
+function siteNameFor(session: Session, asset: { id: string; ownerTenantId: string; homeSiteId: string }): string {
+  const sites = db.getState().sites;
+  if (session.isKasper || asset.ownerTenantId === session.tenantId) {
+    return sites.find(s => s.id === asset.homeSiteId)?.name ?? '';
+  }
+  const rental = db.getState().bookings.find(b =>
+    b.assetId === asset.id &&
+    b.renterTenantId === session.tenantId &&
+    (b.status === 'active' || b.status === 'scheduled')
+  );
+  if (!rental?.renterSiteId) return '';
+  return sites.find(s => s.id === rental.renterSiteId)?.name ?? '';
+}
+
+function toView(alert: Alert, session: Session): AlertView {
   const asset = alert.assetId ? db.getState().assets.find(a => a.id === alert.assetId) : undefined;
   return {
     id: alert.id,
     assetId: alert.assetId ?? '',
     assetCode: asset?.code ?? '—',
     assetName: asset?.name ?? '',
-    siteName: asset ? (db.getState().sites.find(s => s.id === asset.homeSiteId)?.name ?? '') : '',
+    siteName: asset ? siteNameFor(session, asset) : '',
     type: alert.type,
     typeLabel: TYPE_LABELS[alert.type] ?? alert.type,
     typeWords: alert.detail,
@@ -107,7 +126,7 @@ function alertVisible(session: Session, alert: Alert, phase: string): boolean {
 export function visibleAlerts(session: Session, phase: string = 'later'): AlertView[] {
   return db.getState().alerts
     .filter(a => alertVisible(session, a, phase))
-    .map(toView)
+    .map(a => toView(a, session))
     .sort((a, b) => toMs(b.openedAt) - toMs(a.openedAt));
 }
 
@@ -138,7 +157,7 @@ export function acknowledgeAlert(session: Session, alertId: string): OpResult<Al
       return fail('Only the owner can acknowledge this alert.');
     }
   }
-  if (alert.acknowledgedAt) return ok(toView(alert), 'Already acknowledged.');
+  if (alert.acknowledgedAt) return ok(toView(alert, session), 'Already acknowledged.');
 
   alert.acknowledgedBy = session.user.name;
   alert.acknowledgedAt = new Date(clock.now()).toISOString();
@@ -149,7 +168,7 @@ export function acknowledgeAlert(session: Session, alertId: string): OpResult<Al
     tenantId: alert.tenantId,
     detail: `Alert ${alert.id} acknowledged: ${alert.detail}`,
   });
-  return ok(toView(alert), `Acknowledged by ${session.user.name} at ${clock.formatDubaiTime(clock.now())}.`);
+  return ok(toView(alert, session), `Acknowledged by ${session.user.name} at ${clock.formatDubaiTime(clock.now())}.`);
 }
 
 /** Alerts for the bell dropdown: open and unacknowledged only. */

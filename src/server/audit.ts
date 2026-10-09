@@ -36,6 +36,30 @@ export function recordAuditForSession(session: Session, input: Omit<AuditInput, 
   return recordAudit({ ...input, actorUserId: session.userId });
 }
 
+/**
+ * Kasper staff opening a tenant's asset (spec §2 rule 10, §5). Written at most
+ * once per user per asset per hour, so a page that re-renders does not flood
+ * the log. Returns null when the view is already recorded for this window.
+ */
+export const CROSS_TENANT_WINDOW_MS = 3600_000;
+
+export function recordCrossTenantView(session: Session, asset: { id: string; ownerTenantId: string }): AuditEntry | null {
+  const since = clock.now() - CROSS_TENANT_WINDOW_MS;
+  const seen = db.getState().auditEntries.some(e =>
+    e.action === 'asset.view.crossTenant' &&
+    e.actorUserId === session.userId &&
+    e.assetId === asset.id &&
+    new Date(e.at).getTime() > since
+  );
+  if (seen) return null;
+  return recordAuditForSession(session, {
+    action: 'asset.view.crossTenant',
+    tenantId: asset.ownerTenantId,
+    assetId: asset.id,
+    detail: `${actorName(session.userId)} viewed ${tenantName(asset.ownerTenantId)} assets`,
+  });
+}
+
 export function actorName(actorUserId: string): string {
   return db.getState().users.find(u => u.id === actorUserId)?.name ?? actorUserId;
 }

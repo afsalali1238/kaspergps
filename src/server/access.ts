@@ -1,3 +1,4 @@
+import { isSiteScoped } from '@/server/capabilities';
 // Access data — who is related to which asset, and when.
 // Permission decisions live in capabilities.ts: `can(session, cap, assetId?)`.
 // This module only answers "is this asset visible", "what is the relationship",
@@ -19,7 +20,7 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
   if (asset.ownerTenantId === session.tenantId) {
     // Same-tenant assets: tenant admins (no sites) see all;
     // site users see only assets at their sites.
-    if (session.siteIds.length === 0) return true;
+    if (!isSiteScoped(session)) return true;
     return session.siteIds.includes(asset.homeSiteId);
   }
 
@@ -29,7 +30,7 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
     const now = clock.now();
     if (!(new Date(booking.start).getTime() <= now && now <= getGrantEnd(booking))) return false;
     // Tenant admins with no site restriction see all sites; site users must match a site
-    if (session.siteIds.length === 0) return true;
+    if (!isSiteScoped(session)) return true;
     return session.siteIds.includes(booking.renterSiteId!);
   }
 
@@ -115,7 +116,7 @@ export function pastRentalFor(session: Session, assetId: string): Booking | null
     b.assetId === assetId &&
     b.renterTenantId === session.tenantId &&
     getGrantEnd(b) <= now &&
-    (session.siteIds.length === 0 || session.siteIds.includes(b.renterSiteId ?? ''))
+    (!isSiteScoped(session) || session.siteIds.includes(b.renterSiteId ?? ''))
   );
   return booking ?? null;
 }
