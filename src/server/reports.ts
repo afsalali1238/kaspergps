@@ -8,6 +8,7 @@ import { fail, ok, type OpResult } from '@/server/result';
 import { hasCapability, getRelationship, isAssetVisible, isRenterWindowPast, rentalWindow } from '@/server/access';
 import { hasFeature } from '@/domain/features';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
+import { buildIgnitionBreakdown } from '@/server/utilisation';
 import { detectTrips, findGaps } from '@/server/trips';
 import { buildEcuBreakdown } from '@/server/muc';
 import { IDLE_SPEED_KMH, OVERSPEED_KMH, WORKING_LOAD_PCT, FUEL_DROP_PCT } from '@/config/thresholds';
@@ -303,9 +304,22 @@ function buildUtilisation(asset: Asset, fromMs: number, toMs: number): ExportTab
   const columns = tier3
     ? ['Date', 'Working h', 'Idling h', 'Off h', 'Source']
     : ['Date', 'Moving h', 'Stationary, ignition on h', 'Off h', 'Source'];
+  // Without an engine-load signal the report and the asset screen must print the
+  // same ignition hours, so the Tier 1/2 rows come from buildIgnitionBreakdown —
+  // one rule, one number, in the PDF, in the spreadsheet and on the tab.
+  const ignitionDays = new Map(
+    (tier3 ? [] : buildIgnitionBreakdown(asset, fromMs, toMs).days).map(d => [d.key, d])
+  );
   for (const day of daysBetween(fromMs, toMs)) {
     const dStart = day.startMs;
     const dEnd = dStart + 86_400_000;
+    if (!tier3) {
+      const bucket = ignitionDays.get(day.key);
+      rows.push(bucket
+        ? [day.display, bucket.movingHours, bucket.stationaryHours, bucket.offHours, 'Ignition · Estimated']
+        : [day.display, 'Not measured', 'Not measured', 'Not measured', 'No readings in this window']);
+      continue;
+    }
     const readings = getReadingsForAsset(asset, Math.max(dStart, fromMs), Math.min(dEnd, toMs))
       .sort((a, b) => readingMs(a) - readingMs(b));
     let movingMs = 0;
@@ -318,16 +332,12 @@ function buildUtilisation(asset: Asset, fromMs: number, toMs: number): ExportTab
       if (dt > 10 * 60_000 || dt < 0) continue;
       if (a.ignition && a.speedKmh > IDLE_SPEED_KMH) movingMs += dt;
       else if (a.ignition) {
-        if (tier3 && (a.engineLoadPct ?? 0) >= WORKING_LOAD_PCT) workingMs += dt;
+        if ((a.engineLoadPct ?? 0) >= WORKING_LOAD_PCT) workingMs += dt;
         else idleMs += dt;
       }
     }
     const off = Math.max(0, dEnd - dStart - movingMs - workingMs - idleMs) / 3600_000;
-    if (tier3) {
-      rows.push([day.display, n1((movingMs + workingMs) / 3600_000), n1(idleMs / 3600_000), n1(off), 'ECU · engine load']);
-    } else {
-      rows.push([day.display, n1(movingMs / 3600_000), n1((workingMs + idleMs) / 3600_000), n1(off), 'Ignition · Estimated']);
-    }
+    rows.push([day.display, n1((movingMs + workingMs) / 3600_000), n1(idleMs / 3600_000), n1(off), 'ECU · engine load']);
   }
   return [{ title: `${asset.code} utilisation`, columns, rows }];
 }

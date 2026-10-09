@@ -49,7 +49,9 @@ test.describe('S19 — Lina invites a user', () => {
   test('an invited user appears in the View as dropdown afterwards', async ({ page }) => {
     await demo(page, { email: USERS.lina, on: '/app/settings' });
     await page.getByRole('button', { name: 'Invite user' }).click();
-    await page.getByLabel('Full name').fill('Huda Test');
+    // The field's accessible name is its <label> ("Name"); "Full name" is only
+    // the placeholder, which getByLabel does not match.
+    await page.getByLabel('Name').fill('Huda Test');
     await page.getByLabel('Email').fill('huda@marina.ae');
     await page.getByLabel('Sites').selectOption({ index: 1 });
     await page.getByRole('button', { name: 'Send invite' }).click();

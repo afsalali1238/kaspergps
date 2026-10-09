@@ -8,12 +8,15 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, EmptyState, Skeleton,
-  Button,
+  Button, SourceLabel,
 } from '@/components/ui';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { isAssetVisible, getRelationship } from '@/server/access';
+import { hasFeature } from '@/domain/features';
+import { visibleAlerts } from '@/server/alerts';
+import { fleetTodayTotals, engineHoursToday, hoursSourceFor } from '@/server/utilisation';
 import { getReadingForAsset } from '@/server/telemetry/simulator';
 import type { Asset, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
@@ -70,6 +73,11 @@ interface AssetMarker {
   lng: number;
   asset: Asset;
   lastReadingMs: number;
+  /** Phase 2+ list columns (spec 11.2) — null when this asset can't measure it. */
+  fuelPct: number | null;
+  engineHoursToday: number | null;
+  hoursSource: ReturnType<typeof hoursSourceFor>;
+  openAlerts: number;
 }
 
 function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
@@ -198,9 +206,39 @@ export default function MapPage() {
         lng,
         asset: a,
         lastReadingMs: reading ? new Date(reading.deviceTime).getTime() : clock.now(),
+        fuelPct: reading && hasFeature(a, 'fuel.level') && reading.fuelLevelPct !== undefined
+          ? Math.round(reading.fuelLevelPct)
+          : null,
+        engineHoursToday: engineHoursToday(a),
+        hoursSource: hoursSourceFor(a),
+        openAlerts: openAlerts.get(a.id) ?? 0,
       };
     });
   }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView, locale]);
+
+  // Open alerts per asset, for the list badges and the "Open alerts" tile.
+  const openAlerts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!session || phase === 'day_one') return counts;
+    for (const alert of visibleAlerts(session, phase)) {
+      if (alert.status !== 'open' || !alert.assetId) continue;
+      counts.set(alert.assetId, (counts.get(alert.assetId) ?? 0) + 1);
+    }
+    return counts;
+  }, [session, phase]);
+
+  const visibleOpenAlerts = useMemo(
+    () => visibleAssets.reduce((sum, a) => sum + (openAlerts.get(a.id) ?? 0), 0),
+    [visibleAssets, openAlerts]
+  );
+
+  // Phase 2+ "today" tiles (spec 11.2). An asset that can't meter a number
+  // contributes nothing, and a tile with no measuring asset is not shown at all
+  // — the strip never reports a fleet total of zero for data it never received.
+  const today = useMemo(() => {
+    if (!session || phase === 'day_one') return null;
+    return fleetTodayTotals(visibleAssets.map(a => a.asset));
+  }, [session, phase, visibleAssets]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { live: 0, idle: 0, stale: 0, offline: 0, unknown: 0, no_tracker: 0 };
@@ -253,6 +291,41 @@ export default function MapPage() {
         <div className="flex-1" />
         <span className="text-xs text-grey-500 font-mono">{t('common.assets_count', '{count} assets', { count: totalVisible })}</span>
       </div>
+
+      {today && (today.engineAssets > 0 || today.fuelAssets > 0 || openAlerts.size > 0) && (
+        <div className="flex flex-wrap gap-2" data-testid="today-tiles">
+          {today.engineAssets > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface text-xs">
+              <span className="text-grey-500">{t('map.kpi.engine_hours_today', 'Engine hours today (ECU)')}</span>
+              <span className="font-mono font-semibold text-ink">
+                {t('common.hours_short', '{value} h', { value: today.engineHours.toFixed(1) })}
+              </span>
+              <span className="text-[10px] text-grey-500">{t('common.assets_count', '{count} assets', { count: today.engineAssets })}</span>
+            </div>
+          )}
+          {today.fuelAssets > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface text-xs">
+              <span className="text-grey-500">{t('map.kpi.fuel_used_today', 'Fuel used today')}</span>
+              <span className="font-mono font-semibold text-ink">
+                {t('map.kpi.litres_short', '{value} L', { value: today.fuelLitres.toFixed(1) })}
+              </span>
+              {today.fuelEstimatedAssets > 0 && (
+                <SourceLabel source="Estimated" inline />
+              )}
+              <span className="text-[10px] text-grey-500">{t('common.assets_count', '{count} assets', { count: today.fuelAssets })}</span>
+            </div>
+          )}
+          {openAlerts.size > 0 && (
+            <Link
+              href={href('/app/alerts')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface text-xs hover:border-grey-500 hover:bg-paper-2"
+            >
+              <span className="text-grey-500">{t('map.kpi.open_alerts', 'Open alerts')}</span>
+              <span className="font-mono font-semibold text-red">{visibleOpenAlerts}</span>
+            </Link>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div>
@@ -419,6 +492,27 @@ export default function MapPage() {
                     <div className="text-xs text-grey-500 mt-0.5">
                       {a.siteName} · {a.lastUpdated}
                     </div>
+                    {phase !== 'day_one' && (a.fuelPct !== null || a.engineHoursToday !== null || a.openAlerts > 0) && (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-grey-500 mt-1">
+                        {a.fuelPct !== null && (
+                          <span>{t('map.columns.fuel', 'Fuel %')} <span className="font-mono text-grey-700">{a.fuelPct}%</span></span>
+                        )}
+                        {a.engineHoursToday !== null && (
+                          <span className="inline-flex items-center gap-1">
+                            {t('map.columns.engine_hours', 'Engine hours')}
+                            <span className="font-mono text-grey-700">
+                              {t('common.hours_short', '{value} h', { value: a.engineHoursToday.toFixed(1) })}
+                            </span>
+                            <SourceLabel source={a.hoursSource} inline />
+                          </span>
+                        )}
+                        {a.openAlerts > 0 && (
+                          <span className="text-red">
+                            {t('map.columns.open_alerts', 'Open alerts')} <span className="font-mono">{a.openAlerts}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <TierChip tier={a.tier} />

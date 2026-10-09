@@ -10,6 +10,8 @@ import {
   voidStatement, MIN_HOURS_PER_DAY,
 } from './billing';
 import { seed } from '@/server/seed/data';
+import { VAT_PCT } from '@/config/thresholds';
+import * as clock from '@/lib/clock';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string, role?: Session['role']): Session {
@@ -282,6 +284,149 @@ describe('billing — reports and alerts', () => {
     const alerts = overdueInvoiceAlerts(khalid());
     for (const alert of alerts) {
       expect(alert.text).toMatch(/^Invoice INV-EE-\d+ is overdue \(\d+ days?\)$/);
+    }
+  });
+});
+
+// ── Reconciliation ────────────────────────────────────────────────────────────
+// The money invariant the whole screen rests on: an invoice is worth its lines,
+// its payments plus its balance are its total, and the reports are the sum of
+// the invoices they were built from. These run over whatever the seed and the
+// tests above have produced, so they also catch a mutation that breaks the tie.
+
+describe('billing — reconciliation', () => {
+  const allIssued = () => {
+    const byId = new Map<string, ReturnType<typeof issuedInvoices>[number]>();
+    for (const who of [khalid(), omar(), sara()]) {
+      for (const inv of issuedInvoices(who)) byId.set(inv.id, inv);
+    }
+    return [...byId.values()];
+  };
+
+  it('every invoice is its payments plus its balance', () => {
+    const invoices = allIssued();
+    expect(invoices.length).toBeGreaterThan(0);
+    // Guard the loop below: an invariant over an empty or uniform set proves
+    // nothing, so the shapes that must exist in the demo data are named here.
+    expect(invoices.some(i => i.paidAed > 0 && i.balanceAed > 0)).toBe(true);   // part-paid
+    expect(invoices.some(i => i.displayStatus === 'paid')).toBe(true);          // settled
+    expect(invoices.some(i => i.paidAed === 0 && i.balanceAed > 0)).toBe(true); // untouched
+
+    for (const inv of invoices) {
+      const paid = paymentsFor(inv.id).reduce((sum, p) => sum + p.amountAed, 0);
+      expect(inv.paidAed).toBeCloseTo(paid, 2);
+      expect(inv.paidAed + inv.balanceAed).toBeCloseTo(inv.totalAed, 2);
+      expect(inv.balanceAed).toBeGreaterThanOrEqual(0);
+      expect(inv.paidAed).toBeLessThanOrEqual(inv.totalAed + 0.005);
+
+      if (inv.displayStatus === 'paid') expect(inv.balanceAed).toBe(0);
+      if (inv.status === 'unpaid') {
+        expect(inv.paidAed).toBe(0);
+        expect(inv.balanceAed).toBeCloseTo(inv.totalAed, 2);
+      }
+      // A void invoice is never part of what is owed, and is never settled.
+      if (inv.status === 'void') expect(inv.paidAed).toBe(0);
+    }
+  });
+
+  it('the issuer and the customer see the same money on the same invoice', () => {
+    const issuer = issuedInvoices(khalid());
+    const payer = receivedInvoices(lina());
+    const shared = issuer.filter(inv => payer.some(p => p.id === inv.id));
+    expect(shared.length).toBeGreaterThan(0);
+
+    for (const inv of shared) {
+      const other = payer.find(p => p.id === inv.id)!;
+      expect(other.totalAed).toBe(inv.totalAed);
+      expect(other.paidAed).toBe(inv.paidAed);
+      expect(other.balanceAed).toBe(inv.balanceAed);
+      expect(other.displayStatus).toBe(inv.displayStatus);
+    }
+  });
+
+  it('the summary is the sum of the invoices in its window', () => {
+    const session = khalid();
+    const from = clock.now() - 365 * 86_400_000;
+    const to = clock.now() + 86_400_000;
+    const summary = billingSummary(session, from, to);
+    const inWindow = issuedInvoices(session).filter(inv =>
+      inv.status !== 'void' && new Date(inv.issuedAt).getTime() >= from && new Date(inv.issuedAt).getTime() <= to
+    );
+
+    const sum = (pick: (i: (typeof inWindow)[number]) => number) =>
+      Math.round(inWindow.reduce((total, inv) => total + pick(inv), 0) * 100) / 100;
+
+    expect(summary.issuedAed).toBeCloseTo(sum(i => i.totalAed), 2);
+    expect(summary.paidAed).toBeCloseTo(sum(i => i.paidAed), 2);
+    expect(summary.outstandingAed).toBeCloseTo(sum(i => i.balanceAed), 2);
+    expect(summary.paidAed + summary.outstandingAed).toBeCloseTo(summary.issuedAed, 2);
+
+    // Paid and outstanding can never exceed what was issued per customer either.
+    const perCustomer = summary.byCustomer.reduce(
+      (acc, row) => ({
+        issued: acc.issued + row.issuedAed,
+        outstanding: acc.outstanding + row.outstandingAed,
+      }),
+      { issued: 0, outstanding: 0 },
+    );
+    expect(perCustomer.issued).toBeCloseTo(summary.issuedAed, 2);
+    expect(perCustomer.outstanding).toBeCloseTo(summary.outstandingAed, 2);
+  });
+
+  it('the ageing buckets lose nothing on the way to receivables', () => {
+    const session = omar();
+    const outstanding = issuedInvoices(session)
+      .filter(inv => inv.status !== 'void' && inv.balanceAed > 0)
+      .reduce((sum, inv) => sum + inv.balanceAed, 0);
+    const aged = agedReceivables(session).reduce((sum, b) => sum + b.amountAed, 0);
+    expect(aged).toBeCloseTo(outstanding, 2);
+  });
+
+  it('taking an invoice out of the books takes exactly its total and its balance', () => {
+    const issuer = omar();
+    const target = issuedInvoices(issuer).find(i => i.status === 'unpaid' && i.balanceAed > 0)!;
+    const from = clock.now() - 365 * 86_400_000;
+    const to = clock.now() + 86_400_000;
+    const before = billingSummary(issuer, from, to);
+
+    const voided = voidInvoice(issuer, target.id, 'Duplicate of AN-0097');
+    expect(voided.ok).toBe(true);
+
+    const after = billingSummary(issuer, from, to);
+    expect(after.issuedAed).toBeCloseTo(before.issuedAed - target.totalAed, 2);
+    expect(after.outstandingAed).toBeCloseTo(before.outstandingAed - target.balanceAed, 2);
+
+    const view = invoiceById(target.id)!;
+    expect(view.status).toBe('void');
+    // A void invoice never carries payments and never enters the ageing table.
+    expect(paidTotal(target.id)).toBe(0);
+    expect(agedReceivables(issuer).reduce((sum, b) => sum + b.amountAed, 0))
+      .toBeCloseTo(after.outstandingAed, 2);
+  });
+
+  it('a GPS statement is its tier lines with VAT, and matches the invoice it becomes', () => {
+    const statements = lastMonthStatements();
+    if (!statements.some(s => s.invoiceId)) {
+      // Generate one here rather than rely on the earlier test having done it.
+      const pending = statements.find(s => !s.invoiceId && s.totalAed > 0)!;
+      expect(generateStatement(sara(), pending.tenantId).ok).toBe(true);
+    }
+    expect(lastMonthStatements().some(s => s.invoiceId)).toBe(true);
+
+    for (const statement of lastMonthStatements()) {
+      const subtotal = Math.round(statement.lines.reduce((sum, l) => sum + l.amountAed, 0) * 100) / 100;
+      expect(statement.subtotalAed).toBeCloseTo(subtotal, 2);
+      for (const line of statement.lines) {
+        expect(line.amountAed).toBeCloseTo(line.count * line.rateAed, 2);
+      }
+      expect(statement.totalAed).toBeCloseTo(subtotal * (1 + VAT_PCT / 100), 2);
+
+      if (statement.invoiceId) {
+        const invoice = invoiceById(statement.invoiceId)!;
+        expect(invoice.kind).toBe('gps_subscription');
+        expect(invoice.totalAed).toBeCloseTo(statement.totalAed, 2);
+        expect(statement.paidAed).toBeCloseTo(paidTotal(invoice.id), 2);
+      }
     }
   });
 });

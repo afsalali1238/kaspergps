@@ -172,7 +172,8 @@
     "kpi": {
       "engine_hours_today": "ساعات المحرك اليوم (ECU)",
       "fuel_used_today": "الوقود المستهلك اليوم",
-      "open_alerts": "التنبيهات المفتوحة"
+      "open_alerts": "التنبيهات المفتوحة",
+      "litres_short": "{value} ل"
     },
     "columns": {
       "asset": "المعدّة",
@@ -249,7 +250,10 @@
       "request_hint": "اطلب جهاز تتبع وسيؤكد كاسبر موعد التركيب.",
       "contact_kasper": "لا يوجد جهاز تتبع على هذه المعدّة. تواصل مع كاسبر لتركيب واحد.",
       "request_note": "ملاحظة اختيارية لكاسبر",
-      "ecu_partial": "ECU · جزئي · اليوم"
+      "ecu_partial": "ECU · جزئي · اليوم",
+      "km": "{value} كم",
+      "since_midnight": "منذ منتصف الليل بتوقيت دبي",
+      "tracker_battery": "بطارية جهاز التتبع {value}"
     },
     "history": {
       "positions": "المواقع",
@@ -316,7 +320,12 @@
       "off": "متوقف",
       "moving": "متحرك",
       "ignition_stationary": "الإشعال مفعّل، بلا حركة",
-      "note": "المصدر: {source}"
+      "note": "المصدر: {source}",
+      "not_billing_grade": "لا تُستخدم للفوترة",
+      "ignition_note": "من خط الإشعال نفسه: لا توجد ساعات محرك من وحدة التحكم لتُختم منها شهادة، لذلك يُقسَّم اليوم حسب حالة الإشعال والحركة.",
+      "split": "تقسيم اليوم",
+      "day_split": "{stationary} ساعة ثابت، {moving} ساعة متحرك، {off} ساعة متوقف",
+      "source_ignition": "ساعات الإشعال · تقديري"
     },
     "share": {
       "title": "مشاركة رابط التتبع",
