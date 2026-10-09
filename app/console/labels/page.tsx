@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb } from '@/server/api';
 import { useSession } from '@/hooks';
 
 interface Label {

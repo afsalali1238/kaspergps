@@ -182,8 +182,9 @@ describe('maintenance — plans and fault-code tasks', () => {
     // Fault codes are Tier 3 only: a tracker-only asset and a partial CAN asset are refused.
     append('alerts', { ...fault, id: 'al-fake1', assetId: 'a-fb14' });
     append('alerts', { ...fault, id: 'al-fake2', assetId: 'a-pu51' });
-    expect(createTaskFromFault(khalid(), 'al-fake1').error).toContain('has no CAN bus');
-    expect(createTaskFromFault(khalid(), 'al-fake2').error).toContain('has no CAN bus');
+    // The owner's admin is refused for the tracker-only asset by the tier rule.
+    expect(createTaskFromFault(omar(), 'al-fake1').error).toContain('has no CAN bus');
+    expect(createTaskFromFault(lina(), 'al-fake2').error).toContain('has no CAN bus');
     expect(createTaskFromFault(khalid(), 'al-missing').error).toBe('Fault code not found.');
     expect(createTaskFromFault(mark(), fault.id).error).toBe('Your role can\u2019t create service tasks.');
   });

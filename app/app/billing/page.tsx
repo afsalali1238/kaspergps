@@ -8,14 +8,8 @@ import React, { useMemo, useState } from 'react';
 import {
   Badge, Button, EmptyState,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
-import { hasCapability } from '@/server/access';
-import type { InvoiceView } from '@/server/billing';
-import {
-  aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking,
-  invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice,
-  receivedInvoices, recordPayment, statementsFor, voidInvoice,
-} from '@/server/billing';
+import { useDb, type InvoiceView, aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice, receivedInvoices, recordPayment, statementsFor, voidInvoice, can } from '@/server/api';
+
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
 import { downloadBoth, downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
@@ -117,7 +111,7 @@ export default function BillingPage() {
     );
   }
 
-  if (!hasCapability(session, 'billing.view')) {
+  if (!can(session, 'billing.view')) {
     return (
       <div className="p-4">
         <h1 className="text-lg font-semibold text-ink mb-4">{t('billing.title', 'Billing')}</h1>

@@ -11,12 +11,13 @@ import type {
 import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { isBillingGradeHours, tierForAsset } from '@/domain/features';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { INVOICE_DUE_DAYS, VAT_PCT } from '@/config/thresholds';
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 const DAY = 86400000;
 /** Dummy minimum billable hours per day on hire (spec 11.17). */
@@ -62,13 +63,13 @@ export function invoiceView(invoice: Invoice, nowMs: number = clock.now()): Invo
 }
 
 export function canRecordPayment(session: Session, invoice: Invoice): boolean {
-  if (!hasCapability(session, 'billing.recordPayment')) return false;
+  if (!can(session, 'billing.recordPayment')) return false;
   if (session.isKasper) return true;
   return invoice.issuerTenantId === session.tenantId;
 }
 
 export function canPay(session: Session, invoice: Invoice): boolean {
-  if (!hasCapability(session, 'billing.pay')) return false;
+  if (!can(session, 'billing.pay')) return false;
   return invoice.customerTenantId !== null && invoice.customerTenantId === session.tenantId;
 }
 
@@ -82,7 +83,7 @@ export function invoiceByNumber(number: string): Invoice | null {
 
 /** Invoices the session can see, newest first (spec 11.17 capability table). */
 export function issuedInvoices(session: Session): InvoiceView[] {
-  if (!hasCapability(session, 'billing.view')) return [];
+  if (!can(session, 'billing.view')) return [];
   const nowMs = clock.now();
   return db.getState().invoices
     .filter(inv => (session.isKasper ? true : inv.issuerTenantId === session.tenantId) && inv.kind === 'rental')
@@ -91,7 +92,7 @@ export function issuedInvoices(session: Session): InvoiceView[] {
 }
 
 export function receivedInvoices(session: Session): InvoiceView[] {
-  if (!hasCapability(session, 'billing.view') || session.isKasper) return [];
+  if (!can(session, 'billing.view') || session.isKasper) return [];
   const nowMs = clock.now();
   return db.getState().invoices
     .filter(inv => inv.customerTenantId === session.tenantId)
@@ -250,7 +251,7 @@ export function createInvoiceFromBooking(session: Session, input: CreateInvoiceI
 
   const isOwner = asset.ownerTenantId === session.tenantId;
   if (!session.isKasper && !isOwner) return fail('Only the asset owner can invoice a rental.');
-  if (!hasCapability(session, 'billing.recordPayment')) return fail('Your role can\u2019t create invoices.');
+  if (!can(session, 'billing.recordPayment')) return fail('Your role can\u2019t create invoices.');
   if (asset.retiredAt) return fail('This asset is retired.');
 
   const fromMs = ms(booking.start);
@@ -435,7 +436,7 @@ export function lastMonthStatements(nowMs: number = clock.now()): TenantStatemen
 
 /** Generate (idempotently) last month's statement for one tenant. */
 export function generateStatement(session: Session, tenantId: string): OpResult<Invoice> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can generate statements.');
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can generate statements.');
   const tenant = db.getState().tenants.find(t => t.id === tenantId);
   if (!tenant) return fail('Tenant not found.');
   const statement = lastMonthStatements().find(s => s.tenantId === tenantId);
@@ -496,7 +497,7 @@ export function statementById(id: string): Invoice | null {
 
 /** Record a payment on a GPS statement (Kasper Admin, spec 11.17). */
 export function recordStatementPayment(session: Session, statementId: string, input: PaymentInput): OpResult<Payment> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can record payments on statements.');
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can record payments on statements.');
   const statement = statementById(statementId);
   if (!statement) return fail('Statement not found.');
   const balance = n2(statement.totalAed - paidTotal(statement.id));
@@ -527,7 +528,7 @@ export function recordStatementPayment(session: Session, statementId: string, in
 }
 
 export function voidStatement(session: Session, statementId: string, reason: string): OpResult<Invoice> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can void statements.');
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can void statements.');
   const statement = statementById(statementId);
   if (!statement) return fail('Statement not found.');
   if (statement.status === 'void') return fail('This statement is already void.');

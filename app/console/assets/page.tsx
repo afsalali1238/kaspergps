@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Button, Badge, TierChip, EmptyState,
 } from '@/components/ui';
-import { useDb, type DbState } from '@/server/db';
+import { useDb, type DbState } from '@/server/api';
 import type { Asset } from '@/domain/types';
 import { useSession } from '@/hooks';
 

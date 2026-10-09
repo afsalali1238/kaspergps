@@ -6,8 +6,8 @@
 import type { ReportSchedule, Session } from '@/domain/types';
 import { db, append, removeWhere, touch, nextNumber } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
-import { isKasperStaff } from '@/server/capabilities';
+
+import { can, isKasperStaff } from '@/server/capabilities';
 import { runReport, reportableAssets, REPORT_TYPES, type ReportTypeId } from '@/server/reports';
 import * as clock from '@/lib/clock';
 
@@ -45,7 +45,7 @@ function nextRunAfter(baseMs: number, frequency: ScheduleFrequency, runAt: strin
 
 export function createSchedule(session: Session, input: CreateScheduleInput): OpResult<ReportSchedule> {
   const schedulePrefix = `rs-${clock.now()}-`;
-  if (!hasCapability(session, 'report.schedule')) return fail('You can’t create report schedules.');
+  if (!can(session, 'report.schedule')) return fail('You can’t create report schedules.');
   const reportable = new Set(reportableAssets(session).map(a => a.id));
   if (input.assetIds.length === 0) return fail('Pick at least one asset.');
   for (const id of input.assetIds) {

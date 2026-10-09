@@ -4,15 +4,9 @@ import React, { useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb, ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, fitAdapter, stockAdapters, currentTrackerForAsset } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, CanAdapter } from '@/domain/types';
-import {
-  ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fittedAssetFor,
-  fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, fitAdapter,
-  stockAdapters,
-} from '@/server/adapters';
-import { currentTrackerForAsset } from '@/server/trackers';
 import { useSession } from '@/hooks';
 
 function adapterModelLabel(model: string): string {

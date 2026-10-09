@@ -9,6 +9,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 // 3. No Date.now() or new Date() outside clock.ts and seed/telemetry
 // 4. No "device" or "Dozr" in src/
 // 5. No getState() in app/ or src/components/ (F2): screens read through hooks.
+// 6. Screens import server code only from src/server/api (F3).
 
 // The restricted-syntax rules every source file follows.
 const BASE_RESTRICTED_SYNTAX = [
@@ -80,12 +81,19 @@ export default [
     },
   },
 
-  // Screens and components: no getState(), anywhere (F2).
+  // Screens and components: no getState(), anywhere (F2). Server code only
+  // through src/server/api.ts (F3): the facade enforces access with can().
   {
     files: ['app/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}'],
     ignores: ['**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX, NO_GET_STATE],
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/server/**', '!@/server/api'],
+          message: 'Screens import server code only from @/server/api (F3). Add a re-export there if you need a new function.',
+        }],
+      }],
     },
   },
 

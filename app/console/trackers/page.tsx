@@ -4,14 +4,9 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb, assetsWithoutTracker, currentPairingForTracker, markTrackerFaulty, pairingHistory, pairTracker, pairingTargetsFor, registerTracker, retireTracker, unpairTracker, updateTrackerSettings } from '@/server/api';
 import type { Asset, Tracker, TrackerSleepMode } from '@/domain/types';
 import * as clock from '@/lib/clock';
-import {
-  assetsWithoutTracker, currentPairingForTracker, markTrackerFaulty,
-  pairingHistory, pairTracker, pairingTargetsFor, registerTracker, retireTracker,
-  unpairTracker, updateTrackerSettings,
-} from '@/server/trackers';
 import { isValidIccid, isValidImei, ICCID_ERROR, IMEI_ERROR } from '@/domain/tracker-id';
 import { useSession } from '@/hooks';
 

@@ -5,9 +5,8 @@ import {
   Button, Badge, EmptyState,
   Tabs,
 } from '@/components/ui';
-import { useDb, append, nextRowNumber } from '@/server/db';
-import { hasCapability } from '@/server/access';
-import type { Capability } from '@/server/capabilities';
+import { useDb, append, nextRowNumber, type Capability, can } from '@/server/api';
+
 import type { AssetClass, Role, SimBehaviour } from '@/domain/types';
 import * as clock from '@/lib/clock';
 import { useSession } from '@/hooks';
@@ -469,7 +468,7 @@ export default function ConsoleImportPage() {
 
   const [activeTab, setActiveTab] = useState('assets');
 
-  if (!session || !hasCapability(session, 'console.import')) {
+  if (!session || !can(session, 'console.import')) {
     return (
       <div className="text-center py-8">
         <EmptyState title="Not available" description="Only Kasper Admin and Ops can import." />
@@ -477,7 +476,7 @@ export default function ConsoleImportPage() {
     );
   }
 
-  const allowedTabs = importerTabs.filter(t => hasCapability(session, t.cap));
+  const allowedTabs = importerTabs.filter(t => can(session, t.cap));
   const tab = allowedTabs.some(t => t.id === activeTab) ? activeTab : (allowedTabs[0]?.id ?? '');
 
   return (

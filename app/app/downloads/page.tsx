@@ -8,8 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { reportRunsFor, regenerateReport, deleteReportRun } from '@/server/reports';
-import { runDueSchedules } from '@/server/schedules';
+import { reportRunsFor, regenerateReport, deleteReportRun, runDueSchedules } from '@/server/api';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';

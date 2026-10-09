@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button, Badge, StatusBadge, TierChip, Table } from '@/components/ui';
-import { useDb, type DbRow, type DbState } from '@/server/db';
+import { useDb, type DbRow, type DbState } from '@/server/api';
 import { storeActions } from '@/hooks';
 import type { AssetStatus } from '@/domain/types';
 import * as clock from '@/lib/clock';

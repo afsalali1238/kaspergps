@@ -7,8 +7,8 @@ import type { Asset, Booking, Session } from '@/domain/types';
 import { db, append, nextNumber, touch } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { canEndAccess, hasCapability } from '@/server/access';
-import { hasRole } from '@/server/capabilities';
+
+import { can, hasRole } from '@/server/capabilities';
 import { recordAuditForSession } from '@/server/audit';
 import { revokeLinksForBooking } from '@/server/tracking-links';
 
@@ -51,7 +51,7 @@ export function overlappingBooking(assetId: string, startMs: number, endMs: numb
  * asset's own Tenant Admin. Renters never create their own bookings.
  */
 export function canManageBookings(session: Session, asset: Asset): boolean {
-  if (hasCapability(session, 'console.bookings.manage')) return true;
+  if (can(session, 'console.bookings.manage')) return true;
   return hasRole(session, 'tenant_admin') && session.tenantId === asset.ownerTenantId;
 }
 
@@ -252,7 +252,7 @@ export function endEarly(session: Session, bookingId: string, reason: string): O
   if (!booking) return fail('Booking not found.');
   const asset = db.getState().assets.find(a => a.id === booking.assetId);
   if (!asset) return fail('Asset not found.');
-  if (!canEndAccess(session, asset.id)) {
+  if (!can(session, 'grant.endEarly', asset.id)) {
     return fail('Only the owner or Kasper can end this rental early.');
   }
   if (booking.status === 'closed' || booking.status === 'cancelled') return fail('This booking has already ended.');

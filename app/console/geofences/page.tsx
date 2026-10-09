@@ -4,9 +4,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import {
-  visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence,
-} from '@/server/geofences';
+import { visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useSession } from '@/hooks';
 

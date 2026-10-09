@@ -4,13 +4,9 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { hasRole } from '@/server/capabilities';
-import { useDb, type DbState } from '@/server/db';
+import { hasRole, useDb, type DbState, cancelBooking, closeBooking, extendBooking, shortenBooking } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Session, Booking } from '@/domain/types';
-import {
-  cancelBooking, closeBooking, extendBooking, shortenBooking,
-} from '@/server/bookings';
 import { useSession } from '@/hooks';
 
 function bookingStatusWords(booking: Booking): string {
@@ -119,7 +115,7 @@ export default function BookingsSimulatorPage() {
   };
 
   if (!session) return null;
-  if (!session.isKasper && session.role !== 'tenant_admin') {
+  if (!session.isKasper && !hasRole(session, 'tenant_admin')) {
     return (
       <div className="text-center py-8">
         <EmptyState

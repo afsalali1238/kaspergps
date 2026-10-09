@@ -4,9 +4,10 @@
 import type { Geofence, GeofenceEvent, Session } from '@/domain/types';
 import { db, append, removeWhere } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, isAssetVisible } from '@/server/access';
+import { isAssetVisible } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 export interface GeofenceEventView {
   id: string;
@@ -113,7 +114,7 @@ export interface CreateGeofenceInput {
 
 /** Create (circle): Kasper or the tenant admin (geofence.manage). */
 export function createGeofence(session: Session, input: CreateGeofenceInput): OpResult<GeofenceView> {
-  if (!hasCapability(session, 'geofence.manage')) {
+  if (!can(session, 'geofence.manage')) {
     return fail('You can’t create geofences.');
   }
   const name = input.name.trim();
@@ -145,7 +146,7 @@ export function createGeofence(session: Session, input: CreateGeofenceInput): Op
 
 /** Delete: Kasper or the owner tenant admin. */
 export function deleteGeofence(session: Session, id: string): OpResult<null> {
-  if (!hasCapability(session, 'geofence.manage')) {
+  if (!can(session, 'geofence.manage')) {
     return fail('You can’t delete geofences.');
   }
   const idx = db.getState().geofences.findIndex(g => g.id === id && geofenceVisible(session, g));

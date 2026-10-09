@@ -4,12 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
-import { hasRole } from '@/server/capabilities';
-import {
-  getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
-} from '@/server/muc';
-import type { MucVerifyStatus } from '@/server/muc';
+import { useDb, hasRole, getMucVerifyStatus, issueMuc, reissueMuc, voidMuc, type MucVerifyStatus } from '@/server/api';
 import { downloadMucPdf } from '@/lib/muc-pdf';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';

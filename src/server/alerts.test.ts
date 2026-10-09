@@ -58,12 +58,15 @@ describe('alerts (§11.4)', () => {
     expect(result.data!.acknowledgedBy).toBe('Omar Saleh');
     // Acknowledging again is idempotent.
     expect(acknowledgeAlert(omar, 'al-tp23-power').ok).toBe(true);
-    // A closed alert stays closed even when acknowledged.
-    const fatima = sessionFor('u-fatima'); // Palm Tenant Admin — al-wl06-geo is a closed exit
-    const closed = acknowledgeAlert(fatima, 'al-wl06-geo');
+    // Spec §5: a renter never acknowledges (alert.acknowledge is ✕ for renters).
+    const fatima = sessionFor('u-fatima'); // Palm Tenant Admin — renter of EX-11 / WL-06
+    expect(acknowledgeAlert(fatima, 'al-wl06-geo').ok).toBe(false);
+    // A closed alert stays closed even when the owner acknowledges it.
+    const khalid = sessionFor('u-khalid'); // Emirates Tenant Admin — owner of EX-11
+    const closed = acknowledgeAlert(khalid, 'al-ex11-power');
     expect(closed.ok).toBe(true);
     expect(closed.data!.status).toBe('closed');
-    expect(closed.data!.acknowledgedBy).toBe('Fatima Noor');
+    expect(closed.data!.acknowledgedBy).toBe('Khalid Rahman');
   });
 
   it('counts open alerts for the bell and drops acknowledged ones', () => {

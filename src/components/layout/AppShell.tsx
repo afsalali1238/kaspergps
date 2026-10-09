@@ -4,11 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { anyAssetHasFeature, visibleAssetIds, hasCapability } from '@/server/access';
-import type { Capability } from '@/server/capabilities';
-import { useDb } from '@/server/db';
-import { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from '@/server/notifications';
-import { bellAlerts } from '@/server/alerts';
+import { anyAssetHasFeature, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
@@ -135,7 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const visibleNavItems = navItems.filter(item => {
     // §11 nav rule: each item appears only if the user has the capability.
-    const hasCap = session ? hasCapability(session, item.capability) : true;
+    const hasCap = session ? can(session, item.capability) : true;
     if (!hasCap) return false;
     if (item.phase === 'phase2' && currentPhase === 'day_one') return false;
     if (item.phase === 'later' && currentPhase !== 'later') return false;

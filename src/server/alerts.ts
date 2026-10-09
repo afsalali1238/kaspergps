@@ -6,10 +6,11 @@
 import type { Alert, AlertType, Session } from '@/domain/types';
 import { db, touch } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
+import { isAssetVisible, getRelationship } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 export interface AlertView {
   id: string;
@@ -125,11 +126,11 @@ export function alertTypesIn(session: Session, phase: string = 'later'): { type:
 
 /** Acknowledge: Kasper and the owner's Tenant Admin only (matrix, §5). */
 export function acknowledgeAlert(session: Session, alertId: string): OpResult<AlertView> {
-  if (!hasCapability(session, 'alert.acknowledge')) {
-    return fail('You can’t acknowledge alerts.');
-  }
   const alert = db.getState().alerts.find(a => a.id === alertId);
   if (!alert || !alertVisible(session, alert, 'later')) return fail('Alert not found.');
+  if (!can(session, 'alert.acknowledge', alert.assetId ?? undefined)) {
+    return fail('You can’t acknowledge alerts.');
+  }
   if (!session.isKasper) {
     if (alert.tenantId) {
       if (alert.tenantId !== session.tenantId) return fail('Alert not found.');

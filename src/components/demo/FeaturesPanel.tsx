@@ -2,11 +2,8 @@
 
 import React, { useMemo } from 'react';
 import clsx from 'clsx';
-import { useDb } from '@/server/db';
-import { hasCapability, isFeatureVisible, getRelationship } from '@/server/access';
-import { reasonFor } from '@/server/capability-reasons';
+import { useDb, isFeatureVisible, getRelationship, reasonFor, type Capability, can } from '@/server/api';
 import { FEATURES } from '@/domain/features';
-import type { Capability } from '@/server/capabilities';
 import { useSession, useSwitches, useSelectedAssetId } from '@/hooks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -64,10 +61,10 @@ export function FeaturesPanel() {
     if (!session) return [];
     return ALL_CAPABILITIES.map(cap => ({
       capability: cap,
-      ok: hasCapability(session, cap),
+      ok: can(session, cap, asset?.id),
       reason: reasonFor(session, cap, rel),
     }));
-  }, [session, rel]);
+  }, [session, rel, asset?.id]);
 
   // Build the list of features to show
   const featureList = useMemo(() => {

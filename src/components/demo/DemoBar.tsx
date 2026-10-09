@@ -3,12 +3,9 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { useDb } from '@/server/db';
+import { useDb, tamperWithMuc, runDueSchedules, clockPresets } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { exportDemoState, importDemoState, resetDemoState } from '@/lib/demo-state';
-import { tamperWithMuc } from '@/server/muc';
-import { runDueSchedules } from '@/server/schedules';
-import { clockPresets } from '@/server/demo-presets';
 import { useSession, useSwitches, useNow, useClockOffsetMs, useWalkthrough, useWalkthroughsDone, storeActions } from '@/hooks';
 import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
 import { SCENARIOS, startScenario, type Scenario } from '@/components/demo/scenarios';

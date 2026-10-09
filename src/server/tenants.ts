@@ -8,8 +8,8 @@ import type { Session, Tenant } from '@/domain/types';
 import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
-import { hasRole } from '@/server/capabilities';
+
+import { can, hasRole } from '@/server/capabilities';
 import * as clock from '@/lib/clock';
 
 export function tenantById(tenantId: string): Tenant | null {
@@ -17,7 +17,7 @@ export function tenantById(tenantId: string): Tenant | null {
 }
 
 function canManageTenants(session: Session): boolean {
-  return hasCapability(session, 'console.tenants.manage');
+  return can(session, 'console.tenants.manage');
 }
 
 export interface CreateTenantInput {

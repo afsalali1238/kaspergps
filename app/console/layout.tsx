@@ -4,9 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { hasCapability } from '@/server/access';
-import type { Capability } from '@/server/capabilities';
-import { hasRole } from '@/server/capabilities';
+
+import { type Capability, can, hasRole } from '@/server/api';
 import { useSession } from '@/hooks';
 
 interface NavItem {
@@ -110,7 +109,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     );
   }
 
-  const visibleNav = navItems.filter(item => hasCapability(session, item.cap));
+  const visibleNav = navItems.filter(item => can(session, item.cap));
 
   return (
     <>

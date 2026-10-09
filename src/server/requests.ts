@@ -6,10 +6,11 @@ import type { Session, TrackerRequest, Asset } from '@/domain/types';
 import { db, append, touch, nextNumber } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { recordAuditForSession } from '@/server/audit';
 import { notifyUser } from '@/server/notifications';
 import { currentTrackerForAsset, pairTracker, trackerById } from '@/server/trackers';
+import { can } from '@/server/capabilities';
 
 
 export interface TrackerRequestView extends TrackerRequest {
@@ -53,7 +54,7 @@ export function hasOpenTrackerRequest(assetId: string): boolean {
 // ── Tenant side ───────────────────────────────────────────────────────────────
 
 export function requestTracker(session: Session, assetId: string, note = ''): OpResult<TrackerRequest> {
-  if (!hasCapability(session, 'tracker.request')) {
+  if (!can(session, 'tracker.request', assetId)) {
     return fail('Only a Tenant Admin or Kasper can request a tracker.');
   }
   const asset = db.getState().assets.find(a => a.id === assetId);
@@ -92,7 +93,7 @@ export function requestTracker(session: Session, assetId: string, note = ''): Op
 // ── Kasper side ───────────────────────────────────────────────────────────────
 
 export function pairTrackerRequest(session: Session, requestId: string, trackerId: string): OpResult<TrackerRequest> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can pair trackers.');
   }
   const request = db.getState().trackerRequests.find(r => r.id === requestId);
@@ -126,7 +127,7 @@ export function pairTrackerRequest(session: Session, requestId: string, trackerI
 }
 
 export function declineTrackerRequest(session: Session, requestId: string, reason: string): OpResult<TrackerRequest> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can decline requests.');
   }
   const request = db.getState().trackerRequests.find(r => r.id === requestId);

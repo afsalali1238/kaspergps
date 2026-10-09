@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { getMucByNumber, getMucVerifyStatus, getReplacementMuc } from '@/server/muc';
-import type { MucVerifyStatus } from '@/server/muc';
-import { useDb } from '@/server/db';
+import { getMucByNumber, getMucVerifyStatus, getReplacementMuc, type MucVerifyStatus, useDb } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useT, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';

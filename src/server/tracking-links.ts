@@ -5,9 +5,9 @@ import type { Booking, LinkRevokeReason, Session, TrackingLink } from '@/domain/
 import { db, append, nextNumber, touch } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, getRelationship } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
 import { getTrackingLinkState } from '@/server/links';
+import { can } from '@/server/capabilities';
 
 export const LINK_TTL_HOURS = 24;
 
@@ -26,9 +26,7 @@ function toMs(v: string | number | null | undefined): number {
 }
 
 function canShare(session: Session, assetId: string): boolean {
-  if (!hasCapability(session, 'link.create')) return false;
-  const rel = getRelationship(session, assetId);
-  return rel === 'owner' || rel === 'kasper';
+  return can(session, 'link.create', assetId);
 }
 
 /** Jobs the Share panel can attach a link to: this asset's active/upcoming bookings. */
@@ -149,7 +147,7 @@ export function revokeTrackingLink(session: Session, linkId: string, reason: Lin
   if (!link) return fail('Link not found.');
   const asset = db.getState().assets.find(a => a.id === link.assetId);
   if (!asset) return fail('Asset not found.');
-  if (!hasCapability(session, 'link.revoke') || !(getRelationship(session, asset.id) === 'owner' || getRelationship(session, asset.id) === 'kasper')) {
+  if (!can(session, 'link.revoke', asset.id)) {
     return fail('You cannot revoke this link.');
   }
   if (link.revokedAt) return fail('This link is already revoked.');

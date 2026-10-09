@@ -7,11 +7,12 @@ import type { Asset, Pairing, Session, Tracker, TrackerSleepMode } from '@/domai
 import { db, append, touch, nextNumber } from '@/server/db';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { recordAuditForSession } from '@/server/audit';
 import {
   ICCID_ERROR, IMEI_DUPLICATE_ERROR, IMEI_ERROR, isValidIccid, isValidImei,
 } from '@/domain/tracker-id';
+import { can } from '@/server/capabilities';
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export interface RegisterTrackerInput {
 const DEFAULT_FIRMWARE = '03.29.00.Rev.03';
 
 export function registerTracker(session: Session, input: RegisterTrackerInput): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can register trackers.');
   }
   const imei = input.imei.replace(/\s+/g, '');
@@ -119,7 +120,7 @@ export function registerTracker(session: Session, input: RegisterTrackerInput): 
  * pairing first, so history before now stays with the old asset.
  */
 export function pairTracker(session: Session, trackerId: string, assetId: string): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can pair trackers.');
   }
   const tracker = trackerById(trackerId);
@@ -171,7 +172,7 @@ export function pairTracker(session: Session, trackerId: string, assetId: string
 }
 
 export function unpairTracker(session: Session, trackerId: string): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can unpair trackers.');
   }
   const tracker = trackerById(trackerId);
@@ -193,7 +194,7 @@ export function unpairTracker(session: Session, trackerId: string): OpResult<Tra
 }
 
 export function markTrackerFaulty(session: Session, trackerId: string, note: string): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can flag trackers.');
   }
   const tracker = trackerById(trackerId);
@@ -227,7 +228,7 @@ export function markTrackerFaulty(session: Session, trackerId: string, note: str
 }
 
 export function retireTracker(session: Session, trackerId: string): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.manage')) {
+  if (!can(session, 'console.trackers.manage')) {
     return fail('Only Kasper can retire trackers.');
   }
   const tracker = trackerById(trackerId);
@@ -250,7 +251,7 @@ export interface TrackerSettingsInput {
 }
 
 export function updateTrackerSettings(session: Session, trackerId: string, input: TrackerSettingsInput): OpResult<Tracker> {
-  if (!hasCapability(session, 'console.trackers.configure')) {
+  if (!can(session, 'console.trackers.configure')) {
     return fail('Only Kasper can change tracker settings.');
   }
   const tracker = trackerById(trackerId);

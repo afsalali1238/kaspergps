@@ -4,12 +4,9 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb, cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Booking } from '@/domain/types';
-import {
-  cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking,
-} from '@/server/bookings';
 import { useSession } from '@/hooks';
 
 function bookingStatusWords(booking: Booking): string {

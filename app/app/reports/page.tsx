@@ -8,14 +8,9 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Button, EmptyState } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { hasCapability } from '@/server/access';
-import {
-  availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES,
-  type ReportTypeId,
-} from '@/server/reports';
-import { createSchedule, type ScheduleFrequency } from '@/server/schedules';
+
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -79,8 +74,8 @@ export default function ReportsPage() {
     return clock.dubaiDateKey(clock.now());
   }, [dateTo]);
 
-  const canRunReport = session ? hasCapability(session, 'report.run') : false;
-  const canSchedule = session ? hasCapability(session, 'report.schedule') : false;
+  const canRunReport = session ? can(session, 'report.run') : false;
+  const canSchedule = session ? can(session, 'report.schedule') : false;
 
   if (!session) return null;
 

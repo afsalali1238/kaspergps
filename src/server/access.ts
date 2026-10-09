@@ -1,18 +1,13 @@
-// Access layer — all permission checks go through here.
-// Architecture rule 1: every API function checks access in this module first.
+// Access data — who is related to which asset, and when.
+// Permission decisions live in capabilities.ts: `can(session, cap, assetId?)`.
+// This module only answers "is this asset visible", "what is the relationship",
+// and "what rental windows does this session hold". It imports no capability maps,
+// so capabilities.ts can depend on it without a cycle.
 
 import type { Session, Booking } from '@/domain/types';
 import { db } from '@/server/db';
-import { hasFeature, featurePhase } from '@/domain/features';
-import { hasRoleCapability } from '@/server/capabilities';
-import type { Capability } from '@/server/capabilities';
+import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
-
-// ── Capabilities (role-only, no asset context) ────────────────────────────────
-
-export function hasCapability(session: Session, capability: Capability): boolean {
-  return hasRoleCapability(session.role, capability);
-}
 
 // ── Asset visibility ───────────────────────────────────────────────────────────
 
@@ -28,7 +23,7 @@ export function isAssetVisible(session: Session, assetId: string): boolean {
     return session.siteIds.includes(asset.homeSiteId);
   }
 
-  // Check for active rental grant — must also match a site the session can see
+  // Active rental grant — must also match a site the session can see
   const booking = findActiveGrantFor(session, assetId);
   if (booking) {
     const now = clock.now();
@@ -56,18 +51,6 @@ export function findActiveGrantFor(session: Session, assetId: string): Booking |
   return booking;
 }
 
-/**
- * Who can cut a rental short: Kasper, or the asset's own Tenant Admin.
- * The renter never can — it is their rental (spec 5, grant.endEarly).
- */
-export function canEndAccess(session: Session, assetId: string): boolean {
-  if (!hasCapability(session, 'grant.endEarly')) return false;
-  const asset = db.getState().assets.find(a => a.id === assetId);
-  if (!asset) return false;
-  if (session.isKasper) return true;
-  return session.tenantId !== null && asset.ownerTenantId === session.tenantId;
-}
-
 export function getGrantEnd(booking: Booking): number {
   const end = new Date(booking.end).getTime();
   if (booking.cancelledAt) return new Date(booking.cancelledAt).getTime();
@@ -87,66 +70,11 @@ export function getRelationship(session: Session, assetId: string): 'kasper' | '
   return 'none';
 }
 
-export function isAssetEditable(session: Session, assetId: string): boolean {
-  const rel = getRelationship(session, assetId);
-  if (session.isKasper) return rel !== 'none';
-  // Owners' Tenant Admins hold asset.edit (see capabilities matrix);
-  // Site Users and renters never do.
-  return hasCapability(session, 'asset.edit') && rel === 'owner';
-}
-
-// ── Feature visibility ─────────────────────────────────────────────────────────
-
-export function isFeatureVisible(session: Session, assetId: string, featureKey: string, phase: string, _salesView: boolean): boolean {
-  const asset = db.getState().assets.find(a => a.id === assetId);
-  if (!asset) return false;
-  const phaseMap: Record<string, 'day_one' | 'phase2' | 'later'> = {
-    day_one: 'day_one',
-    phase2: 'phase2',
-    later: 'later',
-  };
-  const p = phaseMap[phase] ?? 'later';
-
-  if (!isAssetVisible(session, assetId)) return false;
-
-  const cap = featureCapability(featureKey);
-  if (cap && !hasCapability(session, cap as Capability)) return false;
-
-  return hasFeature(asset, featureKey) && featurePhase(featureKey) !== undefined && (featurePhase(featureKey) === 'day_one' || featurePhase(featureKey) === p || p === 'later');
-}
-
-function featureCapability(key: string): string | null {
-  const map: Record<string, string> = {
-    'fuel.level': 'asset.viewTelemetry',
-    'fuel.used': 'asset.viewTelemetry',
-    'engine.live': 'asset.viewTelemetry',
-    'hours.ecu': 'asset.viewTelemetry',
-    'faults': 'asset.viewTelemetry',
-    'adblue': 'asset.viewTelemetry',
-    'muc': 'muc.view',
-    'billing.hours': 'billing.view',
-    'cost.fuel': 'cost.view',
-    'cost.idle': 'cost.view',
-    'maintenance.hours': 'maintenance.view',
-    'maintenance.km': 'maintenance.view',
-    'maintenance.faults': 'maintenance.view',
-    'labels': 'label.view',
-    'geofence.events': 'geofence.view',
-    'playback': 'playback.view',
-    'eta': 'link.create',
-    'report.geofence': 'report.run',
-  };
-  return map[key] ?? null;
-}
-
-// ── Fleet-level feature visibility ─────────────────────────────────────────────
-
-export function anyAssetHasFeature(session: Session, featureKey: string): boolean {
-  const visible = visibleAssetIds(session);
-  return visible.some(id => {
-    const asset = db.getState().assets.find(a => a.id === id);
-    return asset && hasFeature(asset, featureKey);
-  });
+/** True when the asset has a booking that is scheduled or active right now. */
+export function hasLiveBooking(assetId: string): boolean {
+  return db.getState().bookings.some(b =>
+    b.assetId === assetId && (b.status === 'active' || b.status === 'scheduled')
+  );
 }
 
 export function visibleAssetIds(session: Session): string[] {
@@ -174,17 +102,40 @@ export function rentalWindow(session: Session, assetId: string): { start: number
   };
 }
 
-export function isRenterWindowPast(session: Session, assetId: string): { start: number; end: number } | null {
-  // Past rental windows for reports
+/**
+ * The renter's rental of this asset whose window has ended, or null. "Ended"
+ * is the grant window (getGrantEnd), so a rental still marked active after its
+ * end time counts as past. A Site User sees it only when it was booked to one
+ * of their sites; a Tenant Admin of the renter sees every rental of the company.
+ */
+export function pastRentalFor(session: Session, assetId: string): Booking | null {
   if (!session.tenantId) return null;
+  const now = clock.now();
   const booking = db.getState().bookings.find(b =>
     b.assetId === assetId &&
     b.renterTenantId === session.tenantId &&
-    (b.status === 'closed' || b.status === 'cancelled')
+    getGrantEnd(b) <= now &&
+    (session.siteIds.length === 0 || session.siteIds.includes(b.renterSiteId ?? ''))
   );
+  return booking ?? null;
+}
+
+export function isRenterWindowPast(session: Session, assetId: string): { start: number; end: number } | null {
+  // Past rental windows for reports
+  const booking = pastRentalFor(session, assetId);
   if (!booking) return null;
   return {
     start: new Date(booking.start).getTime(),
     end: booking.closedAt ? new Date(booking.closedAt).getTime() : new Date(booking.end).getTime(),
   };
+}
+
+// ── Fleet-level feature visibility ─────────────────────────────────────────────
+
+export function anyAssetHasFeature(session: Session, featureKey: string): boolean {
+  const visible = visibleAssetIds(session);
+  return visible.some(id => {
+    const asset = db.getState().assets.find(a => a.id === id);
+    return asset && hasFeature(asset, featureKey);
+  });
 }

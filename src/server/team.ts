@@ -8,17 +8,17 @@ import type { Role, Session, User } from '@/domain/types';
 import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
-import { hasCompanyCapability, hasRole } from '@/server/capabilities';
+
+import { can, hasRole } from '@/server/capabilities';
 
 export function userById(userId: string): User | null {
   return db.getState().users.find(u => u.id === userId) ?? null;
 }
 
 // Kasper Admin has the role capability; a Tenant Admin only for its own company
-// (the company matrix grants users.manage / sites.manage).
+// (the callers below compare the target company with the session's company).
 export function canManageUsers(session: Session): boolean {
-  return hasCapability(session, 'users.manage') || hasCompanyCapability(session, 'users.manage');
+  return can(session, 'users.manage');
 }
 
 function canManageUser(session: Session, user: User): boolean {
@@ -158,7 +158,7 @@ export function updateUserSites(session: Session, userId: string, siteIds: strin
   const user = userById(userId);
   if (!user) return fail('User not found.');
   if (!canManageUser(session, user)) return fail('You can\u2019t change this user\u2019s sites.');
-  if (user.role !== 'site_user') return fail('Only Site Users are tied to sites.');
+  if (!hasRole(user, 'site_user')) return fail('Only Site Users are tied to sites.');
   const valid = siteIds.filter(id => db.getState().sites.some(s => s.id === id && s.tenantId === user.tenantId));
   user.siteIds = valid;
   touch('users');

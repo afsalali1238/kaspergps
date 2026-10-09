@@ -5,9 +5,8 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb, type DbState } from '@/server/db';
+import { useDb, type DbState, createTenant } from '@/server/api';
 import { tierForAsset } from '@/domain/features';
-import { createTenant } from '@/server/tenants';
 import type { Tenant } from '@/domain/types';
 import { useSession } from '@/hooks';
 

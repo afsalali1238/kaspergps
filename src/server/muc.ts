@@ -11,7 +11,7 @@ import { db, append, touch, nextNumber } from '@/server/db';
 import { recordAudit } from '@/server/audit';
 import { fail, ok } from '@/server/result';
 import type { OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { hasFeature } from '@/domain/features';
 import { MUC_GAP_RULE, MUC_MAX_GAP_H } from '@/config/thresholds';
@@ -19,6 +19,7 @@ import { canonicalMucPayload, sealMucPayload, sha256Hex, verifyMucPayloadSeal } 
 
 export { canonicalMucPayload, sealMucPayload, sha256Hex };
 import * as clock from '@/lib/clock';
+import { can, hasRole } from '@/server/capabilities';
 
 const n1 = (v: number) => Number(v.toFixed(1));
 
@@ -186,9 +187,7 @@ export function nextMucNumber(assetCode: string, periodFromMs: number, existing:
 
 function canIssueFor(session: Session, asset: Asset): boolean {
   // muc.issue: Kasper Admin or the asset's owner Tenant Admin (never Kasper Ops).
-  if (!hasCapability(session, 'muc.issue')) return false;
-  if (session.isKasper) return true;
-  return asset.ownerTenantId === session.tenantId;
+  return can(session, 'muc.issue', asset.id);
 }
 
 export async function issueMuc(session: Session, input: IssueMucInput): Promise<OpResult<Muc>> {
@@ -225,7 +224,7 @@ export async function issueMuc(session: Session, input: IssueMucInput): Promise<
     if (!input.gapOverrideReason?.trim()) {
       return fail(`This period has a ${gapH}-hour data gap. Certificates can't be issued until it's reviewed.`);
     }
-    if (session.role !== 'kasper_admin') {
+    if (!hasRole(session, 'kasper_admin')) {
       return fail('Only a Kasper Admin can override a data gap.');
     }
   }
@@ -287,8 +286,7 @@ export async function voidMuc(session: Session, mucNumber: string, reason: strin
   if (!muc) return fail('Certificate not found.');
   if (muc.status === 'voided') return fail('This certificate is already voided.');
   // muc.void: Kasper Admin or the owner Tenant Admin — never Kasper Ops.
-  const canVoid = hasCapability(session, 'muc.void') &&
-    (session.isKasper || muc.ownerTenantId === session.tenantId);
+  const canVoid = can(session, 'muc.void', muc.assetId);
   if (!canVoid) {
     return fail('Only the owner Tenant Admin or a Kasper Admin can void a certificate.');
   }

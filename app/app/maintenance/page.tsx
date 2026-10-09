@@ -7,13 +7,8 @@ import {
   Button, Badge, EmptyState, Sheet, SourceLabel,
 } from '@/components/ui';
 import type { MaintenancePlan } from '@/domain/types';
-import { useDb } from '@/server/db';
+import { useDb, visibleAssetIds, boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts, openTasks, planSnapshot, plansVisibleTo, savePlan, serviceHistory, type PlanSnapshot } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { visibleAssetIds } from '@/server/access';
-import {
-  boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts,
-  openTasks, planSnapshot, plansVisibleTo, savePlan, serviceHistory, type PlanSnapshot,
-} from '@/server/maintenance';
 import { tierForAsset } from '@/domain/features';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';

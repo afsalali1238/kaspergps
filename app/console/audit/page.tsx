@@ -2,11 +2,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import {
-  actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName,
-} from '@/server/audit';
+import { actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName, can } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { hasCapability } from '@/server/access';
+
 import { useSession } from '@/hooks';
 
 function formatTs(ts: string | number): string {
@@ -44,7 +42,7 @@ export default function AuditLogPage() {
     setExportedAt(`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} exported`);
   };
 
-  if (!session || !hasCapability(session, 'console.audit.view')) {
+  if (!session || !can(session, 'console.audit.view')) {
     return (
       <div className="text-center py-8">
         <EmptyState title="Not available" description="Only Kasper Admin can view the audit log." />

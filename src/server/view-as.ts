@@ -4,7 +4,7 @@
 
 import type { Asset, Booking, Role, Site, Tenant, User } from '@/domain/types';
 import { tierForAsset } from '@/domain/features';
-import { isKasperStaff } from '@/server/capabilities';
+import { hasRole, isKasperStaff } from '@/server/capabilities';
 
 export interface ViewAsBadge {
   label: string;
@@ -46,7 +46,7 @@ const LIVE_BOOKING: ReadonlyArray<Booking['status']> = ['scheduled', 'active'];
 function visibleAssets(state: ViewAsState, user: User): Asset[] {
   if (isKasperStaff(user.role)) return state.assets;
   const owned = state.assets.filter(a => a.ownerTenantId === user.tenantId);
-  if (user.role !== 'site_user') return owned;
+  if (!hasRole(user, 'site_user')) return owned;
   return owned.filter(a => user.siteIds.includes(a.homeSiteId));
 }
 

@@ -7,11 +7,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { useDb } from '@/server/db';
+import { useDb, viewAsGroups, fb12PublicPath } from '@/server/api';
 import { useSession, storeActions } from '@/hooks';
 import { signInAs } from '@/server/api';
-import { viewAsGroups } from '@/server/view-as';
-import { fb12PublicPath } from '@/server/demo-presets';
 
 function roleShort(role: string): string {
   const map: Record<string, string> = {

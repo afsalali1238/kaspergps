@@ -3,11 +3,7 @@
 import React, { useState } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
-import {
-  allTrackerRequests, declineTrackerRequest, pairTrackerRequest,
-} from '@/server/requests';
-import type { TrackerRequestView } from '@/server/requests';
-import { stockTrackers } from '@/server/trackers';
+import { allTrackerRequests, declineTrackerRequest, pairTrackerRequest, type TrackerRequestView, stockTrackers } from '@/server/api';
 import { useSession } from '@/hooks';
 
 function formatDay(ts: string | number): string {

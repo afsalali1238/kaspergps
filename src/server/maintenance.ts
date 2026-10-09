@@ -12,10 +12,11 @@ import type { Asset, MaintenancePlan, MaintenanceTask, ServiceRecord, Session } 
 import { db, append, touch, nextNumber } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, visibleAssetIds } from '@/server/access';
+import { visibleAssetIds } from '@/server/access';
 import { BEHAVIOUR_HOURS_PER_DAY, ecuHoursAt } from '@/server/muc';
 import { hoursSourceLabel, tierForAsset } from '@/domain/features';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 
 export type { MaintenanceTask } from '@/domain/types';
@@ -226,8 +227,8 @@ export function maintenanceAlerts(session: Session, atMs = clock.now()): { state
   ];
 }
 
-export function canManageMaintenance(session: Session): boolean {
-  return hasCapability(session, 'maintenance.manage');
+export function canManageMaintenance(session: Session, assetId?: string): boolean {
+  return can(session, 'maintenance.manage', assetId);
 }
 
 // ── Service history ────────────────────────────────────────────────────────────
@@ -257,9 +258,9 @@ export function logService(session: Session, input: LogServiceInput): OpResult<S
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t log services.');
   const plan = db.getState().maintenancePlans.find(p => p.id === input.planId);
   if (!plan) return fail('Plan not found.');
+  if (!canManageMaintenance(session, plan.assetId)) return fail('You can only log services on your own assets.');
   const asset = db.getState().assets.find(a => a.id === plan.assetId);
   if (!asset) return fail('Asset not found.');
-  if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only log services on your own assets.');
   if (!Number.isFinite(input.value) || input.value < 0) return fail('Enter the meter reading at the service.');
   if (!Number.isFinite(input.costAed) || input.costAed < 0) return fail('Cost can\u2019t be negative.');
   if (input.doneAt > clock.now() + 3600000) return fail('The service date can\u2019t be in the future.');
@@ -317,7 +318,7 @@ export function savePlan(session: Session, input: SavePlanInput): OpResult<Maint
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t edit service plans.');
   const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
-  if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only plan services on your own assets.');
+  if (!canManageMaintenance(session, asset.id)) return fail('You can only plan services on your own assets.');
   const name = input.name.trim();
   if (!name) return fail('Give the plan a name.');
   if (!Number.isFinite(input.interval) || input.interval <= 0) return fail('The interval must be more than zero.');
@@ -380,6 +381,7 @@ export function createTaskFromFault(session: Session, alertId: string): OpResult
   if (!canManageMaintenance(session)) return fail('Your role can\u2019t create service tasks.');
   const alert = db.getState().alerts.find(a => a.id === alertId && a.type === 'fault_code');
   if (!alert || !alert.assetId) return fail('Fault code not found.');
+  if (!canManageMaintenance(session, alert.assetId)) return fail('You can only create service tasks on your own assets.');
   const asset = db.getState().assets.find(a => a.id === alert.assetId);
   if (!asset) return fail('Asset not found.');
   if (tierForAsset(asset) < 3) return fail(`${asset.code} has no CAN bus, so fault codes aren\u2019t available.`);

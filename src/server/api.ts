@@ -5,8 +5,8 @@
 import type { Session } from '@/domain/types';
 import { db, type DbRow, touch } from '@/server/db';
 import { computeStatus } from '@/server/telemetry/simulator';
-import { hasCapability } from '@/server/access';
-import { isKasperStaff } from '@/server/capabilities';
+
+import { can, isKasperStaff } from '@/server/capabilities';
 import * as clock from '@/lib/clock';
 
 export interface ApiResult<T> {
@@ -81,7 +81,7 @@ function buildSession(user: DbRow<'users'>): Session {
 
 // Asset reads
 export async function getAsset(session: Session, assetId: string): Promise<ApiResult<AssetView>> {
-  const access = hasCapability(session, 'asset.view');
+  const access = can(session, 'asset.view', assetId);
   if (!access) {
     return { success: false, error: 'Asset not found' };
   }
@@ -96,7 +96,7 @@ export async function getAsset(session: Session, assetId: string): Promise<ApiRe
 }
 
 export async function getVisibleAssets(session: Session): Promise<ApiResult<AssetView[]>> {
-  const access = hasCapability(session, 'asset.view');
+  const access = can(session, 'asset.view');
   if (!access) {
     return { success: false, error: 'Access denied' };
   }
@@ -164,3 +164,46 @@ export interface AssetView {
 }
 
 export type { Session };
+
+// ── Screen facade ─────────────────────────────────────────────────────────────
+// Screens (app/** and src/components/**) import server code only from this file
+// (architecture test, rule 6). Every function below enforces its own access check
+// through can(); this file is a list of re-exports, not a second permission layer.
+export { anyAssetHasFeature, getRelationship, isAssetVisible, visibleAssetIds } from './access';
+export { ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fitAdapter, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, stockAdapters } from './adapters';
+export { acknowledgeAlert, alertTypesIn, bellAlerts, visibleAlerts } from './alerts';
+export type { AlertView } from './alerts';
+export { actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, recordAuditForSession, tenantName } from './audit';
+export { aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, generateStatement, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, lastMonthStatements, mucForInvoice, paidTotal, payInvoice, paymentsFor, receivedInvoices, recordPayment, recordStatementPayment, statementById, statementsFor, voidInvoice, voidStatement } from './billing';
+export type { InvoiceView } from './billing';
+export { canManageBookings, cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking } from './bookings';
+export { can, hasRole, isFeatureVisible, isKasperStaff } from './capabilities';
+export type { Capability } from './capabilities';
+export { reasonFor } from './capability-reasons';
+export { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice } from './cost';
+export type { AssetCostRow, CostPeriod } from './cost';
+export { append, hydrateDb, nextRowNumber, useDb } from './db';
+export type { DbRow, DbState } from './db';
+export { clockPresets, dubaiYesterdayAt, fb12PublicPath, presetAt } from './demo-presets';
+export { createGeofence, deleteGeofence, visibleGeofenceEvents, visibleGeofences } from './geofences';
+export { getTrackingLinkState, resolveTrackingLink } from './links';
+export { boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts, openTasks, planSnapshot, plansForAsset, plansVisibleTo, savePlan, serviceHistory } from './maintenance';
+export type { PlanSnapshot } from './maintenance';
+export { buildEcuBreakdown, ecuHoursAt, getMucByNumber, getMucVerifyStatus, getMucsForAsset, getReplacementMuc, issueMuc, reissueMuc, tamperWithMuc, voidMuc } from './muc';
+export type { EcuBreakdown, MucVerifyStatus } from './muc';
+export { bellNotifications, bellUnreadCount, markAllRead, markNotificationRead } from './notifications';
+export { outboxForSession, outboxItems } from './outbox';
+export { REPORT_TYPES, availableReportTypes, deleteReportRun, pastRentalLabel, regenerateReport, reportRunsFor, reportableAssets, runReport } from './reports';
+export type { ReportTypeId } from './reports';
+export { allTrackerRequests, declineTrackerRequest, hasOpenTrackerRequest, pairTrackerRequest, requestTracker, trackerRequestForAsset } from './requests';
+export type { TrackerRequestView } from './requests';
+export { createSchedule, deleteSchedule, runDueSchedules, schedulesFor, setScheduleActive } from './schedules';
+export type { ScheduleFrequency } from './schedules';
+export { searchAssets } from './search';
+export { createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole } from './team';
+export { computeStatus, getReadingForAsset, getReadingsForAsset } from './telemetry/simulator';
+export { createTenant, suspendTenant, unsuspendTenant, updateTenant } from './tenants';
+export { assetsWithoutTracker, currentPairingForTracker, currentTrackerForAsset, markTrackerFaulty, pairTracker, pairingHistory, pairingTargetsFor, registerTracker, retireTracker, stockTrackers, unpairTracker, updateTrackerSettings } from './trackers';
+export { activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink } from './tracking-links';
+export { detectTrips } from './trips';
+export { viewAsGroups } from './view-as';

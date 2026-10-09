@@ -10,10 +10,8 @@ import {
   TierChip, Badge, EmptyState, Skeleton,
   Button,
 } from '@/components/ui';
-import { useDb, type DbState } from '@/server/db';
+import { useDb, type DbState, isAssetVisible, getRelationship, getReadingForAsset } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { isAssetVisible, getRelationship } from '@/server/access';
-import { getReadingForAsset } from '@/server/telemetry/simulator';
 import type { Asset, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';

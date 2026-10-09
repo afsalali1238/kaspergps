@@ -7,7 +7,7 @@ import {
   Button, Badge, EmptyState, Tabs,
   TierChip,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useSession } from '@/hooks';
 

@@ -9,23 +9,10 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
+import { useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
-import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server/telemetry/simulator';
-import { detectTrips } from '@/server/trips';
-import { visibleAlerts, acknowledgeAlert } from '@/server/alerts';
-import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
-import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
-import {
-  activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset,
-  revokeTrackingLink,
-} from '@/server/tracking-links';
-import { endEarly } from '@/server/bookings';
 import type { Asset, TrackingLink } from '@/domain/types';
-import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
-import { canManageMaintenance, planSnapshot, plansForAsset, serviceHistory } from '@/server/maintenance';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
@@ -284,7 +271,7 @@ export default function AssetDetailPage() {
     [assetAlerts]
   );
 
-  const canAcknowledgeAlerts = session ? hasCapability(session, 'alert.acknowledge') : false;
+  const canAcknowledgeAlerts = session ? can(session, 'alert.acknowledge', asset?.id) : false;
 
   const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
@@ -372,15 +359,15 @@ export default function AssetDetailPage() {
 
   const tier = asset.canProfile.adapter === 'ALL-CAN300' ? 3 : asset.canProfile.adapter === 'LVCAN200' ? 2 : 1;
   const isTier1 = tier === 1;
-  const canEdit = hasCapability(session, 'asset.edit');
-  const canShare = hasCapability(session, 'link.create');
-  const canEndAccess = hasCapability(session, 'grant.endEarly');
-  const canRequestTracker = hasCapability(session, 'tracker.request')
-    && (session.isKasper || asset.ownerTenantId === session.tenantId);
+  const canEdit = can(session, 'asset.edit', asset.id);
+  const canShare = can(session, 'link.create', asset.id);
+  const canEndAccess = can(session, 'grant.endEarly', asset.id);
+  const canRequestTracker = can(session, 'tracker.request', asset.id);
+  const canRunReport = can(session, 'report.run', asset.id);
 
   // Maintenance plans belong to the owner: renters never see them (spec 11.18).
-  const isOwnerOrKasper = session.isKasper || asset.ownerTenantId === session.tenantId;
-  const canManageMaintenancePlans = canManageMaintenance(session);
+  const isOwnerOrKasper = can(session, 'maintenance.view', asset.id);
+  const canManageMaintenancePlans = canManageMaintenance(session, asset.id);
   const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
   const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
 
@@ -492,7 +479,7 @@ export default function AssetDetailPage() {
       </div>
 
       {/* Actions */}
-      {(canEdit || canShare || canEndAccess) && (
+      {(canEdit || canShare || canEndAccess || canRunReport) && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {canEdit && (
@@ -505,17 +492,19 @@ export default function AssetDetailPage() {
                 {t('asset_detail.actions.share_link', 'Share tracking link')}
               </Button>
             )}
-            {canEndAccess && rel === 'owner' && currentBooking && (
+            {canEndAccess && currentBooking && (
               <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
                 {t('asset_detail.actions.end_access', 'End access now')}
               </Button>
             )}
-            <a
-              className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
-              href={href('/app/reports')}
-            >
-              {t('asset_detail.actions.run_report', 'Run report')}
-            </a>
+            {canRunReport && (
+              <a
+                className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
+                href={href('/app/reports')}
+              >
+                {t('asset_detail.actions.run_report', 'Run report')}
+              </a>
+            )}
           </div>
 
           {panel === 'share' && (

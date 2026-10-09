@@ -7,9 +7,10 @@ import { db, append, touch, nextNumber } from '@/server/db';
 import { allParamsExcept } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { recordAuditForSession } from '@/server/audit';
 import { currentTrackerForAsset } from '@/server/trackers';
+import { can } from '@/server/capabilities';
 
 export function adapterById(adapterId: string): CanAdapter | null {
   return db.getState().adapters.find(a => a.id === adapterId) ?? null;
@@ -44,7 +45,7 @@ export const LVCAN_MODEL_ERROR = 'LVCAN200 is for light vehicles. Use ALL-CAN300
 export const ADAPTER_SERIAL_DUPLICATE = 'This serial is already registered.';
 
 export function registerAdapter(session: Session, input: { serial: string; model: CanAdapter['model'] }): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can register adapters.');
   }
   const serial = input.serial.trim().toUpperCase();
@@ -78,7 +79,7 @@ export interface FitAdapterInput {
 }
 
 export function fitAdapter(session: Session, input: FitAdapterInput): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can fit adapters.');
   }
   const adapter = adapterById(input.adapterId);
@@ -129,7 +130,7 @@ export function fitAdapter(session: Session, input: FitAdapterInput): OpResult<C
 
 /** Removing drops the asset back to Tier 1 from now; earlier CAN data stays visible. */
 export function removeAdapter(session: Session, adapterId: string): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can remove adapters.');
   }
   const adapter = adapterById(adapterId);
@@ -161,7 +162,7 @@ export function removeAdapter(session: Session, adapterId: string): OpResult<Can
 }
 
 export function markAdapterFaulty(session: Session, adapterId: string, note: string): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can flag adapters.');
   }
   const adapter = adapterById(adapterId);

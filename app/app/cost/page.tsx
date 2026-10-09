@@ -6,10 +6,7 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Sheet, SourceLabel,
 } from '@/components/ui';
-import {
-  canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile,
-  setDieselPrice, type AssetCostRow, type CostPeriod,
-} from '@/server/cost';
+import { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice, type AssetCostRow, type CostPeriod } from '@/server/api';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';

@@ -10,7 +10,7 @@ import type { Asset, AssetCostProfile, Session } from '@/domain/types';
 import { db, append, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { ecuHoursAt } from '@/server/muc';
 import { estimatedHoursAt } from '@/server/maintenance';
 import { CLASS_AVG_FUEL_LPH, DIESEL_PRICE_AED_PER_L } from '@/config/pricing';
@@ -26,6 +26,7 @@ const IDLE_SHARE: Record<Asset['behaviour'], number> = {
   light_vehicle_day: 0.12,
 };
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 export type CostBasis = 'ECU' | 'ECU (ALL-CAN300)' | 'Estimated' | 'From invoices' | 'From service log' | 'Dummy rate' | 'Not measured';
 
@@ -130,8 +131,8 @@ export function costProfileFor(assetId: string): AssetCostProfile | null {
   return db.getState().costProfiles.find(p => p.assetId === assetId) ?? null;
 }
 
-export function canViewCost(session: Session): boolean {
-  return hasCapability(session, 'cost.view');
+export function canViewCost(session: Session, assetId?: string): boolean {
+  return can(session, 'cost.view', assetId);
 }
 
 /** Tier 3 assets bill fuel and idle off the ECU; everything else is estimated. */
@@ -203,7 +204,7 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
   if (!canViewCost(session)) return [];
   const assets = db.getState().assets
     .filter(a => !a.retiredAt)
-    .filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
+    .filter(a => canViewCost(session, a.id));
 
   return assets.map(asset => {
     const profile = costProfileFor(asset.id);
@@ -337,7 +338,7 @@ export function saveCostProfile(session: Session, input: CostProfileInput): OpRe
   if (!canViewCost(session)) return fail('Your role can\u2019t change cost profiles.');
   const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
-  if (!session.isKasper && asset.ownerTenantId !== session.tenantId) return fail('You can only cost your own assets.');
+  if (!canViewCost(session, asset.id)) return fail('You can only cost your own assets.');
   const values = [input.purchaseValueAed, input.monthlyFinanceAed, input.operatorCostPerHourAed, input.insurancePerMonthAed];
   if (values.some(v => !Number.isFinite(v) || v < 0)) return fail('Cost inputs can\u2019t be negative.');
 

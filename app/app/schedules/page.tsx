@@ -7,9 +7,8 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { schedulesFor, runDueSchedules, setScheduleActive, deleteSchedule, createSchedule, type ScheduleFrequency } from '@/server/schedules';
-import { reportableAssets, REPORT_TYPES, type ReportTypeId } from '@/server/reports';
-import { hasCapability } from '@/server/access';
+import { schedulesFor, runDueSchedules, setScheduleActive, deleteSchedule, createSchedule, type ScheduleFrequency, reportableAssets, REPORT_TYPES, type ReportTypeId, can } from '@/server/api';
+
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession } from '@/hooks';
@@ -36,7 +35,7 @@ export default function SchedulesPage() {
 
   if (!session) return null;
 
-  const canSchedule = hasCapability(session, 'report.schedule');
+  const canSchedule = can(session, 'report.schedule');
 
   const handleCreate = () => {
     setMessage(null);

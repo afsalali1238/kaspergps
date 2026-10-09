@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useDb } from '@/server/db';
+import { useDb } from '@/server/api';
 import { now as clockNow } from '@/lib/clock';
 import { useSession } from '@/hooks';
 

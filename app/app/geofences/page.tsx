@@ -7,11 +7,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
-import { isAssetVisible, hasCapability } from '@/server/access';
-import {
-  visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence,
-} from '@/server/geofences';
+import { useDb, isAssetVisible, visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence, can } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -55,7 +51,7 @@ export default function GeofencesPage() {
     () => (session ? visibleGeofenceEvents(session) : []),
     [session, version]
   );
-  const canManage = session ? hasCapability(session, 'geofence.manage') : false;
+  const canManage = session ? can(session, 'geofence.manage') : false;
 
   if (!session) return null;
 

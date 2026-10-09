@@ -9,9 +9,7 @@ import clsx from 'clsx';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView } from '@/server/alerts';
-import { hasCapability, visibleAssetIds } from '@/server/access';
-import { useDb } from '@/server/db';
+import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView, visibleAssetIds, useDb, can } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -57,7 +55,7 @@ export default function AlertsPage() {
   }, [alerts, alertFilter, typeFilter, siteFilter]);
 
   const openCount = useMemo(() => alerts.filter(a => a.status === 'open').length, [alerts]);
-  const canAcknowledge = session ? hasCapability(session, 'alert.acknowledge') : false;
+  const canAcknowledge = (assetId?: string | null) => (session ? can(session, 'alert.acknowledge', assetId ?? undefined) : false);
 
   if (!session) return null;
 
@@ -169,7 +167,7 @@ export default function AlertsPage() {
                     <div className="text-xs text-grey-500 mt-1">{t('alerts.closed', 'Closed')}</div>
                   )}
                 </div>
-                {alert.status === 'open' && canAcknowledge && (
+                {alert.status === 'open' && canAcknowledge(alert.assetId) && (
                   <Button size="sm" variant="secondary" onClick={() => handleAcknowledge(alert.id)}>
                     {t('alerts.acknowledge', 'Acknowledge')}
                   </Button>

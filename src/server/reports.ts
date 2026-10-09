@@ -5,7 +5,7 @@
 import type { Asset, Reading, ReportRun, Session } from '@/domain/types';
 import { db, append, removeWhere, nextNumber } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, getRelationship, isAssetVisible, isRenterWindowPast, rentalWindow } from '@/server/access';
+import { getRelationship, isAssetVisible, isRenterWindowPast, rentalWindow } from '@/server/access';
 import { hasFeature } from '@/domain/features';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { detectTrips, findGaps } from '@/server/trips';
@@ -13,6 +13,7 @@ import { buildEcuBreakdown } from '@/server/muc';
 import { IDLE_SPEED_KMH, OVERSPEED_KMH, WORKING_LOAD_PCT, FUEL_DROP_PCT } from '@/config/thresholds';
 import type { ExportMeta, ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -455,7 +456,7 @@ function buildTables(
 }
 
 export function runReport(session: Session, input: RunReportInput): OpResult<ReportResult> {
-  if (!hasCapability(session, 'report.run')) return fail('You can’t run reports.');
+  if (!can(session, 'report.run')) return fail('You can’t run reports.');
   const rt = REPORT_TYPES.find(r => r.id === input.reportType);
   if (!rt) return fail('Unknown report type.');
   const assets = input.assetIds
@@ -464,7 +465,7 @@ export function runReport(session: Session, input: RunReportInput): OpResult<Rep
   if (assets.length === 0) return fail('Pick at least one asset.');
   const reportable = new Set(reportableAssets(session).map(a => a.id));
   for (const a of assets) {
-    if (!reportable.has(a.id)) {
+    if (!reportable.has(a.id) || !can(session, 'report.run', a.id)) {
       return fail('You no longer have access to this report’s assets.');
     }
   }
@@ -520,7 +521,7 @@ export function regenerateReport(session: Session, runId: string): OpResult<Repo
   const run = db.getState().reportRuns.find(r => r.id === runId);
   if (!run) return fail('Report not found.');
   const isOwn = run.userId === session.userId;
-  const isAdmin = session.isKasper && hasCapability(session, 'console.audit.view');
+  const isAdmin = session.isKasper && can(session, 'console.audit.view');
   if (!isOwn && !isAdmin) return fail('Report not found.');
   const assetIds = run.assetIds ?? [];
   const reportable = new Set(reportableAssets(session).map(a => a.id));
@@ -541,7 +542,7 @@ export function regenerateReport(session: Session, runId: string): OpResult<Repo
 }
 
 export function reportRunsFor(session: Session): ReportRun[] {
-  const isAdmin = session.isKasper && hasCapability(session, 'console.audit.view');
+  const isAdmin = session.isKasper && can(session, 'console.audit.view');
   return db.getState().reportRuns
     .filter(r => r.userId === session.userId || isAdmin)
     .sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());

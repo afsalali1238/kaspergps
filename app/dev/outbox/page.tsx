@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import { outboxForSession, outboxItems } from '@/server/outbox';
+import { outboxForSession, outboxItems } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useSession } from '@/hooks';
 

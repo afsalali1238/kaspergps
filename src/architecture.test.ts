@@ -4,9 +4,14 @@
 //  1. Components never import the store, seed or telemetry modules
 //     (enforced strictly for src/components/ui/**; src/components/layout and
 //     demo shell + app routes have a pinned, no-growth ratchet — see below).
-//  2. `role ===` (any receiver) appears in src/ only in the role→capability map
-//     and the role→words map. Test files build sessions like the session
-//     builder, so they are exempt (lint mirrors this).
+//  2. A role is compared (`role ===` or `role !==`, any receiver) only in the
+//     role→capability map, the role→words map and the seed. Everything else asks
+//     can() or hasRole(). Test files build sessions like the session builder, so
+//     they are exempt (lint mirrors this).
+//  6. Screens (app/ and src/components/) import server code only from
+//     src/server/api.ts (F3).
+//  7. The pre-F3 helpers (hasCapability, hasCompanyCapability, canEndAccess,
+//     isAssetEditable) do not come back.
 //  3. No Date.now() / new Date() outside clock.ts, seed and telemetry.
 //  4. The banned brand words never appear in src/ or app/.
 //
@@ -47,10 +52,37 @@ describe('architecture: role comparisons (rule 2)', () => {
     p === 'src/server/capability-reasons.ts' ||
     p.startsWith('src/server/seed/');
 
-  it('src/ has no role === outside the capability and reason maps', () => {
-    const offenders = srcFiles
+  it('src/ and app/ never compare a role outside the capability and reason maps', () => {
+    const offenders = files
       .filter(f => !allowed(f.path))
-      .filter(f => /role\s*===/.test(f.text))
+      .filter(f => /\brole\s*[!=]==/.test(f.text))
+      .map(f => f.path);
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ── Rule 6: screens reach the server only through the API (F3) ────────────────
+
+describe('architecture: screens import the server only via src/server/api (rule 6)', () => {
+  const screen = (p: string) => p.startsWith('app/') || p.startsWith('src/components/');
+
+  it('no screen imports a server module other than src/server/api', () => {
+    const offenders: string[] = [];
+    for (const f of files.filter(f => screen(f.path))) {
+      for (const m of f.text.matchAll(/from\s+['"](@\/server\/[^'"]+|\.{1,2}\/[^'"]*server\/[^'"]+)['"]/g)) {
+        if (m[1] !== '@/server/api') offenders.push(`${f.path} → ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ── Rule 7: the pre-F3 permission helpers stay deleted ────────────────────────
+
+describe('architecture: removed permission helpers (rule 7)', () => {
+  it('hasCapability, hasCompanyCapability, canEndAccess and isAssetEditable are not called anywhere', () => {
+    const offenders = files
+      .filter(f => /\b(hasCapability|hasCompanyCapability|canEndAccess|isAssetEditable)\(/.test(f.text))
       .map(f => f.path);
     expect(offenders).toEqual([]);
   });

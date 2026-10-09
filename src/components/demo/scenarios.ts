@@ -5,8 +5,7 @@
 import * as clock from '@/lib/clock';
 import { storeActions } from '@/hooks';
 import { signInAs } from '@/server/api';
-import { presetAt, dubaiYesterdayAt, fb12PublicPath } from '@/server/demo-presets';
-import { tamperWithMuc } from '@/server/muc';
+import { presetAt, dubaiYesterdayAt, fb12PublicPath, tamperWithMuc } from '@/server/api';
 
 export interface Scenario {
   id: number;

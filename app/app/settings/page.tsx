@@ -5,11 +5,9 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { useDb } from '@/server/db';
-import { hasRole } from '@/server/capabilities';
+import { useDb, hasRole, createUser } from '@/server/api';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
-import { createUser } from '@/server/team';
 import type { Role } from '@/domain/types';
 
 const EMPTY_INVITE = { name: '', email: '', role: 'tenant_admin' as Role, siteId: '' };

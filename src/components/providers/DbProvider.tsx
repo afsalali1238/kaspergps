@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { hydrateDb } from '@/server/db';
+import { hydrateDb } from '@/server/api';
 
 /**
  * Loads the browser's stored demo database before any screen renders.
