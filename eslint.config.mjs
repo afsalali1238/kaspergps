@@ -1,12 +1,56 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 // Architecture rules:
 // 1. No component imports src/server/store|seed|telemetry
 // 2. No `role ===` outside capabilities.ts and session builder
 // 3. No Date.now() or new Date() outside clock.ts and seed/telemetry
 // 4. No "device" or "Dozr" in src/
+// 5. No getState() in app/ or src/components/ (F2): screens read through hooks.
+// 6. Screens import server code only from src/server/api (F3).
+
+// The restricted-syntax rules every source file follows.
+const BASE_RESTRICTED_SYNTAX = [
+  {
+    // Ban "device" as an identifier, but allow "deviceTime" (standard GPS telemetry field)
+    selector: 'Identifier[name=/(^|\\.)device$/]',
+    message: 'Use "Asset" not "device".',
+  },
+  {
+    selector: 'Identifier[name=/Dozr/]',
+    message: 'Use "Kasper" not "Dozr".',
+  },
+  {
+    selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+    message: 'Use clock.now(). See src/lib/clock.ts.',
+  },
+  {
+    selector: "CallExpression[callee.name='Date'][arguments.length=0]",
+    message: 'Use clock.now(). See src/lib/clock.ts.',
+  },
+  {
+    selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+    message: 'Use clock.dubaiNow() or a specific timestamp instead of new Date().',
+  },
+  {
+    selector: 'BinaryExpression[operator="==="][left.name="role"]',
+    message: 'Use can(session, cap) instead of role === comparisons.',
+  },
+  {
+    selector: 'BinaryExpression[operator="==="][left.property.name="role"]',
+    message: 'Use can(session, cap) / hasRole() instead of role === comparisons.',
+  },
+];
+
+// Screens and components read state through a hook (src/hooks), never by calling
+// getState(): a getState() read does not re-render when the value changes. This
+// covers handlers too. The architecture test is the backstop.
+const NO_GET_STATE = {
+  selector: 'Identifier[name="getState"]',
+  message: 'Read state with a hook from @/hooks (useSession, useSwitches, useDb...), or storeActions in a handler. getState() does not re-render.',
+};
 
 export default [
   { ignores: ['dist', '.next', 'node_modules'] },
@@ -16,6 +60,7 @@ export default [
 
   {
     files: ['**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
@@ -26,47 +71,29 @@ export default [
       },
     },
     rules: {
-      // Ban "device" and "Dozr" in source identifiers
-      // Ban Date.now() everywhere
-      // Ban new Date() without arguments everywhere
-      // Ban role === everywhere
-      'no-restricted-syntax': [
-        'error',
-        {
-          // Ban "device" as an identifier, but allow "deviceTime" (standard GPS telemetry field)
-          selector: 'Identifier[name=/(^|\\.)device$/]',
-          message: 'Use "Asset" not "device".',
-        },
-        {
-          selector: 'Identifier[name=/Dozr/]',
-          message: 'Use "Kasper" not "Dozr".',
-        },
-        {
-          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-          message: 'Use clock.now(). See src/lib/clock.ts.',
-        },
-        {
-          selector: "CallExpression[callee.name='Date'][arguments.length=0]",
-          message: 'Use clock.now(). See src/lib/clock.ts.',
-        },
-        {
-          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
-          message: 'Use clock.dubaiNow() or a specific timestamp instead of new Date().',
-        },
-        {
-          selector: 'BinaryExpression[operator="==="][left.name="role"]',
-          message: 'Use can(session, cap) instead of role === comparisons.',
-        },
-        {
-          selector: 'BinaryExpression[operator="==="][left.property.name="role"]',
-          message: 'Use can(session, cap) / hasRole() instead of role === comparisons.',
-        },
-      ],
+      'react-hooks/rules-of-hooks': 'error',
+      'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX],
       // Allow underscore-prefixed args/vars (intentionally unused params)
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' },
       ],
+    },
+  },
+
+  // Screens and components: no getState(), anywhere (F2). Server code only
+  // through src/server/api.ts (F3): the facade enforces access with can().
+  {
+    files: ['app/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX, NO_GET_STATE],
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/server/**', '!@/server/api'],
+          message: 'Screens import server code only from @/server/api (F3). Add a re-export there if you need a new function.',
+        }],
+      }],
     },
   },
 

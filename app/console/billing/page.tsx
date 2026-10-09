@@ -7,17 +7,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
-import { hasCapability } from '@/server/access';
-import {
-  aed, canRecordPayment, generateStatement, invoiceStatusLabel, invoiceView, issuedInvoices,
-  lastMonthStatements, paidTotal, paymentsFor, recordStatementPayment, statementById,
-  voidStatement,
-} from '@/server/billing';
-import { recordAuditForSession } from '@/server/audit';
+import { useDb, aed, canRecordPayment, generateStatement, invoiceStatusLabel, invoiceView, issuedInvoices, lastMonthStatements, paidTotal, paymentsFor, recordStatementPayment, statementById, voidStatement, recordAuditForSession, can } from '@/server/api';
+
 import { downloadBoth, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 type StatementRow = ReturnType<typeof lastMonthStatements>[number];
 
@@ -33,8 +27,8 @@ function formatDay(ts: string | number): string {
 }
 
 export default function ConsoleBillingPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [version, setVersion] = useState(0);
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -56,7 +50,7 @@ export default function ConsoleBillingPage() {
     [session, version]
   );
 
-  if (!session || !hasCapability(session, 'console.billing.view')) {
+  if (!session || !can(session, 'console.billing.view')) {
     return (
       <div className="text-center py-8">
         <EmptyState title="Not available" description="Billing is for Kasper Admin — Ops can't see it." />

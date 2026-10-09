@@ -1,7 +1,7 @@
 // Global search over the user's visible assets (spec §11.3 Search, S40).
 // Sits behind the API layer so UI components never touch the seed directly.
 
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import type { Session } from '@/domain/types';
 import { visibleAssetIds } from '@/server/access';
 
@@ -21,10 +21,10 @@ export function searchAssets(session: Session | null, query: string, limit = 6):
   if (!session) return [];
   const q = query.trim().toLowerCase();
   const visible = new Set(visibleAssetIds(session));
-  return seed.assets
+  return db.getState().assets
     .filter(a => visible.has(a.id))
     .filter(a => {
-      const site = seed.sites.find(s => s.id === a.homeSiteId)?.name ?? '';
+      const site = db.getState().sites.find(s => s.id === a.homeSiteId)?.name ?? '';
       if (!q) return true;
       return [a.code, a.name, site, a.plateOrSerial, a.make, a.model]
         .filter(Boolean)
@@ -32,7 +32,7 @@ export function searchAssets(session: Session | null, query: string, limit = 6):
     })
     .slice(0, limit)
     .map(a => {
-      const siteName = seed.sites.find(s => s.id === a.homeSiteId)?.name ?? '';
+      const siteName = db.getState().sites.find(s => s.id === a.homeSiteId)?.name ?? '';
       return {
         id: a.id,
         code: a.code,

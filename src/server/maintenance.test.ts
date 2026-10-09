@@ -2,15 +2,15 @@
 // service, plan editing and fault-code tasks.
 import { describe, it, expect } from 'vitest';
 import {
-  boardFor, createTaskFromFault, currentMeter, logService, maintenanceAlerts, maintenanceTasks,
+  boardFor, createTaskFromFault, currentMeter, logService, maintenanceAlerts,
   openTasks, planSnapshot, plansForAsset, plansVisibleTo, savePlan, serviceHistory,
 } from './maintenance';
-import { seed } from '@/server/seed/data';
+import { db, append } from '@/server/db';
 import * as clock from '@/lib/clock';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
@@ -24,11 +24,11 @@ const omar = () => sessionFor('u-omar');       // Al Noor Admin
 const priya = () => sessionFor('u-priya');     // Gulf Lift Admin
 const lina = () => sessionFor('u-lina');       // Marina Builders Admin (a renter here)
 const mark = () => sessionFor('u-mark');       // Gulf Lift Site User
-const asset = (id: string) => seed.assets.find(a => a.id === id)!;
-const plan = (id: string) => seed.maintenancePlans.find(p => p.id === id)!;
+const asset = (id: string) => db.getState().assets.find(a => a.id === id)!;
+const plan = (id: string) => db.getState().maintenancePlans.find(p => p.id === id)!;
 
 const auditFor = (action: string, needle: string) =>
-  seed.auditEntries.find(e => e.action === action && e.detail.includes(needle));
+  db.getState().auditEntries.find(e => e.action === action && e.detail.includes(needle));
 
 describe('maintenance — the board', () => {
   it('sorts every plan into overdue, due soon and ok', () => {
@@ -36,7 +36,7 @@ describe('maintenance — the board', () => {
     expect(board.overdue.map(s => s.asset.code)).toEqual(['BD-02', 'CR-08']);
     expect(board.dueSoon.map(s => s.asset.code)).toEqual(['CR-02', 'EX-04', 'PU-51']);
     expect(board.ok.map(s => s.asset.code)).toEqual(['GN-01', 'TP-22', 'FB-14']);
-    expect(board.overdue.length + board.dueSoon.length + board.ok.length).toBe(seed.maintenancePlans.length);
+    expect(board.overdue.length + board.dueSoon.length + board.ok.length).toBe(db.getState().maintenancePlans.length);
   });
 
   it('writes the headline the way the spec does', () => {
@@ -162,7 +162,7 @@ describe('maintenance — plans and fault-code tasks', () => {
   });
 
   it('raises a one-off task from a Tier 3 fault code and closes it with a service', () => {
-    const fault = seed.alerts.find(a => a.type === 'fault_code' && !a.closedAt)!;
+    const fault = db.getState().alerts.find(a => a.type === 'fault_code' && !a.closedAt)!;
     expect(fault.assetId).toBe('a-bd02'); // Tier 3, has a CAN bus
     const task = createTaskFromFault(khalid(), fault.id);
     expect(task.ok).toBe(true);
@@ -177,13 +177,14 @@ describe('maintenance — plans and fault-code tasks', () => {
     });
     expect(done.ok).toBe(true);
     expect(openTasks(khalid()).map(t => t.id)).not.toContain(task.data!.id);
-    expect(maintenanceTasks.find(t => t.id === task.data!.id)!.doneBy).toBe('u-khalid');
+    expect(db.getState().maintenanceTasks.find(t => t.id === task.data!.id)!.doneBy).toBe('u-khalid');
 
     // Fault codes are Tier 3 only: a tracker-only asset and a partial CAN asset are refused.
-    seed.alerts.push({ ...fault, id: 'al-fake1', assetId: 'a-fb14' });
-    seed.alerts.push({ ...fault, id: 'al-fake2', assetId: 'a-pu51' });
-    expect(createTaskFromFault(khalid(), 'al-fake1').error).toContain('has no CAN bus');
-    expect(createTaskFromFault(khalid(), 'al-fake2').error).toContain('has no CAN bus');
+    append('alerts', { ...fault, id: 'al-fake1', assetId: 'a-fb14' });
+    append('alerts', { ...fault, id: 'al-fake2', assetId: 'a-pu51' });
+    // The owner's admin is refused for the tracker-only asset by the tier rule.
+    expect(createTaskFromFault(omar(), 'al-fake1').error).toContain('has no CAN bus');
+    expect(createTaskFromFault(lina(), 'al-fake2').error).toContain('has no CAN bus');
     expect(createTaskFromFault(khalid(), 'al-missing').error).toBe('Fault code not found.');
     expect(createTaskFromFault(mark(), fault.id).error).toBe('Your role can\u2019t create service tasks.');
   });

@@ -6,18 +6,13 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Sheet, SourceLabel,
 } from '@/components/ui';
-import { useStore } from '@/store';
 import type { MaintenancePlan } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { useDb, visibleAssetIds, boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts, openTasks, planSnapshot, plansVisibleTo, savePlan, serviceHistory, type PlanSnapshot } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { visibleAssetIds } from '@/server/access';
-import {
-  boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts,
-  openTasks, planSnapshot, plansVisibleTo, savePlan, serviceHistory, type PlanSnapshot,
-} from '@/server/maintenance';
 import { tierForAsset } from '@/domain/features';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 type View = 'board' | 'table';
 
@@ -37,10 +32,10 @@ function basisChip(snapshot: PlanSnapshot): React.ReactNode {
 }
 
 export default function MaintenancePage() {
+  const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [view, setView] = useState<View>('board');
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -363,7 +358,7 @@ export default function MaintenancePage() {
 
 // ── Log service ────────────────────────────────────────────────────────────────
 
-type Session = NonNullable<ReturnType<typeof useStore.getState>['session']>;
+type Session = NonNullable<ReturnType<typeof useSession>>;
 
 function LogServiceSheet({ snapshot, session, onClose, onResult }: {
   snapshot: PlanSnapshot;
@@ -467,6 +462,7 @@ function PlanSheet({ snapshot, session, onClose, onResult }: {
   onClose: () => void;
   onResult: (tone: 'ok' | 'error', text: string) => void;
 }) {
+  const seed = useDb(s => s);
   const t = useT();
   const owned = seed.assets.filter(a => session.isKasper || a.ownerTenantId === session.tenantId);
   const [assetId, setAssetId] = useState(snapshot?.asset.id ?? owned[0]?.id ?? '');

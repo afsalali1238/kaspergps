@@ -6,9 +6,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import {
-  actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName,
-} from '@/server/audit';
+import { actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, tenantName } from '@/server/api';
 import * as clock from '@/lib/clock';
 
 function formatTs(ts: string | number): string {

@@ -2,10 +2,8 @@
 // Every create, change, retire, pair, fit, transfer and import writes an entry here.
 
 import type { AuditEntry, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, nextNumber } from '@/server/db';
 import * as clock from '@/lib/clock';
-
-let auditSeq = 1000;
 
 export interface AuditInput {
   actorUserId: string;
@@ -20,7 +18,7 @@ export interface AuditInput {
 /** Append an entry to the audit log. Returns the created entry. */
 export function recordAudit(input: AuditInput): AuditEntry {
   const entry: AuditEntry = {
-    id: `au-${++auditSeq}`,
+    id: `au-${nextNumber('au-', db.getState().auditEntries, 1000)}`,
     at: new Date(clock.now()).toISOString(),
     actorUserId: input.actorUserId,
     action: input.action,
@@ -30,7 +28,7 @@ export function recordAudit(input: AuditInput): AuditEntry {
     detail: input.detail,
     reason: input.reason,
   };
-  seed.auditEntries.push(entry);
+  append('auditEntries', entry);
   return entry;
 }
 
@@ -39,17 +37,17 @@ export function recordAuditForSession(session: Session, input: Omit<AuditInput, 
 }
 
 export function actorName(actorUserId: string): string {
-  return seed.users.find(u => u.id === actorUserId)?.name ?? actorUserId;
+  return db.getState().users.find(u => u.id === actorUserId)?.name ?? actorUserId;
 }
 
 export function tenantName(tenantId?: string): string {
   if (!tenantId) return '—';
-  return seed.tenants.find(t => t.id === tenantId)?.name ?? tenantId;
+  return db.getState().tenants.find(t => t.id === tenantId)?.name ?? tenantId;
 }
 
 export function assetCode(assetId?: string): string {
   if (!assetId) return '—';
-  return seed.assets.find(a => a.id === assetId)?.code ?? assetId;
+  return db.getState().assets.find(a => a.id === assetId)?.code ?? assetId;
 }
 
 // ── Querying (Audit log page) ────────────────────────────────────────────────
@@ -85,7 +83,7 @@ export function queryAuditEntries(filters: AuditFilters = {}): AuditEntry[] {
     if (Number.isFinite(t)) toMs = t;
   }
 
-  return seed.auditEntries
+  return db.getState().auditEntries
     .filter(e => {
       if (filters.action && e.action !== filters.action) return false;
       if (person) {
@@ -106,7 +104,7 @@ export function queryAuditEntries(filters: AuditFilters = {}): AuditEntry[] {
 }
 
 export function auditActions(): string[] {
-  const actions = new Set(seed.auditEntries.map(e => e.action));
+  const actions = new Set(db.getState().auditEntries.map(e => e.action));
   return [...actions].sort();
 }
 

@@ -3,34 +3,40 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
-import { useStore } from '@/store';
 import { signIn } from '@/server/api';
+import { storeActions } from '@/hooks';
 import { useT } from '@/i18n';
+
+/** How long the welcome notice stays before the redirect. */
+const NOTICE_MS = 1500;
 
 export default function SignInPage() {
   const t = useT();
   const router = useRouter();
-  const store = useStore;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
 
-    const result = await signIn(email.trim().toLowerCase(), password);
+    const result = await signIn(email, password);
 
     if (result.success && result.data) {
-      store.getState().setSession(result.data.session);
-      if (result.data.session.isKasper) {
-        router.replace('/console');
-      } else {
-        router.replace('/app');
+      storeActions.setSession(result.data.session);
+      const home = result.data.session.isKasper ? '/console' : '/app';
+      if (result.data.notice) {
+        // First sign-in of an invited user: greet them, then go on.
+        setNotice(result.data.notice);
+        await new Promise(resolve => setTimeout(resolve, NOTICE_MS));
       }
+      router.replace(home);
     } else {
       setError(result.error ?? t('sign_in.errors.failed', 'Sign in failed.'));
       setLoading(false);
@@ -102,8 +108,13 @@ export default function SignInPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red bg-red/5 border border-red/20 rounded-lg px-3 py-2">
+              <p role="alert" className="text-sm text-red bg-red/5 border border-red/20 rounded-lg px-3 py-2">
                 {error}
+              </p>
+            )}
+            {notice && (
+              <p role="status" className="text-sm text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2">
+                {notice}
               </p>
             )}
 

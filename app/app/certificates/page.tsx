@@ -4,18 +4,13 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
-import { hasRole } from '@/server/capabilities';
-import {
-  getMucVerifyStatus, issueMuc, reissueMuc, voidMuc,
-} from '@/server/muc';
-import type { MucVerifyStatus } from '@/server/muc';
+import { useDb, hasRole, getMucVerifyStatus, issueMuc, reissueMuc, voidMuc, type MucVerifyStatus } from '@/server/api';
 import { downloadMucPdf } from '@/lib/muc-pdf';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 function formatTs(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
@@ -48,6 +43,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
   verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
 }) {
+  const seed = useDb(s => s);
   const t = useT();
   const asset = seed.assets.find(a => a.id === muc.assetId);
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
@@ -86,6 +82,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
 }
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
+  const seed = useDb(s => s);
   const t = useT();
   const muc = seed.mucs.find(m => m.number === number);
   const [status, setStatus] = useState<MucVerifyStatus | 'checking'>('checking');
@@ -262,10 +259,10 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
 }
 
 export default function CertificatesPage() {
+  const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
   const [selectedMuc, setSelectedMuc] = useState<string | null>(null);
   const [showIssue, setShowIssue] = useState(false);
   const [version, setVersion] = useState(0);

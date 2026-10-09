@@ -4,8 +4,8 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
+import { useDb } from '@/server/api';
+import { useSession } from '@/hooks';
 
 interface Label {
   id: string;
@@ -22,8 +22,8 @@ const LABELS: Label[] = [
 ];
 
 export default function LabelsPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [searchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);

@@ -5,13 +5,13 @@ import {
   FEATURES, assetsNeedingFeature, featureForSalesView, featurePhase, featureVisible,
   hasFeature, hoursSourceLabel, isBillingGradeHours, tierForAsset,
 } from './features';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import type { Asset, Session } from '@/domain/types';
 
-const asset = (code: string): Asset => seed.assets.find(a => a.code === code)!;
+const asset = (code: string): Asset => db.getState().assets.find(a => a.code === code)!;
 
 const sessionFor = (userId: string): Session => {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
@@ -57,10 +57,10 @@ describe('features — hasFeature', () => {
   });
 
   it('lists the assets that would gain a feature', () => {
-    const withFaults = assetsNeedingFeature(seed.assets, 'faults');
+    const withFaults = assetsNeedingFeature(db.getState().assets, 'faults');
     expect(withFaults.map(a => a.code)).toContain('BD-02');
     expect(withFaults.map(a => a.code)).not.toContain('EX-11');
-    expect(assetsNeedingFeature(seed.assets, 'labels')).toHaveLength(seed.assets.length); // needs nothing
+    expect(assetsNeedingFeature(db.getState().assets, 'labels')).toHaveLength(db.getState().assets.length); // needs nothing
   });
 });
 

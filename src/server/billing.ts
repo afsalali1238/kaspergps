@@ -8,22 +8,20 @@
 import type {
   Asset, Invoice, InvoiceLine, InvoiceStatus, Muc, Payment, PaymentMethod, Session,
 } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, append, nextNumber, touch } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { isBillingGradeHours, tierForAsset } from '@/domain/features';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { INVOICE_DUE_DAYS, VAT_PCT } from '@/config/thresholds';
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 const DAY = 86400000;
 /** Dummy minimum billable hours per day on hire (spec 11.17). */
 export const MIN_HOURS_PER_DAY = 8;
-
-let invoiceSeq = 4200;
-let paymentSeq = 100;
 
 function n2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -47,7 +45,7 @@ export interface InvoiceView extends Invoice {
 }
 
 export function paymentsFor(invoiceId: string): Payment[] {
-  return seed.payments.filter(p => p.invoiceId === invoiceId).sort((a, b) => ms(a.at) - ms(b.at));
+  return db.getState().payments.filter(p => p.invoiceId === invoiceId).sort((a, b) => ms(a.at) - ms(b.at));
 }
 
 export function paidTotal(invoiceId: string): number {
@@ -65,38 +63,38 @@ export function invoiceView(invoice: Invoice, nowMs: number = clock.now()): Invo
 }
 
 export function canRecordPayment(session: Session, invoice: Invoice): boolean {
-  if (!hasCapability(session, 'billing.recordPayment')) return false;
+  if (!can(session, 'billing.recordPayment')) return false;
   if (session.isKasper) return true;
   return invoice.issuerTenantId === session.tenantId;
 }
 
 export function canPay(session: Session, invoice: Invoice): boolean {
-  if (!hasCapability(session, 'billing.pay')) return false;
+  if (!can(session, 'billing.pay')) return false;
   return invoice.customerTenantId !== null && invoice.customerTenantId === session.tenantId;
 }
 
 export function invoiceById(id: string): Invoice | null {
-  return seed.invoices.find(i => i.id === id) ?? null;
+  return db.getState().invoices.find(i => i.id === id) ?? null;
 }
 
 export function invoiceByNumber(number: string): Invoice | null {
-  return seed.invoices.find(i => i.number === number) ?? null;
+  return db.getState().invoices.find(i => i.number === number) ?? null;
 }
 
 /** Invoices the session can see, newest first (spec 11.17 capability table). */
 export function issuedInvoices(session: Session): InvoiceView[] {
-  if (!hasCapability(session, 'billing.view')) return [];
+  if (!can(session, 'billing.view')) return [];
   const nowMs = clock.now();
-  return seed.invoices
+  return db.getState().invoices
     .filter(inv => (session.isKasper ? true : inv.issuerTenantId === session.tenantId) && inv.kind === 'rental')
     .map(inv => invoiceView(inv, nowMs))
     .sort((a, b) => ms(b.issuedAt) - ms(a.issuedAt));
 }
 
 export function receivedInvoices(session: Session): InvoiceView[] {
-  if (!hasCapability(session, 'billing.view') || session.isKasper) return [];
+  if (!can(session, 'billing.view') || session.isKasper) return [];
   const nowMs = clock.now();
-  return seed.invoices
+  return db.getState().invoices
     .filter(inv => inv.customerTenantId === session.tenantId)
     .map(inv => invoiceView(inv, nowMs))
     .sort((a, b) => ms(b.issuedAt) - ms(a.issuedAt));
@@ -104,7 +102,7 @@ export function receivedInvoices(session: Session): InvoiceView[] {
 
 export function mucForInvoice(invoice: Invoice): Muc | null {
   if (!invoice.mucId) return null;
-  return seed.mucs.find(m => m.id === invoice.mucId) ?? null;
+  return db.getState().mucs.find(m => m.id === invoice.mucId) ?? null;
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────
@@ -132,19 +130,21 @@ export function recordPayment(session: Session, invoiceId: string, input: Paymen
   if (amount > balance) return fail(`This is more than the ${aed(balance)} still owed.`);
   if (!input.method) return fail('Pick a payment method.');
 
+  const paymentNo = nextNumber('pay-', db.getState().payments, 100);
   const payment: Payment = {
-    id: `pay-${++paymentSeq}`,
+    id: `pay-${paymentNo}`,
     invoiceId: invoice.id,
     at: input.at !== undefined ? input.at : new Date(clock.now()).toISOString(),
     amountAed: amount,
     method: input.method,
-    reference: input.reference?.trim() || `Payment ${paymentSeq}`,
+    reference: input.reference?.trim() || `Payment ${paymentNo}`,
     recordedBy: session.userId,
   };
-  seed.payments.push(payment);
+  append('payments', payment);
 
   const remaining = n2(balance - amount);
   invoice.status = remaining <= 0 ? 'paid' : 'part_paid';
+  touch('invoices');
 
   recordAuditForSession(session, {
     action: 'invoice.payment',
@@ -168,17 +168,19 @@ export function payInvoice(session: Session, invoiceId: string, input: PayInput 
   if (invoice.status === 'paid') return fail('This invoice is already paid.');
 
   const balance = n2(invoice.totalAed - paidTotal(invoice.id));
+  const paymentNo = nextNumber('pay-', db.getState().payments, 100);
   const payment: Payment = {
-    id: `pay-${++paymentSeq}`,
+    id: `pay-${paymentNo}`,
     invoiceId: invoice.id,
     at: new Date(clock.now()).toISOString(),
     amountAed: balance,
     method: 'simulated_online',
-    reference: input.reference?.trim() || `Online ${paymentSeq}`,
+    reference: input.reference?.trim() || `Online ${paymentNo}`,
     recordedBy: session.userId,
   };
-  seed.payments.push(payment);
+  append('payments', payment);
   invoice.status = 'paid';
+  touch('invoices');
 
   recordAuditForSession(session, {
     action: 'invoice.pay',
@@ -198,6 +200,7 @@ export function voidInvoice(session: Session, invoiceId: string, reason: string)
   if (reason.trim().length < 10) return fail('Give a reason of at least 10 characters.');
 
   invoice.status = 'void';
+  touch('invoices');
   recordAuditForSession(session, {
     action: 'invoice.void',
     tenantId: session.tenantId ?? undefined,
@@ -241,14 +244,14 @@ function initialsFor(name: string): string {
 }
 
 export function createInvoiceFromBooking(session: Session, input: CreateInvoiceInput): OpResult<Invoice> {
-  const booking = seed.bookings.find(b => b.id === input.bookingId);
+  const booking = db.getState().bookings.find(b => b.id === input.bookingId);
   if (!booking) return fail('Booking not found.');
-  const asset = seed.assets.find(a => a.id === booking.assetId);
+  const asset = db.getState().assets.find(a => a.id === booking.assetId);
   if (!asset) return fail('Asset not found.');
 
   const isOwner = asset.ownerTenantId === session.tenantId;
   if (!session.isKasper && !isOwner) return fail('Only the asset owner can invoice a rental.');
-  if (!hasCapability(session, 'billing.recordPayment')) return fail('Your role can\u2019t create invoices.');
+  if (!can(session, 'billing.recordPayment')) return fail('Your role can\u2019t create invoices.');
   if (asset.retiredAt) return fail('This asset is retired.');
 
   const fromMs = ms(booking.start);
@@ -269,7 +272,7 @@ export function createInvoiceFromBooking(session: Session, input: CreateInvoiceI
   } else {
     const tier = tierForAsset(asset);
     if (tier === 3 && isBillingGradeHours(asset)) {
-      const muc = seed.mucs.find(m =>
+      const muc = db.getState().mucs.find(m =>
         m.assetId === asset.id &&
         !m.voidedAt &&
         ms(m.periodFrom) <= fromMs &&
@@ -305,13 +308,14 @@ export function createInvoiceFromBooking(session: Session, input: CreateInvoiceI
 
   const subtotalAed = n2(lines.reduce((sum, l) => sum + l.amountAed, 0));
   const vatAed = n2(subtotalAed * (VAT_PCT / 100));
-  const issuer = seed.tenants.find(t => t.id === asset.ownerTenantId);
-  const customer = seed.tenants.find(t => t.id === booking.renterTenantId);
+  const issuer = db.getState().tenants.find(t => t.id === asset.ownerTenantId);
+  const customer = db.getState().tenants.find(t => t.id === booking.renterTenantId);
   const issuedAt = input.issuedAt ?? new Date(clock.now()).toISOString();
 
+  const invoiceNo = nextNumber('inv-', db.getState().invoices, 4200);
   const invoice: Invoice = {
-    id: `inv-${++invoiceSeq}`,
-    number: `INV-${initialsFor(issuer?.name ?? 'Kasper')}-${invoiceSeq}`,
+    id: `inv-${invoiceNo}`,
+    number: `INV-${initialsFor(issuer?.name ?? 'Kasper')}-${invoiceNo}`,
     kind: 'rental',
     issuerTenantId: asset.ownerTenantId,
     customerTenantId: booking.renterTenantId,
@@ -326,7 +330,7 @@ export function createInvoiceFromBooking(session: Session, input: CreateInvoiceI
     dueAt: ms(issuedAt) + INVOICE_DUE_DAYS * DAY,
     status: 'unpaid',
   };
-  seed.invoices.push(invoice);
+  append('invoices', invoice);
 
   recordAuditForSession(session, {
     action: 'invoice.create',
@@ -363,7 +367,7 @@ export interface TenantStatement {
 }
 
 function tierCounts(tenantId: string): { tier: 1 | 2 | 3; count: number; rateAed: number }[] {
-  const assets = seed.assets.filter(a => a.ownerTenantId === tenantId && !a.retiredAt);
+  const assets = db.getState().assets.filter(a => a.ownerTenantId === tenantId && !a.retiredAt);
   const t1 = assets.filter(a => tierForAsset(a) === 1).length;
   const t2 = assets.filter(a => tierForAsset(a) === 2).length;
   const t3 = assets.filter(a => tierForAsset(a) === 3).length;
@@ -395,7 +399,7 @@ function statementNumber(tenantName: string, monthLabel: string): string {
 }
 
 function statementFor(tenantId: string, monthAtMs: number, nowMs: number): TenantStatement {
-  const tenant = seed.tenants.find(t => t.id === tenantId);
+  const tenant = db.getState().tenants.find(t => t.id === tenantId);
   const tenantName = tenant?.name ?? tenantId;
   const monthLabel = monthLabelFor(monthAtMs);
   const lines: StatementLine[] = tierCounts(tenantId).map(t => ({
@@ -403,7 +407,7 @@ function statementFor(tenantId: string, monthAtMs: number, nowMs: number): Tenan
   }));
   const subtotalAed = n2(lines.reduce((sum, l) => sum + l.amountAed, 0));
   const vatAed = n2(subtotalAed * (VAT_PCT / 100));
-  const generated = seed.invoices.find(inv =>
+  const generated = db.getState().invoices.find(inv =>
     inv.kind === 'gps_subscription' && inv.customerTenantId === tenantId &&
     inv.number === statementNumber(tenantName, monthLabel)
   );
@@ -425,15 +429,15 @@ function statementFor(tenantId: string, monthAtMs: number, nowMs: number): Tenan
 /** Last month's statements for every tenant (Kasper console, spec 11.17). */
 export function lastMonthStatements(nowMs: number = clock.now()): TenantStatement[] {
   const atMs = lastMonthStartMs(nowMs);
-  return seed.tenants
+  return db.getState().tenants
     .map(t => statementFor(t.id, atMs, nowMs))
     .sort((a, b) => a.tenantName.localeCompare(b.tenantName));
 }
 
 /** Generate (idempotently) last month's statement for one tenant. */
 export function generateStatement(session: Session, tenantId: string): OpResult<Invoice> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can generate statements.');
-  const tenant = seed.tenants.find(t => t.id === tenantId);
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can generate statements.');
+  const tenant = db.getState().tenants.find(t => t.id === tenantId);
   if (!tenant) return fail('Tenant not found.');
   const statement = lastMonthStatements().find(s => s.tenantId === tenantId);
   if (!statement) return fail('Tenant not found.');
@@ -450,8 +454,9 @@ export function generateStatement(session: Session, tenantId: string): OpResult<
       quantity: l.count, unit: 'tracker-month', rateAed: l.rateAed, amountAed: l.amountAed,
     }));
 
+  const invoiceNo = nextNumber('inv-', db.getState().invoices, 4200);
   const invoice: Invoice = {
-    id: `inv-${++invoiceSeq}`,
+    id: `inv-${invoiceNo}`,
     number: statementNumber(tenant.name, statement.monthLabel),
     kind: 'gps_subscription',
     issuerTenantId: 'kasper',
@@ -465,7 +470,7 @@ export function generateStatement(session: Session, tenantId: string): OpResult<
     dueAt: atMs + INVOICE_DUE_DAYS * DAY,
     status: 'unpaid',
   };
-  seed.invoices.push(invoice);
+  append('invoices', invoice);
 
   recordAuditForSession(session, {
     action: 'statement.generate',
@@ -479,7 +484,7 @@ export function generateStatement(session: Session, tenantId: string): OpResult<
 /** Statements addressed to the session's own company (customer side). */
 export function statementsFor(session: Session): InvoiceView[] {
   if (!session.tenantId) return [];
-  return seed.invoices
+  return db.getState().invoices
     .filter(inv => inv.kind === 'gps_subscription' && inv.customerTenantId === session.tenantId)
     .map(inv => invoiceView(inv))
     .sort((a, b) => ms(b.issuedAt) - ms(a.issuedAt));
@@ -492,7 +497,7 @@ export function statementById(id: string): Invoice | null {
 
 /** Record a payment on a GPS statement (Kasper Admin, spec 11.17). */
 export function recordStatementPayment(session: Session, statementId: string, input: PaymentInput): OpResult<Payment> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can record payments on statements.');
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can record payments on statements.');
   const statement = statementById(statementId);
   if (!statement) return fail('Statement not found.');
   const balance = n2(statement.totalAed - paidTotal(statement.id));
@@ -501,17 +506,19 @@ export function recordStatementPayment(session: Session, statementId: string, in
   if (!Number.isFinite(amount) || amount <= 0) return fail('Enter an amount greater than zero.');
   if (amount > balance) return fail(`This is more than the ${aed(balance)} still owed.`);
 
+  const paymentNo = nextNumber('pay-', db.getState().payments, 100);
   const payment: Payment = {
-    id: `pay-${++paymentSeq}`,
+    id: `pay-${paymentNo}`,
     invoiceId: statement.id,
     at: input.at ?? new Date(clock.now()).toISOString(),
     amountAed: amount,
     method: input.method,
-    reference: input.reference?.trim() || `Statement ${paymentSeq}`,
+    reference: input.reference?.trim() || `Statement ${paymentNo}`,
     recordedBy: session.userId,
   };
-  seed.payments.push(payment);
+  append('payments', payment);
   statement.status = n2(balance - amount) <= 0 ? 'paid' : 'part_paid';
+  touch('invoices');
   recordAuditForSession(session, {
     action: 'statement.payment',
     tenantId: statement.customerTenantId ?? undefined,
@@ -521,13 +528,14 @@ export function recordStatementPayment(session: Session, statementId: string, in
 }
 
 export function voidStatement(session: Session, statementId: string, reason: string): OpResult<Invoice> {
-  if (!hasCapability(session, 'console.billing.manage')) return fail('Only Kasper Admin can void statements.');
+  if (!can(session, 'console.billing.manage')) return fail('Only Kasper Admin can void statements.');
   const statement = statementById(statementId);
   if (!statement) return fail('Statement not found.');
   if (statement.status === 'void') return fail('This statement is already void.');
   if (statement.status === 'paid') return fail('A paid statement can\u2019t be voided.');
   if (reason.trim().length < 10) return fail('Give a reason of at least 10 characters.');
   statement.status = 'void';
+  touch('invoices');
   recordAuditForSession(session, {
     action: 'statement.void',
     tenantId: statement.customerTenantId ?? undefined,

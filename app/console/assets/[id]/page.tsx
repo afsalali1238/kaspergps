@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
   TierChip,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
+import { useDb } from '@/server/api';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -37,9 +37,9 @@ function assetStatusBadge(status: string): React.ReactNode {
 // ── page ───────────────────────────────────────────────────────────────────────
 
 export default function ConsoleAssetDetailPage() {
+  const seed = useDb(s => s);
   const params = useParams();
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [activeTab, setActiveTab] = useState('overview');
   const [canChecked, setCanChecked] = useState(false);
@@ -70,10 +70,7 @@ export default function ConsoleAssetDetailPage() {
 
   const tenant = seed.tenants.find(t => t.id === asset.ownerTenantId);
   const site = seed.sites.find(s => s.id === asset.homeSiteId);
-  const tracker = useMemo(() =>
-    seed.trackers.find(t => t.stockStatus === 'paired' && seed.pairings.some(p => p.assetId === asset.id && p.trackerId === t.id)),
-    [asset.id]
-  );
+  const tracker = seed.trackers.find(t => t.stockStatus === 'paired' && seed.pairings.some(p => p.assetId === asset.id && p.trackerId === t.id));
   const bookings = seed.bookings.filter(b => b.assetId === asset.id);
   const activeBookings = bookings.filter(b => b.status === 'active' || b.status === 'scheduled');
   const otherTenants = seed.tenants.filter(t => t.id !== asset.ownerTenantId);

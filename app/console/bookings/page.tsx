@@ -4,13 +4,10 @@ import React, { useMemo, useState } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
+import { useDb, cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Booking } from '@/domain/types';
-import {
-  cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking,
-} from '@/server/bookings';
+import { useSession } from '@/hooks';
 
 function bookingStatusWords(booking: Booking): string {
   const start = new Date(booking.start).getTime();
@@ -38,8 +35,8 @@ function toLocalInput(ms: number): string {
 }
 
 export default function ConsoleBookingsPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
@@ -294,7 +291,8 @@ function CreateBookingForm({ onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const seed = useDb(s => s);
+  const session = useSession()!;
   const [assetId, setAssetId] = useState(seed.assets[0]?.id ?? '');
   const [renterTenantId, setRenterTenantId] = useState('');
   const [renterSiteId, setRenterSiteId] = useState('');

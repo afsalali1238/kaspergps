@@ -2,10 +2,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
-import { hasCapability } from '@/server/access';
-import { hasRole, isKasperStaff } from '@/server/capabilities';
+import { useDb, can, hasRole, isKasperStaff } from '@/server/api';
+
+import { useSession } from '@/hooks';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -16,8 +15,8 @@ function roleLabel(role: string): string {
 }
 
 export default function KasperTeamPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -35,7 +34,7 @@ export default function KasperTeamPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  if (!session || !hasCapability(session, 'console.staff.manage')) {
+  if (!session || !can(session, 'console.staff.manage')) {
     return (
       <div className="text-center py-8">
         <EmptyState title="Not available" description="Only Kasper Admin can manage Kasper staff accounts." />

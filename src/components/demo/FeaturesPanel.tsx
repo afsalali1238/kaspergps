@@ -2,12 +2,9 @@
 
 import React, { useMemo } from 'react';
 import clsx from 'clsx';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
-import { hasCapability, isFeatureVisible, getRelationship } from '@/server/access';
-import { reasonFor } from '@/server/capability-reasons';
+import { useDb, isFeatureVisible, getRelationship, reasonFor, type Capability, can } from '@/server/api';
 import { FEATURES } from '@/domain/features';
-import type { Capability } from '@/server/capabilities';
+import { useSession, useSwitches, useSelectedAssetId } from '@/hooks';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -48,11 +45,12 @@ const ALL_CAPABILITIES: Capability[] = [
 // ── Main component ──────────────────────────────────────────────────────────────
 
 export function FeaturesPanel() {
-  const session = useStore.getState().session;
-  const selectedAssetId = useStore.getState().selectedAssetId;
-  const showHidden = useStore.getState().demoSwitches.showHidden;
-  const phase = useStore.getState().demoSwitches.phase;
-  const salesView = useStore.getState().demoSwitches.salesView;
+  const seed = useDb(s => s);
+  const session = useSession();
+  const selectedAssetId = useSelectedAssetId();
+  const { showHidden } = useSwitches();
+  const { phase } = useSwitches();
+  const { salesView } = useSwitches();
 
   const user = session?.user;
   const asset = selectedAssetId ? seed.assets.find(a => a.id === selectedAssetId) : null;
@@ -63,10 +61,10 @@ export function FeaturesPanel() {
     if (!session) return [];
     return ALL_CAPABILITIES.map(cap => ({
       capability: cap,
-      ok: hasCapability(session, cap),
+      ok: can(session, cap, asset?.id),
       reason: reasonFor(session, cap, rel),
     }));
-  }, [session, rel]);
+  }, [session, rel, asset?.id]);
 
   // Build the list of features to show
   const featureList = useMemo(() => {

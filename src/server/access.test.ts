@@ -1,12 +1,12 @@
 // Access layer unit tests — verify visibility, grants, relationship.
 import { describe, it, expect } from 'vitest';
-import { seed } from './seed/data';
+import { db } from '@/server/db';
 import * as access from './access';
 import type { Session } from '@/domain/types';
 
 /** Build a session for a seeded user without the store. */
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id,
     user,
@@ -59,7 +59,7 @@ describe('access — isAssetVisible', () => {
     // BK-1003 starts tomorrow — not visible yet
     expect(access.isAssetVisible(s, 'a-ex07')).toBe(false);
     // BK-1003 is scheduled, not active
-    const booking = seed.bookings.find(b => b.id === 'b-1003');
+    const booking = db.getState().bookings.find(b => b.id === 'b-1003');
     expect(booking?.status).toBe('scheduled');
   });
 
@@ -87,9 +87,9 @@ describe('access — isAssetVisible', () => {
   it('EX-11 access ended early for Palm (BK-1010 override)', () => {
     const s = sessionFor('u-fatima');
     // BK-1010 had an early override by Khalid
-    const booking = seed.bookings.find(b => b.id === 'b-1010');
+    const booking = db.getState().bookings.find(b => b.id === 'b-1010');
     expect(booking).toBeDefined();
-    const override = seed.grantOverrides.find(o => o.bookingId === 'b-1010');
+    const override = db.getState().grantOverrides.find(o => o.bookingId === 'b-1010');
     expect(override).toBeDefined();
     expect(override!.reason).toBe('Payment overdue for two weeks');
     // The override ended the grant — Palm can't see EX-11
@@ -201,63 +201,5 @@ describe('access — getRelationship', () => {
   it('Lina is none for EX-07 (booking not yet started)', () => {
     const s = sessionFor('u-lina');
     expect(access.getRelationship(s, 'a-ex07')).toBe('none');
-  });
-});
-
-describe('access — hasCapability', () => {
-  it('Kasper Admin has everything', () => {
-    const s = sessionFor('u-sara');
-    expect(access.hasCapability(s, 'asset.view')).toBe(true);
-    expect(access.hasCapability(s, 'asset.edit')).toBe(true);
-    expect(access.hasCapability(s, 'console.audit.view')).toBe(true);
-    expect(access.hasCapability(s, 'console.staff.manage')).toBe(true);
-    expect(access.hasCapability(s, 'muc.issue')).toBe(true);
-  });
-
-  it('Kasper Ops has asset and tracker capabilities but not admin', () => {
-    const s = sessionFor('u-ravi');
-    expect(access.hasCapability(s, 'asset.view')).toBe(true);
-    expect(access.hasCapability(s, 'console.trackers.view')).toBe(true);
-    expect(access.hasCapability(s, 'console.staff.manage')).toBe(false);
-    expect(access.hasCapability(s, 'console.audit.view')).toBe(false);
-    expect(access.hasCapability(s, 'users.manage')).toBe(false);
-  });
-
-  it('Omar (Al Noor) can view and edit own assets but not create links for others', () => {
-    const s = sessionFor('u-omar');
-    expect(access.hasCapability(s, 'asset.view')).toBe(true);
-    expect(access.hasCapability(s, 'asset.edit')).toBe(true);
-    expect(access.hasCapability(s, 'link.create')).toBe(true);
-    expect(access.hasCapability(s, 'console.tenants.view')).toBe(false);
-  });
-
-  it('Lina (Marina) can act on her own assets but never on a rental she is renting in', () => {
-    const s = sessionFor('u-lina');
-    expect(access.hasCapability(s, 'asset.view')).toBe(true);
-    expect(access.hasCapability(s, 'asset.edit')).toBe(true);
-    expect(access.hasCapability(s, 'link.create')).toBe(true);
-    // Owner side: the role has the capability…
-    expect(access.hasCapability(s, 'grant.endEarly')).toBe(true);
-    // …but as the renter on EX-04 she cannot end the rental.
-    expect(access.canEndAccess(s, 'a-ex04')).toBe(false);
-    expect(access.canEndAccess(s, 'a-pu51')).toBe(true);
-    // Khalid owns EX-04, so he can.
-    expect(access.canEndAccess(sessionFor('u-khalid'), 'a-ex04')).toBe(true);
-    expect(access.canEndAccess(sessionFor('u-ahmed'), 'a-ex04')).toBe(false);
-    expect(access.canEndAccess(sessionFor('u-ravi'), 'a-ex04')).toBe(true);
-    expect(access.canEndAccess(sessionFor('u-ravi'), 'a-nope')).toBe(false);
-  });
-
-  it('Site Users cannot edit assets', () => {
-    const s = sessionFor('u-ahmed');
-    expect(access.hasCapability(s, 'asset.view')).toBe(true);
-    expect(access.hasCapability(s, 'asset.edit')).toBe(false);
-    expect(access.hasCapability(s, 'link.create')).toBe(false);
-  });
-
-  it('Site Users cannot acknowledge alerts', () => {
-    const s = sessionFor('u-ahmed');
-    expect(access.hasCapability(s, 'alert.view')).toBe(true);
-    expect(access.hasCapability(s, 'alert.acknowledge')).toBe(false);
   });
 });

@@ -5,12 +5,12 @@ import {
   canViewCost, costProfileFor, costRows, getDieselPrice, monthlySeries, periodRange, roiFor,
   saveCostProfile, setDieselPrice,
 } from './cost';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import * as clock from '@/lib/clock';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
@@ -21,10 +21,10 @@ const sara = () => sessionFor('u-sara');       // Kasper Admin
 const ravi = () => sessionFor('u-ravi');       // Kasper Ops — never sees cost
 const khalid = () => sessionFor('u-khalid');   // Emirates Earthmovers Admin
 const mark = () => sessionFor('u-mark');       // Gulf Lift Site User — never sees cost
-const asset = (id: string) => seed.assets.find(a => a.id === id)!;
+const asset = (id: string) => db.getState().assets.find(a => a.id === id)!;
 const lastMonth = () => periodRange('last_month');
 const auditFor = (action: string, needle: string) =>
-  seed.auditEntries.find(e => e.action === action && e.detail.includes(needle));
+  db.getState().auditEntries.find(e => e.action === action && e.detail.includes(needle));
 
 describe('cost — periods', () => {
   it('gives Dubai months and never runs past the clock', () => {

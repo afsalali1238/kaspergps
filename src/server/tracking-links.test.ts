@@ -7,12 +7,13 @@ import {
 } from './tracking-links';
 import { bookingById, cancelBooking, closeBooking } from './bookings';
 import { getTrackingLinkState, resolveTrackingLink } from './links';
-import { seed, ANCHOR_MS } from '@/server/seed/data';
+import { db, removeWhere } from '@/server/db';
+import { ANCHOR_MS } from '@/server/seed/data';
 import type { Session } from '@/domain/types';
 import * as clock from '@/lib/clock';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id,
     user,
@@ -33,9 +34,7 @@ const HOUR = 3600000;
 afterEach(() => {
   clock.setAnchor(ANCHOR_MS);
   // Drop anything a test created so the seeded link lists stay predictable.
-  for (let i = seed.trackingLinks.length - 1; i >= 0; i--) {
-    if (seed.trackingLinks[i].id.startsWith('lk-new-')) seed.trackingLinks.splice(i, 1);
-  }
+  removeWhere('trackingLinks', l => l.id.startsWith('lk-new-'));
 });
 
 describe('tracking links — tokens and reads', () => {
@@ -101,7 +100,7 @@ describe('tracking links — create', () => {
     expect(getTrackingLinkState(link.token)).toBe('active');
     expect(result.message).toContain('EX-07 link created');
 
-    const audit = seed.auditEntries.find(a => a.action === 'link.create' && a.assetId === 'a-ex07');
+    const audit = db.getState().auditEntries.find(a => a.action === 'link.create' && a.assetId === 'a-ex07');
     expect(audit?.detail).toContain('BK-1003');
 
     // Kasper can too, and the seeded FB-12 link is what the public page resolves.
@@ -162,7 +161,7 @@ describe('tracking links — revoke', () => {
     expect(activeLinksForAsset('a-fb12')).toHaveLength(before - 1);
     expect(linkEndWords(linkById('lk-fb12')!)).toBe('Revoked by Omar Saleh');
     expect(getTrackingLinkState('k7Qm2Xc9TpLw4ZaN8rVb3Ye5')).toBe('revoked');
-    expect(seed.auditEntries.some(a => a.action === 'link.revoke' && a.assetId === 'a-fb12')).toBe(true);
+    expect(db.getState().auditEntries.some(a => a.action === 'link.revoke' && a.assetId === 'a-fb12')).toBe(true);
 
     expect(revokeTrackingLink(omar(), 'lk-fb12')).toMatchObject({
       ok: false, error: 'This link is already revoked.',
@@ -189,7 +188,7 @@ describe('tracking links — revoke', () => {
     revokeTrackingLink(sara(), a.data!.id);
 
     expect(revokeLinksForBooking('b-1010', 'manual', 'u-priya')).toBe(1);
-    expect(seed.trackingLinks.find(l => l.id === b.data!.id)?.revokeReason).toBe('manual');
+    expect(db.getState().trackingLinks.find(l => l.id === b.data!.id)?.revokeReason).toBe('manual');
     expect(revokeLinksForBooking('b-1010', 'manual', 'u-priya')).toBe(0);
   });
 

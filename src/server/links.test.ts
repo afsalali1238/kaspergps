@@ -2,7 +2,7 @@
 // The resolver must expose exactly 4 keys, or 5 when the link has ETA enabled.
 import { describe, it, expect } from 'vitest';
 import { getTrackingLinkState, resolveTrackingLink } from './links';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import * as clock from '@/lib/clock';
 
 // Fixed demo tokens from the seed (spec 8.5).
@@ -47,12 +47,12 @@ describe('resolveTrackingLink', () => {
 
   it('reports the asset name from the seed', () => {
     const resolved = resolveTrackingLink(FB12_TOKEN)!;
-    const asset = seed.assets.find(a => a.id === 'a-fb12')!;
+    const asset = db.getState().assets.find(a => a.id === 'a-fb12')!;
     expect(resolved.assetName).toBe(asset.name);
   });
 
   it('is unavailable once the booking is cancelled', () => {
-    const booking = seed.bookings.find(b => b.id === 'b-1011')!;
+    const booking = db.getState().bookings.find(b => b.id === 'b-1011')!;
     const original = booking.status;
     booking.status = 'cancelled';
     try {
@@ -69,7 +69,7 @@ describe('resolveTrackingLink', () => {
   });
 
   it('starts working when a future booking starts (access runs from booking start)', () => {
-    const booking = seed.bookings.find(b => b.id === 'b-1011')!;
+    const booking = db.getState().bookings.find(b => b.id === 'b-1011')!;
     const originalStart = booking.start;
     booking.start = clock.now() + 3600 * 1000;
     try {

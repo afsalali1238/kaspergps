@@ -2,13 +2,9 @@
 
 import React, { useState } from 'react';
 import { Button, Badge, EmptyState } from '@/components/ui';
-import { useStore } from '@/store';
 import * as clock from '@/lib/clock';
-import {
-  allTrackerRequests, declineTrackerRequest, pairTrackerRequest,
-} from '@/server/requests';
-import type { TrackerRequestView } from '@/server/requests';
-import { stockTrackers } from '@/server/trackers';
+import { allTrackerRequests, declineTrackerRequest, pairTrackerRequest, type TrackerRequestView, stockTrackers } from '@/server/api';
+import { useSession } from '@/hooks';
 
 function formatDay(ts: string | number): string {
   const ms = typeof ts === 'number' ? ts : new Date(ts).getTime();
@@ -16,8 +12,7 @@ function formatDay(ts: string | number): string {
 }
 
 export default function RequestsPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [version, setVersion] = useState(0);
   const [pairingRequestId, setPairingRequestId] = useState<string | null>(null);
