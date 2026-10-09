@@ -99,7 +99,7 @@ export function DemoBar() {
   };
 
   return (
-    <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: '36px' }}>
+    <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: 'var(--demo-bar-h)' }}>
       {/* DEMO tag */}
       <span className="demo-tag flex-shrink-0 text-[9px]">DEMO</span>
 

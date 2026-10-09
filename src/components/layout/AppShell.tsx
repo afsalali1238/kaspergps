@@ -162,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Top bar */}
-      <header className="bg-surface border-b border-line px-4 lg:px-6 h-14 flex items-center justify-between sticky top-0 z-40" style={{ marginTop: '36px' }}>
+      <header className="bg-surface border-b border-line px-4 lg:px-6 h-14 flex items-center justify-between sticky top-0 z-40" style={{ top: 'var(--demo-bar-h)' }}>
         <div className="flex items-center gap-3">
           {/* Kasper wordmark */}
           <Link href={session?.isKasper ? '/console' : href('/app')} className="flex items-center gap-2 flex-shrink-0">

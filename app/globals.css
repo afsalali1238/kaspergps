@@ -2,6 +2,9 @@
 @import "tailwindcss";
 
 :root {
+  /* Fixed demo bar height: every page is offset by it (H3.5). */
+  --demo-bar-h: 36px;
+
   /* Brand */
   --ink: #141518;
   --Kasper-yellow: #FFC400;
@@ -112,6 +115,10 @@ code, pre, .mono {
 }
 
 /* Demo bar */
+body {
+  padding-top: var(--demo-bar-h);
+}
+
 .demo-bar {
   background: var(--demo-bar-bg);
   color: #F1F1EC;
