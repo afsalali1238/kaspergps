@@ -231,6 +231,15 @@ export default function AssetDetailPage() {
   const params = useParams();
   const assetId = params.id as string;
   const session = useSession();
+  /** The renter's name: the tenant's, or the outside hirer's name for outside hires. */
+  const renterNameOf = (b: { renterTenantId: string | null; renterName?: string }): string =>
+    (b.renterTenantId ? seed.tenants.find(x => x.id === b.renterTenantId)?.name : undefined) ?? b.renterName ?? '';
+  /** "until 20:00" on the same Dubai day, otherwise "until 9 Oct 20:00". */
+  const untilText = (endIso: string | number): string => {
+    const ms = new Date(endIso).getTime();
+    const sameDay = clock.dubaiDateKey(ms) === clock.dubaiDateKey(clock.now());
+    return `until ${sameDay ? '' : clock.formatDubaiDate(ms) + ' '}${clock.formatDubaiTime(ms)}`;
+  };
   const { phase } = useSwitches();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -436,16 +445,15 @@ export default function AssetDetailPage() {
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? t('asset_detail.rental_strip.no_destination', 'No destination')} ·
-                  until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {renterNameOf(currentBooking)} · {untilText(currentBooking.end)}
+                  {currentBooking.destination && <div className="text-xs text-grey-500 mt-0.5">{currentBooking.destination.name}</div>}
                 </div>
               </div>
             ) : upcomingBooking ? (
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {renterNameOf(upcomingBooking)} ·
                   from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
                 </div>
               </div>
@@ -457,7 +465,7 @@ export default function AssetDetailPage() {
                 <div className="font-medium text-ink text-sm">{t('asset_detail.rental_strip.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {seed.tenants.find(x => x.id === b.renterTenantId)?.name} ·
+                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {renterNameOf(b)} ·
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}

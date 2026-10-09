@@ -5,6 +5,7 @@
 import type { Reading, Asset } from '@/domain/types';
 import { db, type DbRow } from '@/server/db';
 import { ANCHOR_MS } from '@/server/seed/data';
+import { ecuHoursAt } from '@/server/telemetry/ecu';
 import * as clock from '@/lib/clock';
 import { OFFLINE_AFTER_SEC, STALE_AFTER_SEC } from '@/config/thresholds';
 
@@ -195,7 +196,43 @@ function generateIdleTail(asset: Asset, fromMs: number, toMs: number, prng: () =
   return readings;
 }
 
+const CAN_PARAMS = ['rpm', 'engineLoad', 'fuelLevel', 'fuelUsed', 'fuelRate', 'canOdometer', 'coolantTemp', 'engineHours', 'faultCodes', 'adBlue'];
+
+/**
+ * Fills the CAN fields a tracker reads from the engine bus, but only for the
+ * parameters the asset's adapter supports (spec §6.2), and only after the
+ * adapter was fitted. Everything else stays undefined.
+ */
+function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
+  const supported = new Set<string>(asset.canProfile.supported);
+  if (!CAN_PARAMS.some(p => supported.has(p))) return readings;
+  const salt = assetSeed(asset);
+  return readings.map(r => {
+    const t = new Date(r.deviceTime).getTime();
+    if (!isCanReadingAvailable(asset, t)) return r;
+    const u = mulberry32(t + salt)();
+    const on = r.ignition;
+    const moving = r.moving;
+    const out: Reading = { ...r };
+    if (supported.has('rpm')) out.rpm = on ? (moving ? 1400 + 700 * u : 700 + 100 * u) : 0;
+    if (supported.has('engineLoad')) out.engineLoadPct = on ? (moving ? 40 + 40 * u : 15 + 10 * u) : 0;
+    if (supported.has('fuelLevel')) out.fuelLevelPct = Math.round((40 + 40 * (0.5 + 0.5 * Math.sin(t / (6 * 3600000)))) * 10) / 10;
+    if (supported.has('fuelUsed')) out.fuelUsedL = Math.round(r.gnssOdometerKm * 0.35 * 10) / 10;
+    if (supported.has('fuelRate')) out.fuelRateLph = on ? (moving ? 18 + 12 * u : 3 + 2 * u) : 0;
+    if (supported.has('canOdometer')) out.canOdometerKm = r.gnssOdometerKm;
+    if (supported.has('coolantTemp')) out.coolantC = on ? 82 + 8 * u : 28 + 4 * u;
+    if (supported.has('engineHours')) out.engineHours = ecuHoursAt(asset, t);
+    if (supported.has('faultCodes')) out.activeDtcs = [];
+    if (supported.has('adBlue')) out.adBluePct = Math.round((60 + 10 * u) * 10) / 10;
+    return out;
+  });
+}
+
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
+  return withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
+}
+
+function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   const prng = mulberry32(assetSeed(asset) + Math.floor(dayMs / 86400000));
   const dayEndDubai = dayMs + 86400000;
   const now = clock.now();

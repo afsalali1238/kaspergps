@@ -122,6 +122,17 @@ describe('seed data', () => {
       expect(t.model).toBe('FMC130');
     }
   });
+
+  it('has one open pairing per paired tracker (34), and each asset has exactly one except LD-09 and MW-01', () => {
+    const open = seed.pairings.filter(p => p.to === null);
+    expect(open).toHaveLength(34);
+    for (const asset of seed.assets) {
+      const n = open.filter(p => p.assetId === asset.id).length;
+      if (asset.code === 'LD-09' || asset.code === 'MW-01') {
+        expect(n, asset.code).toBe(0);
+      } else {
+        expect(n, asset.code).toBe(1);
+      }
+    }
+  });
 });
-
-
