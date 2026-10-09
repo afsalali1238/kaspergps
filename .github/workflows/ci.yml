@@ -17,6 +17,9 @@ jobs:
   checks:
     name: Typecheck, lint and unit tests
     runs-on: ubuntu-latest
+    # The suite generates telemetry day-by-day in a few files; it normally takes
+    # about a minute and a half, so this only cuts off a hung job.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
