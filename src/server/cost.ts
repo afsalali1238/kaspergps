@@ -139,11 +139,13 @@ function isTier3(asset: Asset): boolean {
   return asset.canProfile.adapter === 'ALL-CAN300';
 }
 
-function burnRateLph(asset: Asset): number {
+/** Class-average burn rate for an asset's type — a dummy rate, disclosed as such (spec 11.19). */
+export function burnRateLph(asset: Asset): number {
   return CLASS_AVG_FUEL_LPH[asset.assetClass] ?? CLASS_AVG_FUEL_LPH[asset.type.toLowerCase()] ?? 8;
 }
 
-function engineHoursIn(asset: Asset, fromMs: number, toMs: number): number {
+/** Engine hours in a window: the ECU meter on Tier 3, the ignition estimate on Tier 1/2. */
+export function engineHoursIn(asset: Asset, fromMs: number, toMs: number): number {
   return isTier3(asset)
     ? Math.max(0, ecuHoursAt(asset, toMs) - ecuHoursAt(asset, fromMs))
     : Math.max(0, estimatedHoursAt(asset, toMs) - estimatedHoursAt(asset, fromMs));

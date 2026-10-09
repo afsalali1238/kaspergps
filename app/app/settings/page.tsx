@@ -107,31 +107,31 @@ export default function SettingsPage() {
               <h3 className="text-xs text-grey-500 font-medium">{t('settings.users.invite_title', 'Invite a user')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.name', 'Name')}</label>
-                  <input
+                  <label htmlFor="inv-name" className="text-xs text-grey-500 font-medium">{t('settings.users.name', 'Name')}</label>
+                  <input id="inv-name"
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.users.full_name', 'Full name')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.email', 'Email')}</label>
-                  <input
+                  <label htmlFor="inv-email" className="text-xs text-grey-500 font-medium">{t('settings.users.email', 'Email')}</label>
+                  <input id="inv-email"
                     type="email"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder="user@company.com"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.role', 'Role')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="inv-role" className="text-xs text-grey-500 font-medium">{t('settings.users.role', 'Role')}</label>
+                  <select id="inv-role" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option value="tenant_admin">{t('settings.users.tenant_admin', 'Tenant Admin')}</option>
                     <option value="site_user">{t('settings.users.site_user', 'Site User')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="inv-sites" className="text-xs text-grey-500 font-medium">{t('settings.users.sites', 'Sites')}</label>
+                  <select id="inv-sites" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option value="">{t('settings.users.sites_hint', 'Pick at least one site (Site User only)')}</option>
                     {mySites.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -220,22 +220,22 @@ export default function SettingsPage() {
               <h3 className="text-xs text-grey-500 font-medium">{t('settings.sites.add', 'Add a site')}</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.name', 'Site name')}</label>
-                  <input
+                  <label htmlFor="site-name" className="text-xs text-grey-500 font-medium">{t('settings.sites.name', 'Site name')}</label>
+                  <input id="site-name"
                     type="text"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.sites.name_placeholder', 'e.g. Business Bay Tower')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.location', 'Location')}</label>
+                  <span className="text-xs text-grey-500 font-medium">{t('settings.sites.location', 'Location')}</span>
                   <div className="bg-paper-2 rounded-lg p-3 border border-line text-xs text-grey-500">
                     Click on the map to pick a location, or search a Dubai area.
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.sites.radius', 'Radius (100–2,000 m)')}</label>
-                  <input
+                  <label htmlFor="site-radius" className="text-xs text-grey-500 font-medium">{t('settings.sites.radius', 'Radius (100–2,000 m)')}</label>
+                  <input id="site-radius"
                     type="number"
                     min={100}
                     max={2000}
@@ -315,24 +315,24 @@ export default function SettingsPage() {
               <h3 className="text-xs text-grey-500 font-medium">{t('settings.assets.add', 'Add an asset')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.code', 'Code')}</label>
-                  <input
+                  <label htmlFor="asset-code" className="text-xs text-grey-500 font-medium">{t('settings.assets.code', 'Code')}</label>
+                  <input id="asset-code"
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.assets.code_placeholder', 'EX-15')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.name', 'Name')}</label>
-                  <input
+                  <label htmlFor="asset-name" className="text-xs text-grey-500 font-medium">{t('settings.assets.name', 'Name')}</label>
+                  <input id="asset-name"
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.assets.name_placeholder', 'Excavator 15')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.type', 'Type')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="asset-type" className="text-xs text-grey-500 font-medium">{t('settings.assets.type', 'Type')}</label>
+                  <select id="asset-type" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option>{t('settings.assets.types.excavator', 'Excavator')}</option>
                     <option>{t('settings.assets.types.wheel_loader', 'Wheel loader')}</option>
                     <option>{t('settings.assets.types.dozer', 'Dozer')}</option>
@@ -342,8 +342,8 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.class', 'Class')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="asset-class" className="text-xs text-grey-500 font-medium">{t('settings.assets.class', 'Class')}</label>
+                  <select id="asset-class" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option>{t('settings.assets.classes.plant', 'Plant')}</option>
                     <option>{t('settings.assets.classes.lifting', 'Lifting')}</option>
                     <option>{t('settings.assets.classes.truck', 'Truck')}</option>
@@ -352,24 +352,24 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.make', 'Make')}</label>
-                  <input
+                  <label htmlFor="asset-make" className="text-xs text-grey-500 font-medium">{t('settings.assets.make', 'Make')}</label>
+                  <input id="asset-make"
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder={t('settings.assets.make_placeholder', 'CAT')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.model', 'Model')}</label>
-                  <input
+                  <label htmlFor="asset-model" className="text-xs text-grey-500 font-medium">{t('settings.assets.model', 'Model')}</label>
+                  <input id="asset-model"
                     type="text"
                     className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                     placeholder="320"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.home_site', 'Home site')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="asset-home_site" className="text-xs text-grey-500 font-medium">{t('settings.assets.home_site', 'Home site')}</label>
+                  <select id="asset-home_site" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option value="">{t('settings.assets.select_site', 'Select a site')}</option>
                     {mySites.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -377,8 +377,8 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-grey-500 font-medium">{t('settings.assets.behaviour', 'Behaviour')}</label>
-                  <select className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
+                  <label htmlFor="asset-behaviour" className="text-xs text-grey-500 font-medium">{t('settings.assets.behaviour', 'Behaviour')}</label>
+                  <select id="asset-behaviour" className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink">
                     <option value="parked">{t('settings.assets.behaviours.parked', 'Parked')}</option>
                     <option value="works_at_site">{t('settings.assets.behaviours.works_at_site', 'Works at site')}</option>
                     <option value="drives_between_sites">{t('settings.assets.behaviours.drives_between_sites', 'Drives between sites')}</option>

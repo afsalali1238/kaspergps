@@ -7,7 +7,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
-  TierChip, Badge, Button, StatusBadge,
+  TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
 import { useStore } from '@/store';
 import { seed } from '@/server/seed/data';
@@ -17,6 +17,7 @@ import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server
 import { detectTrips } from '@/server/trips';
 import { visibleAlerts, acknowledgeAlert } from '@/server/alerts';
 import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
+import { last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/utilisation';
 import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
 import {
   activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset,
@@ -247,6 +248,7 @@ export default function AssetDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [breakdown, setBreakdown] = useState<EcuBreakdown | null>(null);
+  const [ignition, setIgnition] = useState<IgnitionBreakdown | null>(null);
   const [verifyStates, setVerifyStates] = useState<Record<string, MucVerifyStatus>>({});
   const [requestNote, setRequestNote] = useState('');
   const [panel, setPanel] = useState<'share' | 'end' | 'edit' | null>(null);
@@ -267,6 +269,9 @@ export default function AssetDetailPage() {
     const end = clock.now();
     return getReadingsForAsset(asset, end - 24 * 3600_000, end).slice(-24);
   }, [asset]);
+
+  // Today's distance and ignition-on time (spec 11.3 Overview).
+  const today = useMemo(() => (asset ? todayFor(asset) : null), [asset]);
 
   const recentTrips = useMemo(() => {
     if (!asset) return [];
@@ -342,7 +347,14 @@ export default function AssetDetailPage() {
     const to = clock.now();
     const from = to - 7 * 86400000;
     const next = buildEcuBreakdown(asset, from, to);
-    if (!cancelled) setBreakdown(next);
+    // The Moving / Ignition-on-stationary / Off bars come from the ignition
+    // line, which every tracker with an ignition input can answer — the ECU
+    // meter alone would leave a Tier 1 or Tier 2 asset with nothing to show.
+    const ignitionNext = last7DaysIgnition(asset, to);
+    if (!cancelled) {
+      setBreakdown(next);
+      setIgnition(ignitionNext);
+    }
     return () => { cancelled = true; };
   }, [asset, utilisationOpen]);
 
@@ -661,9 +673,31 @@ export default function AssetDetailPage() {
             </div>
           </div>
 
+          {/* Today: distance and ignition-on time (spec 11.3 "Overview"). */}
+          {today && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.today_distance', "Today's distance")}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {t('asset_detail.overview.km', '{value} km', { value: today.distanceKm.toFixed(1) })}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">{t('asset_detail.overview.since_midnight', 'Since midnight, Dubai')}</div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.today_ignition', "Today's ignition-on time")}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {t('common.hours_short', '{value} h', { value: today.ignitionHours.toFixed(1) })}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <SourceLabel source={today.source} inline />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* CAN tiles (only for Tier 2+) */}
           {!isTier1 && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="bg-surface border border-line rounded-lg p-4">
                 <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_hours', 'Engine hours')}</div>
                 <div className="text-lg font-semibold text-ink mt-1 font-mono">
@@ -694,6 +728,67 @@ export default function AssetDetailPage() {
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('rpm') && reading?.rpm !== undefined
                     ? t('asset_detail.overview.live_value', 'Live value')
+                    : t('common.not_available', 'Not available')}
+                </div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.power', 'Power')}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {reading && hasFeature(asset, 'power.status') ? `${reading.extVoltage.toFixed(1)} V` : t('common.not_measured', 'Not measured')}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {hasFeature(asset, 'power.status')
+                    ? t('asset_detail.overview.tracker_battery', 'Tracker battery {value}', { value: reading ? `${reading.intBattery.toFixed(1)} V` : '—' })
+                    : t('common.not_available', 'Not available')}
+                </div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.coolant', 'Coolant')}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {asset.canProfile.supported.includes('coolantTemp') && reading?.coolantC !== undefined
+                    ? `${reading.coolantC.toFixed(0)} °C`
+                    : t('common.not_measured', 'Not measured')}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {asset.canProfile.supported.includes('coolantTemp')
+                    ? t('asset_detail.engine.can_source', 'CAN')
+                    : t('common.not_available', 'Not available')}
+                </div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.load', 'Engine load')}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {asset.canProfile.supported.includes('engineLoad') && reading?.engineLoadPct !== undefined
+                    ? `${reading.engineLoadPct.toFixed(0)}%`
+                    : t('common.not_measured', 'Not measured')}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {asset.canProfile.supported.includes('engineLoad')
+                    ? t('asset_detail.engine.can_source', 'CAN')
+                    : t('common.not_available', 'Not available')}
+                </div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.adblue', 'AdBlue')}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {asset.canProfile.supported.includes('adBlue') && reading?.adBluePct !== undefined
+                    ? `${reading.adBluePct.toFixed(0)}%`
+                    : t('common.not_measured', 'Not measured')}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {asset.canProfile.supported.includes('adBlue')
+                    ? t('asset_detail.engine.can_source', 'CAN')
+                    : t('common.not_available', 'Not available')}
+                </div>
+              </div>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.faults', 'Active faults')}</div>
+                <div className="text-lg font-semibold text-ink mt-1 font-mono">
+                  {hasFeature(asset, 'faults') ? `${reading?.activeDtcs?.length ?? 0}` : t('common.not_measured', 'Not measured')}
+                </div>
+                <div className="text-xs text-grey-500 mt-1">
+                  {hasFeature(asset, 'faults')
+                    ? t('asset_detail.engine.fault_codes', 'Fault codes')
                     : t('common.not_available', 'Not available')}
                 </div>
               </div>
@@ -919,11 +1014,71 @@ export default function AssetDetailPage() {
               </div>
             </>
           ) : (
-            <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.utilisation', 'Utilisation')}</div>
-              <div className="text-sm text-grey-500">
-                Last 7 days utilisation for this asset.
+            <div className="bg-surface border border-line rounded-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-line flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">{t('asset_detail.tabs.utilisation', 'Utilisation')}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <SourceLabel source="Estimated" inline />
+                  <span className="text-[10px] text-grey-500">{t('asset_detail.utilisation.not_billing_grade', 'Not for billing')}</span>
+                </span>
               </div>
+              <div className="px-3 py-2 text-[11px] text-grey-500 border-b border-line">
+                {t('asset_detail.utilisation.ignition_note', 'From the tracker\'s ignition line: no engine hours to seal a certificate from, so the day is split by whether the ignition was on and the asset was moving.')}
+              </div>
+              {!ignition ? (
+                <div className="p-4 text-sm text-grey-500">{t('asset_detail.reading_ecu', 'Reading the ECU…')}</div>
+              ) : ignition.days.length === 0 ? (
+                <div className="p-4 text-sm text-grey-500">{t('asset_detail.no_engine_data', 'No engine data in this window.')}</div>
+              ) : (
+                <>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-paper-2 text-grey-500">
+                        <th className="px-3 py-2 text-left font-medium">{t('asset_detail.utilisation.day', 'Day')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.ignition_stationary', 'Ignition on, stationary')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.moving', 'Moving')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.off_h', 'Off (h)')}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t('asset_detail.utilisation.gap_min', 'Gap (min)')}</th>
+                        <th className="px-3 py-2 text-left font-medium w-28">{t('asset_detail.utilisation.split', 'Day split')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ignition.days.map(d => {
+                        const on = d.movingHours + d.stationaryHours;
+                        const pct = (v: number) => `${Math.min(100, Math.round((v / 24) * 100))}%`;
+                        return (
+                          <tr key={d.key} className="bg-paper hover:bg-paper-2">
+                            <td className="px-3 py-2 border-b border-line text-grey-700">{d.date}</td>
+                            <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{d.stationaryHours.toFixed(1)}</td>
+                            <td className="px-3 py-2 border-b border-line text-right font-mono text-ink">{d.movingHours.toFixed(1)}</td>
+                            <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-500">{d.offHours.toFixed(1)}</td>
+                            <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-500">{d.gapMinutes || '—'}</td>
+                            <td className="px-3 py-2 border-b border-line">
+                              <div
+                                className="flex h-2 rounded-sm overflow-hidden bg-paper-2"
+                                role="img"
+                                aria-label={t('asset_detail.utilisation.day_split',
+                                  '{stationary} h stationary, {moving} h moving, {off} h off',
+                                  { stationary: d.stationaryHours, moving: d.movingHours, off: d.offHours })}
+                              >
+                                <div className="bg-idle" style={{ width: pct(d.stationaryHours) }} />
+                                <div className="bg-live" style={{ width: pct(d.movingHours) }} />
+                                <div className="bg-grey-500/40" style={{ width: pct(Math.max(0, 24 - on - d.gapMinutes / 60)) }} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="px-3 py-2 border-t border-line flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-grey-500">
+                    <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-idle" />{t('asset_detail.utilisation.ignition_stationary', 'Ignition on, stationary')}</span>
+                    <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-live" />{t('asset_detail.utilisation.moving', 'Moving')}</span>
+                    <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-grey-500/40" />{t('asset_detail.utilisation.off', 'Off')}</span>
+                    <span className="text-grey-500">{t('asset_detail.utilisation.note', 'Source: {source}', { source: t('asset_detail.utilisation.source_ignition', 'Ignition hours · Estimated') })}</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

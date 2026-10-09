@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -5,7 +6,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': '/home/user/kaspergps/src',
+      // Resolved from this file, never from a checkout path — the repo has to
+    // work in CI, in a container and on a laptop alike.
+    '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   test: {

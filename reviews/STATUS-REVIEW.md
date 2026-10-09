@@ -5,6 +5,63 @@ Reviewed against: `BUILD_PROMPT.md` (14 phases, §1–§17), repo at `7e0d709`.
 
 ---
 
+## Revision R2 — 2026-10-09 (`arena/dae7b9a9-kaspergps`)
+
+A later session picked up the three open items from R1's "What is left" that could
+be closed without a browser, plus the two product gaps from R1 item 5.
+
+**Closed here**
+
+| R1 item | Now |
+| --- | --- |
+| 5 — Overview "today" tiles | `src/server/utilisation.ts` (`hoursToday`, `distanceToday`, `fuelToday`, `openAlertsToday`, `fleetTodayTotals`) drives a KPI strip row on `app/app/page.tsx` and per-asset Phase-2 cells in the list. Tiles render only for a fleet that meters them; an unmeasurable number is absent, never 0 |
+| 5 — non-MUC utilisation | The Tier 1/2 branch of `app/app/assets/[id]/page.tsx` was the sentence "Last 7 days utilisation for this asset."; it is now a 7-day Moving / Ignition-on-stationary / Off table plus a day-split bar, with `SourceLabel: Estimated` and the "Not for billing" rule. The MUC branch is untouched, so S2's expectations still hold |
+| 5 — Overview distance/idle from `detectTrips` | Distance today now comes from `detectTrips`; *idle* today was deliberately not added — Tier 1/2 cannot measure idling (§6) and the tab already says so |
+| 4 — P1–P13 self-checks | `reviews/P1-self-check.md` … `P13-self-check.md`, reconstructed. **Retrospective**: each one states what proves a §15 check today and says "not executed" where nothing does. Screenshots are still missing — no browser here |
+| 3 — e2e in CI | `.github/workflows/ci.yml`: `checks` (typecheck, lint, vitest, coverage) + `e2e` (Chromium, `next build && next start`, retries, artifact on failure). `vitest.config.ts`'s absolute `@` alias is gone (it pinned the suite to one machine); `playwright.config.ts` now uses `retries: 2` on CI so `trace: 'on-first-retry'` can produce a trace, and an HTML reporter |
+| new | `tests/e2e/certificate.spec.ts` — certificates phase gate (locked at Day 1, Tier 3 tab disabled at Day 1 and enabled at Phase 2, unlock). `src/server/billing.test.ts` — reconciliation: payments + balance = total on every invoice both sides can see, per-customer and window totals, voided invoices excluded (mutation-checked). `src/e2e-contract.test.ts` — every `getByLabel` in `tests/e2e` must correspond to a `<label htmlFor>`/wrapping control in `app/`, plus pins for the phase-gate copy, demo-bar triggers, `map.kpi.*` keys and "the non-MUC table replaced the sentence" |
+
+**Fixed as a side effect:** the three Settings forms (`app/app/settings/page.tsx`)
+rendered their `<label>`s as siblings of un-`id`'d controls, so
+`getByLabel('Email')`, `('Sites')`, `('Code')`, `('Site name')` and `(/Radius/)`
+in `S17-S19.spec.ts` would have found nothing. Labels are paired now and the spec
+line `S19` asks for the field the form actually has ("Name", not "Full name" —
+§11.8 asks for name/email/role/sites, so the spec was re-pointed rather than the
+form widened).
+
+**Current health (2026-10-09)**
+
+| Command | Result |
+| --- | --- |
+| `npm test` | 29 files, **329 tests**, all green |
+| `npm run test:coverage` | **87.97 %** lines — ≥ 85 % floor met |
+| `npm run typecheck` / `npm run lint` / `npm run build` | Clean; build exit 0 |
+| `next start` + HTTP | `/sign-in`, `/app`, `/app/assets/a-ex04`, `/app/certificates`, `/app/settings` → 200, no error payload |
+| `npm run test:e2e` | **still never executed** — no Chromium in this sandbox and `cdn.playwright.dev` is unreachable. The CI job is the first thing that can run it |
+
+**What is still left after R2**
+
+1. A green Playwright run on CI — every "written, not executed" verdict in the
+   per-phase self-checks depends on it.
+2. `reviews/screenshots/` — empty.
+3. Map filter/search state in the URL (§11.2) — the one §15 check R2 found and
+   deliberately did not half-implement.
+4. Geofence report: `FEATURE_LABEL_KEYS` advertises `report.geofence` but
+   `REPORT_TYPES` has no such type.
+5. Polygon geofence drawing — typed coordinates only; `@geoman-io/leaflet-geoman-free`
+   is installed and used by nothing.
+6. Settings → Sites/Assets create real records (§11.8) — the forms are still
+   presentational; R2 made them accessible, not functional.
+7. Customer nav drops Certificates/Billing/Maintenance/Cost & ROI for tenants at
+   every width (§11 wants them in a bottom sheet on phone only) — left as found,
+   recorded in `reviews/P4-self-check.md`.
+
+`HANDOFF.md` in the repository root claimed "100 % complete", "~91 % coverage" and
+full E2E coverage. R2 corrected it: the numbers above are the record, and the
+"never executed" facts are stated where a reader would otherwise assume otherwise.
+
+---
+
 ## Revision R1 — post-implementation status (2026-10-08, later the same day)
 
 After the review, the §6 remediation order A–E was executed on this branch.
