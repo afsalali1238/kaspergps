@@ -4,8 +4,8 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
+import { useDb } from '@/server/api';
+import { useSession } from '@/hooks';
 
 function roleLabel(role: string): string {
   const labels: Record<string, string> = {
@@ -18,8 +18,8 @@ function roleLabel(role: string): string {
 }
 
 export default function UsersPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [tenantFilter, setTenantFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);

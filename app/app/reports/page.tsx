@@ -8,17 +8,12 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Button, EmptyState } from '@/components/ui';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { hasCapability } from '@/server/access';
-import {
-  availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES,
-  type ReportTypeId,
-} from '@/server/reports';
-import { createSchedule, type ScheduleFrequency } from '@/server/schedules';
+
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 const DATE_PRESETS: { key: string; label: string; days: number }[] = [
   { key: 'last_24h', label: 'Last 24 hours', days: 1 },
@@ -29,10 +24,10 @@ const DATE_PRESETS: { key: string; label: string; days: number }[] = [
 type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
 
 export default function ReportsPage() {
+  const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(null);
   const [scope, setScope] = useState<ScopeType>('multiple_assets');
@@ -79,8 +74,8 @@ export default function ReportsPage() {
     return clock.dubaiDateKey(clock.now());
   }, [dateTo]);
 
-  const canRunReport = session ? hasCapability(session, 'report.run') : false;
-  const canSchedule = session ? hasCapability(session, 'report.schedule') : false;
+  const canRunReport = session ? can(session, 'report.run') : false;
+  const canSchedule = session ? can(session, 'report.schedule') : false;
 
   if (!session) return null;
 

@@ -1,16 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Button, Badge, EmptyState,
   Tabs,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
-import { hasCapability } from '@/server/access';
-import type { Capability } from '@/server/capabilities';
+import { useDb, append, nextRowNumber, type Capability, can } from '@/server/api';
+
 import type { AssetClass, Role, SimBehaviour } from '@/domain/types';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -69,12 +68,13 @@ SN-CAN001,ALL-CAN300
 // ── importers ───────────────────────────────────────────────────────────────────
 
 function AssetsImporter() {
+  const seed = useDb(s => s);
   const [text, setText] = useState('');
   const [rows, setRows] = useState<{ cells: string[]; errors: string[] }[]>([]);
   const [done, setDone] = useState<string | null>(null);
 
-  const tenants = useMemo(() => seed.tenants, []);
-  const sites = useMemo(() => seed.sites, []);
+  const tenants = seed.tenants;
+  const sites = seed.sites;
 
   const process = () => {
     const parsed = parseCsvRows(text);
@@ -112,8 +112,8 @@ function AssetsImporter() {
     for (const { cells } of valid) {
       const tenant = tenants.find(t => t.name.toLowerCase() === cells[8].trim().toLowerCase())!;
       const site = sites.find(s => s.name.toLowerCase() === cells[9].trim().toLowerCase())!;
-      seed.assets.push({
-        id: `asset-import-${seed.assets.length + 1}`,
+      append('assets', {
+        id: `asset-import-${nextRowNumber('assets', 'asset-import-')}`,
         code: cells[0].trim(), name: cells[1].trim(), type: cells[2].trim(),
         assetClass: cells[3].trim() as AssetClass,
         make: cells[4].trim(), model: cells[5].trim(), year: Number(cells[6]) || 0,
@@ -184,6 +184,7 @@ function AssetsImporter() {
 }
 
 function TrackersImporter() {
+  const seed = useDb(s => s);
   const [text, setText] = useState('');
   const [rows, setRows] = useState<{ imei: string; iccid: string; errors: string[] }[]>([]);
   const [done, setDone] = useState<string | null>(null);
@@ -213,8 +214,8 @@ function TrackersImporter() {
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
     const importedAt = new Date(clock.now()).toISOString();
-    for (const row of valid) seed.trackers.push({
-      id: `tracker-import-${seed.trackers.length + 1}`, assetId: null, imei: row.imei,
+    for (const row of valid) append('trackers', {
+      id: `tracker-import-${nextRowNumber('trackers', 'tracker-import-')}`, assetId: null, imei: row.imei,
       model: 'FMC130', simIccid: row.iccid, firmware: '03.29.00.Rev.03',
       pingIntervalSec: 30, sleepMode: 'off', stockStatus: 'in_stock',
       registeredAt: importedAt, registeredBy: 'csv-import',
@@ -271,6 +272,7 @@ function TrackersImporter() {
 }
 
 function AdaptersImporter() {
+  const seed = useDb(s => s);
   const [text, setText] = useState('');
   const [rows, setRows] = useState<{ serial: string; model: string; errors: string[] }[]>([]);
   const [done, setDone] = useState<string | null>(null);
@@ -297,8 +299,8 @@ function AdaptersImporter() {
   const importValid = () => {
     const valid = rows.filter(r => r.errors.length === 0);
     const importedAt = new Date(clock.now()).toISOString();
-    for (const row of valid) seed.adapters.push({
-      id: `adapter-import-${seed.adapters.length + 1}`, serial: row.serial,
+    for (const row of valid) append('adapters', {
+      id: `adapter-import-${nextRowNumber('adapters', 'adapter-import-')}`, serial: row.serial,
       model: row.model as 'LVCAN200' | 'ALL-CAN300', status: 'in_stock',
       assetId: null, registeredAt: importedAt,
     });
@@ -354,11 +356,12 @@ function AdaptersImporter() {
 }
 
 function UsersImporter() {
+  const seed = useDb(s => s);
   const [text, setText] = useState('');
   const [rows, setRows] = useState<{ cells: string[]; errors: string[] }[]>([]);
   const [done, setDone] = useState<string | null>(null);
 
-  const tenants = useMemo(() => seed.tenants, []);
+  const tenants = seed.tenants;
 
   const process = () => {
     const parsed = parseCsvRows(text);
@@ -390,8 +393,8 @@ function UsersImporter() {
     for (const { cells } of valid) {
       const tenant = tenants.find(t => t.name.toLowerCase() === cells[3].trim().toLowerCase())!;
       const siteNames = cells[4].split(/[;|]/).map(v => v.trim().toLowerCase()).filter(Boolean);
-      seed.users.push({
-        id: `user-import-${seed.users.length + 1}`, name: cells[0].trim(), email: cells[1].trim(),
+      append('users', {
+        id: `user-import-${nextRowNumber('users', 'user-import-')}`, name: cells[0].trim(), email: cells[1].trim(),
         role: cells[2].trim() as Role, tenantId: tenant.id,
         siteIds: seed.sites.filter(site => site.tenantId === tenant.id && siteNames.includes(site.name.toLowerCase())).map(site => site.id),
         status: 'active',
@@ -461,12 +464,11 @@ const importerTabs: { id: string; label: string; cap: Capability }[] = [
 ];
 
 export default function ConsoleImportPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [activeTab, setActiveTab] = useState('assets');
 
-  if (!session || !hasCapability(session, 'console.import')) {
+  if (!session || !can(session, 'console.import')) {
     return (
       <div className="text-center py-8">
         <EmptyState title="Not available" description="Only Kasper Admin and Ops can import." />
@@ -474,7 +476,7 @@ export default function ConsoleImportPage() {
     );
   }
 
-  const allowedTabs = importerTabs.filter(t => hasCapability(session, t.cap));
+  const allowedTabs = importerTabs.filter(t => can(session, t.cap));
   const tab = allowedTabs.some(t => t.id === activeTab) ? activeTab : (allowedTabs[0]?.id ?? '');
 
   return (

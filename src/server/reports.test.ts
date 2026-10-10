@@ -2,7 +2,8 @@
 // clipping, permission re-check on Download again, and the schedule loop.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { seed, ANCHOR_MS } from '@/server/seed/data';
+import { db } from '@/server/db';
+import { ANCHOR_MS } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import type { Session, User } from '@/domain/types';
 import { isKasperStaff } from '@/server/capabilities';
@@ -14,7 +15,7 @@ import {
 import { createSchedule, runDueSchedules, schedulesFor, setScheduleActive } from '@/server/schedules';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId) as User;
+  const user = db.getState().users.find(u => u.id === userId) as User;
   return {
     userId: user.id,
     user,
@@ -35,7 +36,7 @@ afterEach(() => {
 
 describe('trip detection (§11.5 trip rule)', () => {
   it('detects trips for a truck with movement and reports distance', () => {
-    const fb12 = seed.assets.find(a => a.id === 'a-fb12')!;
+    const fb12 = db.getState().assets.find(a => a.id === 'a-fb12')!;
     const trips = detectTrips(fb12, ANCHOR_MS - 2 * 86_400_000, ANCHOR_MS);
     expect(trips.length).toBeGreaterThan(0);
     for (const t of trips) {
@@ -47,13 +48,13 @@ describe('trip detection (§11.5 trip rule)', () => {
   });
 
   it('finds no trips for a stationary generator', () => {
-    const gn01 = seed.assets.find(a => a.id === 'a-gn01')!;
+    const gn01 = db.getState().assets.find(a => a.id === 'a-gn01')!;
     const trips = detectTrips(gn01, ANCHOR_MS - 86_400_000, ANCHOR_MS);
     expect(trips).toEqual([]);
   });
 
   it('reports gaps as gaps and never fills them', () => {
-    const wt08 = seed.assets.find(a => a.id === 'a-wt08')!;
+    const wt08 = db.getState().assets.find(a => a.id === 'a-wt08')!;
     const gaps = findGaps([], ANCHOR_MS - 3 * 86_400_000, ANCHOR_MS);
     // No readings at all over three days ⇒ one big gap covering the range.
     expect(gaps.length).toBeGreaterThanOrEqual(1);
@@ -65,7 +66,7 @@ describe('trip detection (§11.5 trip rule)', () => {
 describe('report types gate by hardware (§11.5)', () => {
   it('Omar (Al Noor, Tier 1 only) never sees Fuel or Operating hours ECU types for day one, and never Fuel at any phase', () => {
     const omar = sessionFor('u-omar');
-    const fb12 = seed.assets.find(a => a.id === 'a-fb12')!;
+    const fb12 = db.getState().assets.find(a => a.id === 'a-fb12')!;
     const later = availableReportTypes(omar, [fb12.id], 'later');
     expect(later.map(r => r.id)).not.toContain('fuel');
     const dayOne = availableReportTypes(omar, [fb12.id], 'day_one');
@@ -74,7 +75,7 @@ describe('report types gate by hardware (§11.5)', () => {
 
   it('Khalid (Tier 3) gets Fuel for EX-04', () => {
     const khalid = sessionFor('u-khalid');
-    const ex04 = seed.assets.find(a => a.id === 'a-ex04')!;
+    const ex04 = db.getState().assets.find(a => a.id === 'a-ex04')!;
     const types = availableReportTypes(khalid, [ex04.id], 'later');
     expect(types.map(r => r.id)).toContain('fuel');
     expect(types.map(r => r.id)).toContain('operating_hours');
@@ -84,7 +85,7 @@ describe('report types gate by hardware (§11.5)', () => {
 describe('runReport (§11.5)', () => {
   it('runs a Trip & Mileage report and records a ReportRun', () => {
     const khalid = sessionFor('u-khalid');
-    const before = seed.reportRuns.length;
+    const before = db.getState().reportRuns.length;
     const result = runReport(khalid, {
       reportType: 'trip_mileage',
       assetIds: ['a-wl06'],
@@ -93,7 +94,7 @@ describe('runReport (§11.5)', () => {
       format: 'xlsx',
     });
     expect(result.ok).toBe(true);
-    expect(seed.reportRuns.length).toBe(before + 1);
+    expect(db.getState().reportRuns.length).toBe(before + 1);
     expect(result.data!.run.fileName).toMatch(/^Kasper_TripMileage_WL-06_.*\.xlsx$/);
     expect(result.data!.tables[0].title).toBe('Summary');
     expect(result.data!.tables.length).toBeGreaterThan(1);
@@ -101,7 +102,7 @@ describe('runReport (§11.5)', () => {
 
   it('refuses when nothing is in range instead of writing an empty file', () => {
     const khalid = sessionFor('u-khalid');
-    const before = seed.reportRuns.length;
+    const before = db.getState().reportRuns.length;
     const result = runReport(khalid, {
       reportType: 'trip_mileage',
       assetIds: ['a-wl06'],
@@ -111,7 +112,7 @@ describe('runReport (§11.5)', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Nothing to report for this period');
-    expect(seed.reportRuns.length).toBe(before);
+    expect(db.getState().reportRuns.length).toBe(before);
   });
 
   it('clips a renter to their rental window and says so', () => {
@@ -208,7 +209,7 @@ describe('report schedules (§11.13)', () => {
     // schedule (§11.13).
     clock.setOffsetMs(10 * 86_400_000);
     const outcomes = runDueSchedules(clock.now()).filter(o => o.scheduleId === created.data!.id);
-    const runs = seed.reportRuns.filter(r => r.scheduleId === created.data!.id);
+    const runs = db.getState().reportRuns.filter(r => r.scheduleId === created.data!.id);
     expect(runs.length).toBeGreaterThanOrEqual(7);
     expect(runs.some(r => r.status === 'ready')).toBe(true);
     expect(outcomes.some(o => o.status === 'skipped')).toBe(true);
@@ -230,13 +231,13 @@ describe('report schedules (§11.13)', () => {
     // the window — use a report type the scope can't support instead: mark the
     // schedule's user deactivated so runReport refuses? Simplest: point the
     // schedule at an asset the user cannot report on by clearing rentals.
-    const booking = seed.bookings.find(b => b.id === 'b-1001')!;
+    const booking = db.getState().bookings.find(b => b.id === 'b-1001')!;
     const originalEnd = booking.end;
     booking.end = new Date(clock.now() - 3 * 86_400_000).toISOString();
     void originalEnd;
     clock.setOffsetMs(2 * 86_400_000);
     runDueSchedules(clock.now());
-    const runs = seed.reportRuns.filter(r => r.scheduleId === created.data!.id);
+    const runs = db.getState().reportRuns.filter(r => r.scheduleId === created.data!.id);
     expect(runs.some(r => r.status === 'skipped')).toBe(true);
     // restore
     booking.end = originalEnd;
@@ -255,7 +256,7 @@ describe('report schedules (§11.13)', () => {
     setScheduleActive(khalid, created.data!.id, false);
     clock.setOffsetMs(2 * 86_400_000);
     runDueSchedules(clock.now());
-    const runs = seed.reportRuns.filter(r => r.scheduleId === created.data!.id);
+    const runs = db.getState().reportRuns.filter(r => r.scheduleId === created.data!.id);
     expect(runs).toHaveLength(0);
   });
 });

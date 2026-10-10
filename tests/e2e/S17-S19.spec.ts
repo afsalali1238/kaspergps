@@ -56,7 +56,8 @@ test.describe('S19 — Lina invites a user', () => {
     await page.getByLabel('Sites').selectOption({ index: 1 });
     await page.getByRole('button', { name: 'Send invite' }).click();
     await page.getByRole('button', { name: 'View as' }).click();
-    await expect(page.getByText('Huda Test')).toBeVisible();
+    // The row is a menu button; the name also appears in the table and the notice.
+    await expect(page.getByRole('button', { name: /Huda Test/ })).toBeVisible();
     await goTo(page, '/app');
   });
 });

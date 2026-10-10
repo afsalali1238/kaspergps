@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { resolveTrackingLink, getTrackingLinkState } from '@/server/links';
+import { resolveTrackingLink, getTrackingLinkState } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { AutoRefresh } from './AutoRefresh';
 import { headers } from 'next/headers';

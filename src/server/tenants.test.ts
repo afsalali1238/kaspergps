@@ -5,11 +5,11 @@ import {
   createTenant, onboardingTenants, setTenantStatus, suspendTenant, tenantById, unsuspendTenant, updateTenant,
 } from './tenants';
 import { createUser, reactivateUser } from './team';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role,
     isKasper: user.role === 'kasper_admin' || user.role === 'kasper_ops',
@@ -21,14 +21,14 @@ const ravi = () => sessionFor('u-ravi');     // Kasper Ops — read only
 const omar = () => sessionFor('u-omar');     // Al Noor Tenant Admin
 
 const auditFor = (action: string, needle: string) =>
-  seed.auditEntries.find(e => e.action === action && e.detail.includes(needle));
+  db.getState().auditEntries.find(e => e.action === action && e.detail.includes(needle));
 
 describe('tenants — creating and editing companies', () => {
   it('creates a company and refuses duplicate names', () => {
     const created = createTenant(sara(), { name: 'Desert Star Logistics', type: 'client' });
     expect(created.ok).toBe(true);
     expect(created.data!.status).toBe('active');
-    expect(seed.tenants).toContainEqual(created.data!);
+    expect(db.getState().tenants).toContainEqual(created.data!);
     expect(auditFor('tenant.create', 'Desert Star Logistics')).toBeTruthy();
     expect(createTenant(sara(), { name: '  desert star logistics ', type: 'vendor' }).error)
       .toBe('A company with that name already exists.');

@@ -9,26 +9,12 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
 import * as clock from '@/lib/clock';
-import { isAssetVisible, getRelationship, hasCapability } from '@/server/access';
-import { getReadingForAsset, getReadingsForAsset, computeStatus } from '@/server/telemetry/simulator';
-import { detectTrips } from '@/server/trips';
-import { visibleAlerts, acknowledgeAlert } from '@/server/alerts';
-import { buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus } from '@/server/muc';
-import { last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/utilisation';
-import { hasOpenTrackerRequest, requestTracker, trackerRequestForAsset } from '@/server/requests';
-import {
-  activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset,
-  revokeTrackingLink,
-} from '@/server/tracking-links';
-import { endEarly } from '@/server/bookings';
 import type { Asset, TrackingLink } from '@/domain/types';
-import type { EcuBreakdown, MucVerifyStatus } from '@/server/muc';
 import { hasFeature } from '@/domain/features';
-import { canManageMaintenance, planSnapshot, plansForAsset, serviceHistory } from '@/server/maintenance';
 import { useT, useHref } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,7 +59,8 @@ function SharePanel({ asset, onClose, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const seed = useDb(s => s);
+  const session = useSession()!;
   const t = useT();
   const options = expiryOptions(asset.id);
   const [optionKey, setOptionKey] = useState(String(options[0]?.bookingId ?? 'none'));
@@ -238,13 +225,13 @@ function SharePanel({ asset, onClose, onDone, onError }: {
 type TabId = 'overview' | 'history' | 'trips' | 'engine' | 'driving' | 'utilisation' | 'certificates' | 'maintenance' | 'alerts';
 
 export default function AssetDetailPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
   const params = useParams();
   const assetId = params.id as string;
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [breakdown, setBreakdown] = useState<EcuBreakdown | null>(null);
@@ -257,7 +244,7 @@ export default function AssetDetailPage() {
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [assetId]);
+  const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [seed.assets, assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
   const rel = useMemo(() => asset && session ? getRelationship(session, asset.id) : null, [asset, session]);
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);
@@ -288,7 +275,7 @@ export default function AssetDetailPage() {
     [assetAlerts]
   );
 
-  const canAcknowledgeAlerts = session ? hasCapability(session, 'alert.acknowledge') : false;
+  const canAcknowledgeAlerts = session ? can(session, 'alert.acknowledge', asset?.id) : false;
 
   const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
@@ -383,15 +370,15 @@ export default function AssetDetailPage() {
 
   const tier = asset.canProfile.adapter === 'ALL-CAN300' ? 3 : asset.canProfile.adapter === 'LVCAN200' ? 2 : 1;
   const isTier1 = tier === 1;
-  const canEdit = hasCapability(session, 'asset.edit');
-  const canShare = hasCapability(session, 'link.create');
-  const canEndAccess = hasCapability(session, 'grant.endEarly');
-  const canRequestTracker = hasCapability(session, 'tracker.request')
-    && (session.isKasper || asset.ownerTenantId === session.tenantId);
+  const canEdit = can(session, 'asset.edit', asset.id);
+  const canShare = can(session, 'link.create', asset.id);
+  const canEndAccess = can(session, 'grant.endEarly', asset.id);
+  const canRequestTracker = can(session, 'tracker.request', asset.id);
+  const canRunReport = can(session, 'report.run', asset.id);
 
   // Maintenance plans belong to the owner: renters never see them (spec 11.18).
-  const isOwnerOrKasper = session.isKasper || asset.ownerTenantId === session.tenantId;
-  const canManageMaintenancePlans = canManageMaintenance(session);
+  const isOwnerOrKasper = can(session, 'maintenance.view', asset.id);
+  const canManageMaintenancePlans = canManageMaintenance(session, asset.id);
   const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
   const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
 
@@ -503,7 +490,7 @@ export default function AssetDetailPage() {
       </div>
 
       {/* Actions */}
-      {(canEdit || canShare || canEndAccess) && (
+      {(canEdit || canShare || canEndAccess || canRunReport) && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {canEdit && (
@@ -516,17 +503,19 @@ export default function AssetDetailPage() {
                 {t('asset_detail.actions.share_link', 'Share tracking link')}
               </Button>
             )}
-            {canEndAccess && rel === 'owner' && currentBooking && (
+            {canEndAccess && currentBooking && (
               <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
                 {t('asset_detail.actions.end_access', 'End access now')}
               </Button>
             )}
-            <a
-              className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
-              href={href('/app/reports')}
-            >
-              {t('asset_detail.actions.run_report', 'Run report')}
-            </a>
+            {canRunReport && (
+              <a
+                className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
+                href={href('/app/reports')}
+              >
+                {t('asset_detail.actions.run_report', 'Run report')}
+              </a>
+            )}
           </div>
 
           {panel === 'share' && (

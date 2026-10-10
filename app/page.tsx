@@ -2,14 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { useStore } from '@/store';
+import { useSession } from '@/hooks';
 
 export default function RootPage() {
   const router = useRouter();
-  const store = useStore;
+  const session = useSession();
 
   useEffect(() => {
-    const session = store.getState().session;
     if (session) {
       if (session.isKasper) {
         router.replace('/console');
@@ -19,7 +18,7 @@ export default function RootPage() {
     } else {
       router.replace('/sign-in');
     }
-  }, [router, store]);
+  }, [router, session]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-bg">

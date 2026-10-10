@@ -4,19 +4,16 @@
 
 import React, { useState, useMemo } from 'react';
 import { Badge, Button, EmptyState } from '@/components/ui';
-import { useStore } from '@/store';
-import {
-  visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence,
-} from '@/server/geofences';
+import { visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence } from '@/server/api';
 import * as clock from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 function kindLabel(kind: string): string {
   return { site: 'Site', job: 'Job', yard: 'Yard', restricted: 'Restricted' }[kind] ?? kind;
 }
 
 export default function ConsoleGeofencesPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

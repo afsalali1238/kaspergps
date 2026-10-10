@@ -10,17 +10,13 @@ import {
   TierChip, Badge, EmptyState, Skeleton,
   Button, SourceLabel,
 } from '@/components/ui';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
-import * as clock from '@/lib/clock';
-import { isAssetVisible, getRelationship } from '@/server/access';
+import { useDb, type DbState, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor } from '@/server/api';
 import { hasFeature } from '@/domain/features';
-import { visibleAlerts } from '@/server/alerts';
-import { fleetTodayTotals, engineHoursToday, hoursSourceFor } from '@/server/utilisation';
-import { getReadingForAsset } from '@/server/telemetry/simulator';
+import * as clock from '@/lib/clock';
 import type { Asset, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';
+import { useSession, useSwitches } from '@/hooks';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,10 +76,10 @@ interface AssetMarker {
   openAlerts: number;
 }
 
-function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
-  const pairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
+function computeStatus(asset: Asset, data: Pick<DbState, 'pairings' | 'trackers'>, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
+  const pairing = data.pairings.find(p => p.assetId === asset.id && p.to === null);
   if (!pairing) return 'no_tracker';
-  const tracker = seed.trackers.find(t => t.id === pairing.trackerId);
+  const tracker = data.trackers.find(t => t.id === pairing.trackerId);
   if (!tracker || tracker.stockStatus !== 'paired') return 'no_tracker';
   const reading = getReadingForAsset(asset);
   if (!reading) return 'no_tracker';
@@ -139,14 +135,14 @@ function MapBoundsUpdater({ assets }: { assets: AssetMarker[] }) {
 }
 
 export default function MapPage() {
+  const seed = useDb(s => s);
   const t = useT();
   const href = useHref();
   const locale = useLocale();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
-  const showHidden = store.getState().demoSwitches.showHidden;
-  const salesView = store.getState().demoSwitches.salesView;
+  const session = useSession();
+  const { phase } = useSwitches();
+  const { showHidden } = useSwitches();
+  const { salesView } = useSwitches();
 
   const [statusFilter, setStatusFilter] = useState<StatusKey | 'all'>('all');
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
@@ -160,12 +156,24 @@ export default function MapPage() {
     setLoading(false);
   }, []);
 
+  // Open alerts per asset, for the list badges and the "Open alerts" tile.
+  // Declared before visibleAssets, which reads it (main crashed here).
+  const openAlerts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!session || phase === 'day_one') return counts;
+    for (const alert of visibleAlerts(session, phase)) {
+      if (alert.status !== 'open' || !alert.assetId) continue;
+      counts.set(alert.assetId, (counts.get(alert.assetId) ?? 0) + 1);
+    }
+    return counts;
+  }, [session, phase]);
+
   const visibleAssets: AssetMarker[] = useMemo(() => {
     if (!session) return [];
 
     return seed.assets.filter(a => {
       if (!isAssetVisible(session, a.id)) return false;
-      const status = computeStatus(a);
+      const status = computeStatus(a, seed);
       if (statusFilter !== 'all' && status !== statusFilter) return false;
       if (selectedSite && a.homeSiteId !== selectedSite) return false;
       if (selectedClass && a.assetClass !== selectedClass) return false;
@@ -184,7 +192,7 @@ export default function MapPage() {
       }
       return true;
     }).map(a => {
-      const status = computeStatus(a);
+      const status = computeStatus(a, seed);
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       const site = seed.sites.find(s => s.id === a.homeSiteId);
       const rel = getRelationship(session!, a.id);
@@ -214,18 +222,7 @@ export default function MapPage() {
         openAlerts: openAlerts.get(a.id) ?? 0,
       };
     });
-  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView, locale]);
-
-  // Open alerts per asset, for the list badges and the "Open alerts" tile.
-  const openAlerts = useMemo(() => {
-    const counts = new Map<string, number>();
-    if (!session || phase === 'day_one') return counts;
-    for (const alert of visibleAlerts(session, phase)) {
-      if (alert.status !== 'open' || !alert.assetId) continue;
-      counts.set(alert.assetId, (counts.get(alert.assetId) ?? 0) + 1);
-    }
-    return counts;
-  }, [session, phase]);
+  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView, locale, openAlerts]);
 
   const visibleOpenAlerts = useMemo(
     () => visibleAssets.reduce((sum, a) => sum + (openAlerts.get(a.id) ?? 0), 0),
@@ -233,8 +230,7 @@ export default function MapPage() {
   );
 
   // Phase 2+ "today" tiles (spec 11.2). An asset that can't meter a number
-  // contributes nothing, and a tile with no measuring asset is not shown at all
-  // — the strip never reports a fleet total of zero for data it never received.
+  // contributes nothing, and a tile with no measuring asset is not shown at all.
   const today = useMemo(() => {
     if (!session || phase === 'day_one') return null;
     return fleetTodayTotals(visibleAssets.map(a => a.asset));

@@ -9,13 +9,13 @@ import {
   receivedInvoices, recordPayment, recordStatementPayment, statementsFor, voidInvoice,
   voidStatement, MIN_HOURS_PER_DAY,
 } from './billing';
-import { seed } from '@/server/seed/data';
+import { db } from '@/server/db';
 import { VAT_PCT } from '@/config/thresholds';
 import * as clock from '@/lib/clock';
 import type { Session } from '@/domain/types';
 
 function sessionFor(userId: string, role?: Session['role']): Session {
-  const user = seed.users.find(u => u.id === userId)!;
+  const user = db.getState().users.find(u => u.id === userId)!;
   return {
     userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds,
     role: role ?? user.role,
@@ -140,7 +140,7 @@ describe('billing — voiding', () => {
     const voided = voidInvoice(omar(), created.id, 'Wrong rate on the booking');
     expect(voided.ok).toBe(true);
     expect(invoiceById(created.id)!.status).toBe('void');
-    const entry = seed.auditEntries.find(e => e.action === 'invoice.void' && e.detail.includes(created.number));
+    const entry = db.getState().auditEntries.find(e => e.action === 'invoice.void' && e.detail.includes(created.number));
     expect(entry?.reason).toBe('Wrong rate on the booking');
     expect(invoiceById(invoice.id)!.number).toBe('INV-EE-0415');
   });
@@ -184,8 +184,8 @@ describe('billing — invoices from bookings', () => {
 
   it('needs the customer to agree before estimated hours are billed', () => {
     // TP-21 is Tier 1 and worked 26 Sep – 1 Oct (booking b-1008).
-    const asset = seed.assets.find(a => a.id === 'a-tp21')!;
-    const booking = seed.bookings.find(b => b.id === 'b-1008')!;
+    const asset = db.getState().assets.find(a => a.id === 'a-tp21')!;
+    const booking = db.getState().bookings.find(b => b.id === 'b-1008')!;
     const hours = estimatedIgnitionHours(asset, Number(booking.start), Number(booking.end));
     expect(hours).toBeGreaterThan(0);
 
@@ -217,7 +217,7 @@ describe('billing — invoices from bookings', () => {
 describe('billing — GPS statements', () => {
   it('builds last month’s statements per tenant by tier', () => {
     const statements = lastMonthStatements();
-    expect(statements.length).toBe(seed.tenants.length);
+    expect(statements.length).toBe(db.getState().tenants.length);
     const gulflift = statements.find(s => s.tenantId === 't-gulflift')!;
     expect(gulflift.totalAed).toBeGreaterThan(0);
     expect(gulflift.lines.reduce((sum, l) => sum + l.amountAed, 0)).toBe(gulflift.subtotalAed);

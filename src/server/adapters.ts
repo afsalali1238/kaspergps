@@ -3,36 +3,35 @@
 // history stays Tier 1 and CAN readings only exist after the fit.
 
 import type { Asset, CanAdapter, Session } from '@/domain/types';
-import { seed, allParamsExcept } from '@/server/seed/data';
+import { db, append, touch, nextNumber } from '@/server/db';
+import { allParamsExcept } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability } from '@/server/access';
+
 import { recordAuditForSession } from '@/server/audit';
 import { currentTrackerForAsset } from '@/server/trackers';
-
-let adapterSeq = 0;
-let fittingSeq = 0;
+import { can } from '@/server/capabilities';
 
 export function adapterById(adapterId: string): CanAdapter | null {
-  return seed.adapters.find(a => a.id === adapterId) ?? null;
+  return db.getState().adapters.find(a => a.id === adapterId) ?? null;
 }
 
 /** The asset an adapter is fitted to right now (null when in stock/faulty). */
 export function fittedAssetFor(adapter: CanAdapter): Asset | null {
   if (!adapter.assetId) return null;
-  return seed.assets.find(a => a.id === adapter.assetId) ?? null;
+  return db.getState().assets.find(a => a.id === adapter.assetId) ?? null;
 }
 
 export function adapterForAsset(assetId: string): CanAdapter | null {
-  return seed.adapters.find(a => a.assetId === assetId && a.status === 'fitted') ?? null;
+  return db.getState().adapters.find(a => a.assetId === assetId && a.status === 'fitted') ?? null;
 }
 
 export function stockAdapters(model?: CanAdapter['model']): CanAdapter[] {
-  return seed.adapters.filter(a => a.status === 'in_stock' && (!model || a.model === model));
+  return db.getState().adapters.filter(a => a.status === 'in_stock' && (!model || a.model === model));
 }
 
 export function fittingHistory(adapterId: string) {
-  return seed.adapterFittings
+  return db.getState().adapterFittings
     .filter(f => f.adapterId === adapterId)
     .sort((a, b) => toMs(b.from) - toMs(a.from));
 }
@@ -46,24 +45,24 @@ export const LVCAN_MODEL_ERROR = 'LVCAN200 is for light vehicles. Use ALL-CAN300
 export const ADAPTER_SERIAL_DUPLICATE = 'This serial is already registered.';
 
 export function registerAdapter(session: Session, input: { serial: string; model: CanAdapter['model'] }): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can register adapters.');
   }
   const serial = input.serial.trim().toUpperCase();
   if (!/^(AC3|LV2)-\d{6}$/.test(serial)) {
     return fail('Serial must look like AC3-006101 (ALL-CAN300) or LV2-002201 (LVCAN200).');
   }
-  if (seed.adapters.some(a => a.serial.toUpperCase() === serial)) return fail(ADAPTER_SERIAL_DUPLICATE);
+  if (db.getState().adapters.some(a => a.serial.toUpperCase() === serial)) return fail(ADAPTER_SERIAL_DUPLICATE);
 
   const adapter: CanAdapter = {
-    id: `ad-new-${++adapterSeq}`,
+    id: `ad-new-${nextNumber('ad-new-', db.getState().adapters)}`,
     serial,
     model: input.model,
     status: 'in_stock',
     assetId: null,
     registeredAt: new Date(clock.now()).toISOString(),
   };
-  seed.adapters.push(adapter);
+  append('adapters', adapter);
   recordAuditForSession(session, {
     action: 'adapter.register',
     detail: `CAN adapter ${serial} (${input.model}) registered`,
@@ -80,12 +79,12 @@ export interface FitAdapterInput {
 }
 
 export function fitAdapter(session: Session, input: FitAdapterInput): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can fit adapters.');
   }
   const adapter = adapterById(input.adapterId);
   if (!adapter) return fail('Adapter not found.');
-  const asset = seed.assets.find(a => a.id === input.assetId);
+  const asset = db.getState().assets.find(a => a.id === input.assetId);
   if (!asset) return fail('Asset not found.');
   if (adapter.status === 'faulty') return fail('This adapter is flagged faulty.');
   if (adapter.status === 'retired') return fail('This adapter is retired.');
@@ -111,8 +110,9 @@ export function fitAdapter(session: Session, input: FitAdapterInput): OpResult<C
     checkedAt: now,
     notes: input.notes,
   };
-  seed.adapterFittings.push({
-    id: `fit-new-${++fittingSeq}`,
+  touch('adapters', 'assets');
+  append('adapterFittings', {
+    id: `fit-new-${nextNumber('fit-new-', db.getState().adapterFittings)}`,
     adapterId: adapter.id,
     assetId: asset.id,
     from: now,
@@ -130,16 +130,16 @@ export function fitAdapter(session: Session, input: FitAdapterInput): OpResult<C
 
 /** Removing drops the asset back to Tier 1 from now; earlier CAN data stays visible. */
 export function removeAdapter(session: Session, adapterId: string): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can remove adapters.');
   }
   const adapter = adapterById(adapterId);
   if (!adapter) return fail('Adapter not found.');
-  const asset = adapter.assetId ? seed.assets.find(a => a.id === adapter.assetId) : null;
+  const asset = adapter.assetId ? db.getState().assets.find(a => a.id === adapter.assetId) : null;
   if (!asset) return fail('This adapter is not fitted to an asset.');
 
   const now = new Date(clock.now()).toISOString();
-  const open = seed.adapterFittings.find(f => f.adapterId === adapter.id && f.to === null && f.assetId === asset.id);
+  const open = db.getState().adapterFittings.find(f => f.adapterId === adapter.id && f.to === null && f.assetId === asset.id);
   if (open) open.to = now;
   adapter.status = 'in_stock';
   adapter.assetId = null;
@@ -150,6 +150,7 @@ export function removeAdapter(session: Session, adapterId: string): OpResult<Can
     checkedAt: now,
     notes: `${adapter.serial} removed ${clock.formatDubaiDate(clock.now())}`,
   };
+  touch('adapters', 'assets', 'adapterFittings');
 
   recordAuditForSession(session, {
     action: 'adapter.remove',
@@ -161,23 +162,24 @@ export function removeAdapter(session: Session, adapterId: string): OpResult<Can
 }
 
 export function markAdapterFaulty(session: Session, adapterId: string, note: string): OpResult<CanAdapter> {
-  if (!hasCapability(session, 'console.adapters.manage')) {
+  if (!can(session, 'console.adapters.manage')) {
     return fail('Only Kasper can flag adapters.');
   }
   const adapter = adapterById(adapterId);
   if (!adapter) return fail('Adapter not found.');
   if (!note.trim()) return fail('Add a note saying what is wrong.');
 
-  const asset = adapter.assetId ? seed.assets.find(a => a.id === adapter.assetId) ?? null : null;
+  const asset = adapter.assetId ? db.getState().assets.find(a => a.id === adapter.assetId) ?? null : null;
   if (asset) {
     const now = new Date(clock.now()).toISOString();
-    const open = seed.adapterFittings.find(f => f.adapterId === adapter.id && f.to === null && f.assetId === asset.id);
+    const open = db.getState().adapterFittings.find(f => f.adapterId === adapter.id && f.to === null && f.assetId === asset.id);
     if (open) open.to = now;
     asset.canProfile = { adapter: 'none', supported: allParamsExcept('none') as Asset['canProfile']['supported'], checkedAt: now };
     adapter.assetId = null;
   }
   adapter.status = 'faulty';
   adapter.fittedAt = undefined;
+  touch('adapters', 'assets', 'adapterFittings');
 
   recordAuditForSession(session, {
     action: 'adapter.faulty',

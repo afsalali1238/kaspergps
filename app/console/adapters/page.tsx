@@ -4,16 +4,10 @@ import React, { useState } from 'react';
 import {
   Button, Badge, EmptyState, TierChip,
 } from '@/components/ui';
-import { seed } from '@/server/seed/data';
-import { useStore } from '@/store';
+import { useDb, ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, fitAdapter, stockAdapters, currentTrackerForAsset } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, CanAdapter } from '@/domain/types';
-import {
-  ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fittedAssetFor,
-  fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, fitAdapter,
-  stockAdapters,
-} from '@/server/adapters';
-import { currentTrackerForAsset } from '@/server/trackers';
+import { useSession } from '@/hooks';
 
 function adapterModelLabel(model: string): string {
   return model;
@@ -33,8 +27,8 @@ function tierOf(asset: Asset): 1 | 2 | 3 {
 }
 
 export default function AdaptersPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -276,7 +270,7 @@ function RegisterAdapterForm({ serials, onCancel, onDone, onError }: {
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const session = useStore.getState().session!;
+  const session = useSession()!;
   const [serial, setSerial] = useState('');
   const [model, setModel] = useState<CanAdapter['model']>('ALL-CAN300');
 
@@ -337,6 +331,7 @@ function FitPicker({ adapter, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: (assetId: string) => void;
 }) {
+  const seed = useDb(s => s);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
 

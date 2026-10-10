@@ -3,17 +3,16 @@
 // Architecture rule 9: all time from clock.ts (here Date.now() is allowed as it IS the clock module).
 
 import type { Reading, Asset } from '@/domain/types';
-import { seed, ANCHOR_MS } from '@/server/seed/data';
+import { db, type DbRow } from '@/server/db';
+import { ANCHOR_MS } from '@/server/seed/data';
 import * as clock from '@/lib/clock';
 import { OFFLINE_AFTER_SEC, STALE_AFTER_SEC } from '@/config/thresholds';
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
 
-const cache = new Map<string, Map<number, Reading[]>>(); // trackerId → dayMs → readings[]
-
-function cacheKey(trackerId: string, dayMs: number): string {
-  return `${trackerId}:${dayMs}`;
-}
+// (asset, tracker) → dayMs → readings[]. Keyed by asset too, so a tracker moved
+// to another asset never serves the old asset's readings.
+const cache = new Map<string, Map<number, Reading[]>>();
 
 // ── Status computation ─────────────────────────────────────────────────────────
 
@@ -36,12 +35,12 @@ export function computeStatus(asset: Asset, sessionMs: number = clock.now()): 'l
   return 'no_tracker';
 }
 
-function currentTrackerFor(asset: Asset): typeof seed.trackers[0] | null {
+function currentTrackerFor(asset: Asset): DbRow<'trackers'> | null {
   // Find the current pairing (explicit swap tracking)
-  const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  const currentPairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
+  if (currentPairing) return db.getState().trackers.find(t => t.id === currentPairing.trackerId) ?? null;
   // Fallback: use the tracker's assetId field (implicit pairing from seed)
-  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
+  return db.getState().trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
 // How far back to look for a reading: a stale or offline asset can be days
@@ -77,7 +76,7 @@ function lastReadingFor(asset: Asset): Reading | null {
 // ── Antenna fitting check ──────────────────────────────────────────────────────
 
 export function isCanReadingAvailable(asset: Asset, deviceTimeMs: number): boolean {
-  const adapter = seed.adapters.find(a => a.assetId === asset.id);
+  const adapter = db.getState().adapters.find(a => a.assetId === asset.id);
   if (!adapter) return false;
   const fittingAt = adapter.fittedAt ? new Date(adapter.fittedAt).getTime() : 0;
   return deviceTimeMs >= fittingAt;
@@ -103,9 +102,9 @@ export function getReadingsForAsset(asset: Asset, startMs: number, endMs: number
   return results;
 }
 
-function getReadingsForDay(asset: Asset, tracker: typeof seed.trackers[0], dayMs: number): Reading[] {
-  const _key = cacheKey(tracker.id, dayMs);
-  const dayMap = cache.get(tracker.id);
+function getReadingsForDay(asset: Asset, tracker: DbRow<'trackers'>, dayMs: number): Reading[] {
+  const cacheOwner = `${asset.id}|${tracker.id}`;
+  const dayMap = cache.get(cacheOwner);
   if (dayMap?.has(dayMs)) {
     return Array.from(dayMap.get(dayMs)!);
   }
@@ -114,7 +113,7 @@ function getReadingsForDay(asset: Asset, tracker: typeof seed.trackers[0], dayMs
   if (!dayMap) {
     const m = new Map<number, Reading[]>();
     m.set(dayMs, readings);
-    cache.set(tracker.id, m);
+    cache.set(cacheOwner, m);
   } else {
     dayMap.set(dayMs, readings);
   }
@@ -183,7 +182,7 @@ function tailReadings(asset: Asset, tail: { via?: 'plant' | 'lifting' }, dayMs: 
 /** Idling tail: engine running, not moving, every 10 minutes up to the clock. */
 function generateIdleTail(asset: Asset, fromMs: number, toMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerFor(asset);
   const trackerId = tracker?.id ?? 'unknown';
@@ -262,7 +261,7 @@ function nowMs(): number { return clock.now(); }
 
 function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const interval = 10 * 60 * 1000; // parked: every 10 min
   const odometer = rand(prng, 0, 1000) + asset.code.charCodeAt(0);
@@ -278,7 +277,7 @@ function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prn
 
 function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, isMoving: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const interval = isMoving ? 30 * 1000 : 10 * 60 * 1000;
   let azimuth = 0;
@@ -309,7 +308,7 @@ function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng:
 
 function generateTruckReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const interval = 30 * 1000;
   let lat = site.center.lat;
@@ -342,7 +341,7 @@ function generateTruckReadings(asset: Asset, dayMs: number, endMs: number, prng:
 
 function generateBatteryReadings(asset: Asset, startMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -359,7 +358,7 @@ function generateBatteryReadings(asset: Asset, startMs: number, endMs: number, p
 
 function generateGeneratorReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, lowBattery: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -378,7 +377,7 @@ function generateGeneratorReadings(asset: Asset, dayMs: number, endMs: number, p
 
 function generateLightVehicleReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -413,7 +412,7 @@ function generateLightVehicleReadings(asset: Asset, dayMs: number, endMs: number
 
 function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -447,7 +446,7 @@ function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng
 
 function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, isMoving: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = seed.sites.find(s => s.id === asset.homeSiteId);
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -475,12 +474,12 @@ function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prn
   return readings;
 }
 
-function currentTrackerAndAsset(asset: Asset): typeof seed.trackers[0] | null {
+function currentTrackerAndAsset(asset: Asset): DbRow<'trackers'> | null {
   // Find the current pairing (explicit swap tracking)
-  const currentPairing = seed.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (currentPairing) return seed.trackers.find(t => t.id === currentPairing.trackerId) ?? null;
+  const currentPairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
+  if (currentPairing) return db.getState().trackers.find(t => t.id === currentPairing.trackerId) ?? null;
   // Fallback: use the tracker's assetId field (implicit pairing from seed)
-  return seed.trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
+  return db.getState().trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
 // ── FB-12 scripted movement (drives to destination) ────────────────────────────
@@ -497,7 +496,7 @@ export function getFB12Readings(startMs: number, endMs: number): Reading[] {
   // Linear movement with jitter
   const duration = arriveAt - startAt;
   const steps = Math.floor((actualEnd - startAt) / 30000);
-  const tracker = seed.trackers.find(t => t.id === 'tr-fb12')!;
+  const tracker = db.getState().trackers.find(t => t.id === 'tr-fb12')!;
 
   for (let i = 0; i <= steps; i++) {
     const t = startAt + (i / steps) * duration;
@@ -548,7 +547,7 @@ export function injectGNFuelDrop(readings: Reading[]): Reading[] {
 
 export function getFB14ReplayBatch(): Reading[] {
   const readings: Reading[] = [];
-  const tracker = seed.trackers.find(t => t.id === 'tr-fb14')!;
+  const tracker = db.getState().trackers.find(t => t.id === 'tr-fb14')!;
   const deviceTimeMs = ANCHOR_MS - 6 * 3600000;
   const baseLat = 25.0118;
   const baseLng = 55.1132;

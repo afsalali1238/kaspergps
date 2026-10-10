@@ -43,18 +43,18 @@ test.describe('S21 — the sales view locks Tier 3 cards', () => {
 test.describe('S22 — a deactivated account cannot sign in', () => {
   test('the sign-in form refuses Karim with the account message', async ({ page }) => {
     await page.goto('/sign-in');
-    await page.getByLabel('Email').fill('karim@gulflift.ae');
+    await page.getByLabel('Email').fill('karim@marina.ae');
     await page.getByLabel('Password').fill('demo');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByText('Your account is no longer active. Contact your company admin.')).toBeVisible();
     await expect(page).toHaveURL(/\/sign-in/);
   });
 
-  test('View as can still switch to the deactivated user for the demo', async ({ page }) => {
+  test('View as on Karim shows the same message and keeps the current user', async ({ page }) => {
     await demo(page, { email: USERS.omar });
     await page.getByRole('button', { name: 'View as' }).click();
     await page.getByRole('button', { name: /^Karim / }).first().click();
-    await page.waitForURL(/\/app$/);
-    await expect(page.getByText('Karim')).toBeVisible();
+    await expect(page.getByText('Your account is no longer active. Contact your company admin.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'View as' })).toContainText('Omar Saleh');
   });
 });

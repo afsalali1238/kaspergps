@@ -3,10 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Badge, Table, Panel, PanelHeader } from '@/components/ui';
-import type { Capability } from '@/server/capabilities';
-import { isKasperStaff } from '@/server/capabilities';
-import { seed } from '@/server/seed/data';
-import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
+import { type Capability, can, isKasperStaff, useDb, isAssetVisible, getRelationship } from '@/server/api';
 
 import type { Session } from '@/domain/types';
 
@@ -83,6 +80,7 @@ function TierChip({ tier }: { tier: number }) {
 }
 
 export default function DevAccessPage() {
+  const seed = useDb(s => s);
   const [selectedUserIdx, setSelectedUserIdx] = useState(0);
   const [capabilityQuery, setCapabilityQuery] = useState('');
 
@@ -157,7 +155,7 @@ export default function DevAccessPage() {
         <Panel className="mt-4">
           <PanelHeader
             title="Capabilities"
-            subtitle={`${filteredCaps.filter(c => hasCapability(session, c.id as Capability)).length} of ${filteredCaps.length} available`}
+            subtitle={`${filteredCaps.filter(c => can(session, c.id as Capability)).length} of ${filteredCaps.length} available`}
           >
             <input
               type="text"
@@ -172,7 +170,7 @@ export default function DevAccessPage() {
             columns={[
               { key: 'id', header: 'Capability', width: '200px', render: (r: CapRow) => <span className="font-mono text-xs text-ink">{r.id}</span> },
               { key: 'label', header: 'Label', render: (r: CapRow) => <span className="text-sm">{r.label}</span> },
-              { key: 'has', header: 'Allowed', width: '80px', align: 'center', render: (r: CapRow) => hasCapability(session, r.id as Capability) ? <Badge variant="green">✓</Badge> : <Badge variant="red">✕</Badge> },
+              { key: 'has', header: 'Allowed', width: '80px', align: 'center', render: (r: CapRow) => can(session, r.id as Capability) ? <Badge variant="green">✓</Badge> : <Badge variant="red">✕</Badge> },
             ]}
             rows={filteredCaps}
           />

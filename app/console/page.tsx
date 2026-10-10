@@ -2,17 +2,17 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
+import { useDb } from '@/server/api';
 import { now as clockNow } from '@/lib/clock';
+import { useSession } from '@/hooks';
 
 function getClockNow() {
   return clockNow();
 }
 
 export default function ConsoleOverviewPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const seed = useDb(s => s);
+  const session = useSession();
 
   if (!session || !session.isKasper) {
     return null;

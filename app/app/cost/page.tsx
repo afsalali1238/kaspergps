@@ -6,13 +6,10 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Sheet, SourceLabel,
 } from '@/components/ui';
-import { useStore } from '@/store';
-import {
-  canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile,
-  setDieselPrice, type AssetCostRow, type CostPeriod,
-} from '@/server/cost';
+import { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice, type AssetCostRow, type CostPeriod } from '@/server/api';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 const PERIODS: { id: CostPeriod; label: string }[] = [
   { id: 'this_month', label: 'This month' },
@@ -33,9 +30,8 @@ function Amount({ value }: { value: number | null }) {
 
 export default function CostPage() {
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [period, setPeriod] = useState<CostPeriod>('last_month');
   const [sortKey, setSortKey] = useState<SortKey>('marginAed');
@@ -290,7 +286,7 @@ export default function CostPage() {
 
 // ── Asset view ─────────────────────────────────────────────────────────────────
 
-type Session = NonNullable<ReturnType<typeof useStore.getState>['session']>;
+type Session = NonNullable<ReturnType<typeof useSession>>;
 
 function AssetCostSheet({ row, session, onClose, onResult }: {
   row: AssetCostRow;

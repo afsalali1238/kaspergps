@@ -4,12 +4,13 @@
 // tenant for geofence/maintenance/invoice alerts). Day one shows offline only.
 
 import type { Alert, AlertType, Session } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, touch } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { hasCapability, isAssetVisible, getRelationship } from '@/server/access';
+import { isAssetVisible, getRelationship } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
+import { can } from '@/server/capabilities';
 
 export interface AlertView {
   id: string;
@@ -51,13 +52,13 @@ function toMs(v: string | number): number {
 }
 
 function toView(alert: Alert): AlertView {
-  const asset = alert.assetId ? seed.assets.find(a => a.id === alert.assetId) : undefined;
+  const asset = alert.assetId ? db.getState().assets.find(a => a.id === alert.assetId) : undefined;
   return {
     id: alert.id,
     assetId: alert.assetId ?? '',
     assetCode: asset?.code ?? '—',
     assetName: asset?.name ?? '',
-    siteName: asset ? (seed.sites.find(s => s.id === asset.homeSiteId)?.name ?? '') : '',
+    siteName: asset ? (db.getState().sites.find(s => s.id === asset.homeSiteId)?.name ?? '') : '',
     type: alert.type,
     typeLabel: TYPE_LABELS[alert.type] ?? alert.type,
     typeWords: alert.detail,
@@ -95,7 +96,7 @@ function alertVisible(session: Session, alert: Alert, phase: string): boolean {
   if (!isAssetVisible(session, alert.assetId)) return false;
 
   // Hardware-gated types: the asset must be able to produce them.
-  const asset = seed.assets.find(a => a.id === alert.assetId);
+  const asset = db.getState().assets.find(a => a.id === alert.assetId);
   if (!asset) return false;
   for (const hw of HARDWARE_TYPES) {
     if (hw.type === alert.type && !hasFeature(asset, hw.feature)) return false;
@@ -104,7 +105,7 @@ function alertVisible(session: Session, alert: Alert, phase: string): boolean {
 }
 
 export function visibleAlerts(session: Session, phase: string = 'later'): AlertView[] {
-  return seed.alerts
+  return db.getState().alerts
     .filter(a => alertVisible(session, a, phase))
     .map(toView)
     .sort((a, b) => toMs(b.openedAt) - toMs(a.openedAt));
@@ -125,11 +126,11 @@ export function alertTypesIn(session: Session, phase: string = 'later'): { type:
 
 /** Acknowledge: Kasper and the owner's Tenant Admin only (matrix, §5). */
 export function acknowledgeAlert(session: Session, alertId: string): OpResult<AlertView> {
-  if (!hasCapability(session, 'alert.acknowledge')) {
+  const alert = db.getState().alerts.find(a => a.id === alertId);
+  if (!alert || !alertVisible(session, alert, 'later')) return fail('Alert not found.');
+  if (!can(session, 'alert.acknowledge', alert.assetId ?? undefined)) {
     return fail('You can’t acknowledge alerts.');
   }
-  const alert = seed.alerts.find(a => a.id === alertId);
-  if (!alert || !alertVisible(session, alert, 'later')) return fail('Alert not found.');
   if (!session.isKasper) {
     if (alert.tenantId) {
       if (alert.tenantId !== session.tenantId) return fail('Alert not found.');
@@ -141,6 +142,7 @@ export function acknowledgeAlert(session: Session, alertId: string): OpResult<Al
 
   alert.acknowledgedBy = session.user.name;
   alert.acknowledgedAt = new Date(clock.now()).toISOString();
+  touch('alerts');
   recordAuditForSession(session, {
     action: 'alert.acknowledge',
     assetId: alert.assetId,

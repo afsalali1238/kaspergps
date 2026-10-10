@@ -8,7 +8,7 @@
 // ETA comes from the booking's destination + spec 11.14 maths in src/domain/eta.ts.
 
 import type { TrackingLink } from '@/domain/types';
-import { seed } from '@/server/seed/data';
+import { db, type DbRow } from '@/server/db';
 import { getReadingForAsset, getReadingsForAsset } from '@/server/telemetry/simulator';
 import { averageMovingSpeedKmh, etaSpeedKmh, computeEta, distanceToDestinationM } from '@/domain/eta';
 import type { EtaState } from '@/domain/eta';
@@ -45,17 +45,17 @@ function toMs(v: string | number | null | undefined): number | null {
 }
 
 export function getTrackingLinkState(token: string, nowMs: number = clock.now()): LinkState {
-  const link = seed.trackingLinks.find(l => l.token === token);
+  const link = db.getState().trackingLinks.find(l => l.token === token);
   if (!link) return 'not_found';
   if (link.revokedAt) return 'revoked';
   if (toMs(link.expiresAt) !== null && nowMs > toMs(link.expiresAt)!) return 'expired';
-  const booking = link.bookingId ? seed.bookings.find(b => b.id === link.bookingId) : null;
+  const booking = link.bookingId ? db.getState().bookings.find(b => b.id === link.bookingId) : null;
   if (booking) {
     if (booking.status === 'cancelled') return 'booking_cancelled';
     if (booking.status === 'closed') return 'job_closed';
     const closedAt = toMs(booking.closedAt);
     if (closedAt !== null && nowMs > closedAt) return 'access_ended';
-    const override = seed.grantOverrides.find(o => o.bookingId === booking.id);
+    const override = db.getState().grantOverrides.find(o => o.bookingId === booking.id);
     const endedAt = override ? toMs(override.endedAt) : null;
     if (endedAt !== null && nowMs > endedAt) return 'access_ended';
     if (nowMs < toMs(booking.start)!) return 'active';
@@ -72,11 +72,11 @@ function isLinkActive(link: TrackingLink, nowMs: number): boolean {
  * no longer active (expired, revoked, booking cancelled, job closed, access ended).
  */
 export function resolveTrackingLink(token: string, nowMs: number = clock.now()): ResolvedTrackingLink | null {
-  const link = seed.trackingLinks.find(l => l.token === token);
+  const link = db.getState().trackingLinks.find(l => l.token === token);
   if (!link) return null;
   if (!isLinkActive(link, nowMs)) return null;
 
-  const asset = seed.assets.find(a => a.id === link.assetId);
+  const asset = db.getState().assets.find(a => a.id === link.assetId);
   if (!asset) return null;
 
   const reading = getReadingForAsset(asset);
@@ -89,7 +89,7 @@ export function resolveTrackingLink(token: string, nowMs: number = clock.now()):
     at: reading.deviceTime,
   };
 
-  const booking = link.bookingId ? seed.bookings.find(b => b.id === link.bookingId) : null;
+  const booking = link.bookingId ? db.getState().bookings.find(b => b.id === link.bookingId) : null;
   const destination = booking?.destination;
   if (destination && link.showEta) {
     resolved.eta = resolveEtaForLink(link, asset, reading, destination.name, { lat: destination.lat, lng: destination.lng }, nowMs);
@@ -101,7 +101,7 @@ export function resolveTrackingLink(token: string, nowMs: number = clock.now()):
 /** ETA row for a link (spec 11.14) — also used by the owner's link list. */
 export function resolveEtaForLink(
   link: TrackingLink,
-  asset: (typeof seed.assets)[number],
+  asset: DbRow<'assets'>,
   reading: { lat: number; lng: number; deviceTime: string } | null,
   destinationName: string,
   destination: { lat: number; lng: number },

@@ -3,6 +3,7 @@ import './globals.css';
 import { headers } from 'next/headers';
 import { DemoBar } from '@/components/demo/DemoBar';
 import { LocaleProvider, type Locale } from '@/i18n';
+import { DbProvider } from '@/components/providers/DbProvider';
 
 export const metadata: Metadata = {
   title: 'Kasper GPS',
@@ -28,8 +29,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <body className="min-h-screen bg-bg antialiased">
         <LocaleProvider locale={locale}>
-          <DemoBar />
-          {children}
+          <DbProvider>
+            <DemoBar />
+            {children}
+          </DbProvider>
         </LocaleProvider>
       </body>
     </html>

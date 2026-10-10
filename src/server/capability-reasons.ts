@@ -3,26 +3,8 @@
 
 import type { Session } from '@/domain/types';
 
-export type Capability = 
-  | 'asset.view' | 'asset.viewHistory' | 'asset.viewTelemetry' | 'asset.edit'
-  | 'report.run' | 'link.create' | 'link.revoke' | 'grant.endEarly'
-  | 'alert.view' | 'alert.acknowledge'
-  | 'users.manage' | 'sites.manage'
-  | 'console.tenants.view' | 'console.tenants.manage' | 'console.assets.manage'
-  | 'console.trackers.view' | 'console.trackers.manage' | 'console.trackers.configure'
-  | 'console.audit.view'
-  | 'label.view' | 'label.manage'
-  | 'geofence.view' | 'geofence.manage'
-  | 'playback.view' | 'report.schedule'
-  | 'maintenance.view' | 'maintenance.manage'
-  | 'cost.view'
-  | 'muc.view' | 'muc.issue' | 'muc.void'
-  | 'billing.view' | 'billing.recordPayment' | 'billing.pay'
-  | 'console.billing.view' | 'console.billing.manage'
-  | 'asset.create' | 'asset.retire' | 'tracker.request'
-  | 'console.assets.transfer' | 'console.adapters.manage'
-  | 'console.bookings.view' | 'console.bookings.manage'
-  | 'console.staff.manage' | 'console.import';
+import type { Capability } from './capabilities';
+export type { Capability };
 
 export function reasonFor(session: Session, capability: Capability, assetRelationship?: 'kasper' | 'owner' | 'renter' | 'none'): string | null {
   const role = session.role;

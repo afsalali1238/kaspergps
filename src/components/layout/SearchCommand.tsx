@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Session } from '@/domain/types';
-import { searchAssets } from '@/server/search';
+import { searchAssets } from '@/server/api';
 import { useT, useHref } from '@/i18n';
 
 interface SearchCommandProps {

@@ -317,6 +317,10 @@ export interface ReportSchedule {
   format: ReportFormat;
   nextRunAt: string | number;
   active: boolean;
+  /** Assets the schedule reports on. Seeded rows predate this and may omit it. */
+  assetIds?: string[];
+  /** Runs skipped in a row; two pause the schedule. */
+  consecutiveSkips?: number;
 }
 
 export interface MaintenancePlan {
@@ -550,4 +554,15 @@ export interface FeatureVisibility {
   key: string;
   visible: boolean;
   reason?: string;
+}
+
+/** A one-off service task raised from a fault code (Tier 3 only). */
+export interface MaintenanceTask {
+  id: string;
+  assetId: string;
+  title: string;
+  fromFaultCode: string;
+  createdAt: number;
+  doneAt?: number;
+  doneBy?: string;
 }

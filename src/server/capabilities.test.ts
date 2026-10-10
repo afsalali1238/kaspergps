@@ -9,7 +9,8 @@ describe('capabilities — hasRoleCapability', () => {
     expect(hasRoleCapability('kasper_admin', 'console.audit.view')).toBe(true);
     expect(hasRoleCapability('kasper_admin', 'console.staff.manage')).toBe(true);
     expect(hasRoleCapability('kasper_admin', 'muc.issue')).toBe(true);
-    expect(hasRoleCapability('kasper_admin', 'billing.pay')).toBe(true);
+    // Spec §5: Kasper Admin does not pay invoices (billing.pay is ✕).
+    expect(hasRoleCapability('kasper_admin', 'billing.pay')).toBe(false);
     expect(hasRoleCapability('kasper_admin', 'console.billing.manage')).toBe(true);
     expect(hasRoleCapability('kasper_admin', 'console.assets.transfer')).toBe(true);
     expect(hasRoleCapability('kasper_admin', 'console.adapters.manage')).toBe(true);
@@ -24,7 +25,7 @@ describe('capabilities — hasRoleCapability', () => {
     expect(hasRoleCapability('kasper_ops', 'console.adapters.manage')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'console.bookings.view')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'console.bookings.manage')).toBe(true);
-    expect(hasRoleCapability('kasper_ops', 'console.assets.transfer')).toBe(true);
+    expect(hasRoleCapability('kasper_ops', 'console.assets.transfer')).toBe(false);
     expect(hasRoleCapability('kasper_ops', 'console.import')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'asset.create')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'asset.retire')).toBe(true);
@@ -35,7 +36,7 @@ describe('capabilities — hasRoleCapability', () => {
     expect(hasRoleCapability('kasper_ops', 'alert.acknowledge')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'label.view')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'geofence.view')).toBe(true);
-    expect(hasRoleCapability('kasper_ops', 'geofence.manage')).toBe(true);
+    expect(hasRoleCapability('kasper_ops', 'geofence.manage')).toBe(false);
     expect(hasRoleCapability('kasper_ops', 'playback.view')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'report.schedule')).toBe(true);
     expect(hasRoleCapability('kasper_ops', 'maintenance.view')).toBe(true);
@@ -85,10 +86,10 @@ describe('capabilities — hasRoleCapability', () => {
     expect(hasRoleCapability('tenant_admin', 'asset.create')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'asset.retire')).toBe(true);
     expect(hasRoleCapability('tenant_admin', 'tracker.request')).toBe(true);
-    expect(hasRoleCapability('tenant_admin', 'console.assets.transfer')).toBe(true);
+    expect(hasRoleCapability('tenant_admin', 'console.assets.transfer')).toBe(false);
+    expect(hasRoleCapability('tenant_admin', 'users.manage')).toBe(true);
+    expect(hasRoleCapability('tenant_admin', 'sites.manage')).toBe(true);
 
-    expect(hasRoleCapability('tenant_admin', 'users.manage')).toBe(false);
-    expect(hasRoleCapability('tenant_admin', 'sites.manage')).toBe(false);
     expect(hasRoleCapability('tenant_admin', 'console.tenants.view')).toBe(false);
     expect(hasRoleCapability('tenant_admin', 'console.tenants.manage')).toBe(false);
     expect(hasRoleCapability('tenant_admin', 'console.audit.view')).toBe(false);

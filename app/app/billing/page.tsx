@@ -8,19 +8,13 @@ import React, { useMemo, useState } from 'react';
 import {
   Badge, Button, EmptyState,
 } from '@/components/ui';
-import { useStore } from '@/store';
-import { seed } from '@/server/seed/data';
-import { hasCapability } from '@/server/access';
-import type { InvoiceView } from '@/server/billing';
-import {
-  aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking,
-  invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice,
-  receivedInvoices, recordPayment, statementsFor, voidInvoice,
-} from '@/server/billing';
+import { useDb, type InvoiceView, aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice, receivedInvoices, recordPayment, statementsFor, voidInvoice, can } from '@/server/api';
+
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
 import { downloadBoth, downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { useSession, useSwitches } from '@/hooks';
 
 type TabId = 'issued' | 'received' | 'gps' | 'reports';
 
@@ -61,10 +55,10 @@ const PAYMENT_METHODS = [
 ] as const;
 
 export default function BillingPage() {
+  const seed = useDb(s => s);
   const t = useT();
-  const store = useStore;
-  const session = store.getState().session;
-  const phase = store.getState().demoSwitches.phase;
+  const session = useSession();
+  const { phase } = useSwitches();
 
   const [tab, setTab] = useState<TabId>('received');
   const [version, setVersion] = useState(0);
@@ -117,7 +111,7 @@ export default function BillingPage() {
     );
   }
 
-  if (!hasCapability(session, 'billing.view')) {
+  if (!can(session, 'billing.view')) {
     return (
       <div className="p-4">
         <h1 className="text-lg font-semibold text-ink mb-4">{t('billing.title', 'Billing')}</h1>

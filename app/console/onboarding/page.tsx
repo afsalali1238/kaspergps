@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   Button,
 } from '@/components/ui';
-import { useStore } from '@/store';
+import { useSession } from '@/hooks';
 
 const STEPS = [
   { id: 1, title: 'Company', description: 'Name, type, licence no.' },
@@ -16,8 +16,7 @@ const STEPS = [
 ];
 
 export default function OnboardingPage() {
-  const store = useStore;
-  const session = store.getState().session;
+  const session = useSession();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [draft, setDraft] = useState({
