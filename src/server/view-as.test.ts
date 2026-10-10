@@ -62,3 +62,22 @@ describe('View as: live groups and badges', () => {
     expect(ahmed?.subtitle.startsWith('Site User · ')).toBe(true);
   });
 });
+
+describe('View as: role dropdown', () => {
+  beforeEach(() => {
+    resetDb();
+  });
+
+  it('a role filter keeps only users of that role, across every company', () => {
+    const rows = viewAsGroups(state(), '', 'site_user').flatMap(g => g.rows);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(r => r.user.role === 'site_user')).toBe(true);
+  });
+
+  it('Kasper roles show only Kasper staff, and "all" keeps everyone', () => {
+    const kasper = viewAsGroups(state(), '', 'kasper_ops').flatMap(g => g.rows);
+    expect(kasper.every(r => r.user.role === 'kasper_ops')).toBe(true);
+    const everyone = viewAsGroups(state(), '', 'all').flatMap(g => g.rows);
+    expect(everyone.length).toBe(db.getState().users.length);
+  });
+});

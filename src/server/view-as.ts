@@ -2,7 +2,7 @@
 // from a fixed list of companies: a company created in the demo appears here,
 // and so does a user invited in the demo.
 
-import type { Asset, Booking, Role, Site, Tenant, User } from '@/domain/types';
+import type { Asset, Booking, Role, Site, Tenant, User, ViewAsRoleFilter } from '@/domain/types';
 import { tierForAsset } from '@/domain/features';
 import { hasRole, isKasperStaff } from '@/server/capabilities';
 
@@ -97,10 +97,11 @@ function subtitleFor(state: ViewAsState, user: User): string {
  * users, in the order the companies were created. A search matches name or
  * email; groups with no match are dropped.
  */
-export function viewAsGroups(state: ViewAsState, search: string): ViewAsGroup[] {
+export function viewAsGroups(state: ViewAsState, search: string, roleFilter: ViewAsRoleFilter = 'all'): ViewAsGroup[] {
   const q = search.trim().toLowerCase();
   const matches = (u: User) =>
-    q === '' || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    (roleFilter === 'all' || hasRole(u, roleFilter)) &&
+    (q === '' || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
   const row = (u: User): ViewAsRow => ({
     user: u,
     subtitle: subtitleFor(state, u),

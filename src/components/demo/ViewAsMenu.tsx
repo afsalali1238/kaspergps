@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { useDb, viewAsGroups, fb12PublicPath } from '@/server/api';
+import type { ViewAsRoleFilter } from '@/domain/types';
 import { useSession, storeActions } from '@/hooks';
 import { signInAs } from '@/server/api';
 
@@ -39,6 +40,7 @@ export function ViewAsMenu() {
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [role, setRole] = useState<ViewAsRoleFilter>('all');
   const [notice, setNotice] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
 
   // Ctrl+K (or Cmd+K) opens the menu from anywhere; Escape closes it.
@@ -55,7 +57,7 @@ export function ViewAsMenu() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const groups = open ? viewAsGroups({ users, tenants, sites, assets, bookings }, query) : [];
+  const groups = open ? viewAsGroups({ users, tenants, sites, assets, bookings }, query, role) : [];
 
   const selectUser = (userId: string) => {
     const result = signInAs(userId);
@@ -108,6 +110,18 @@ export function ViewAsMenu() {
       {open && (
         <div className="absolute top-full left-0 mt-1 w-80 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
           <div className="p-2 border-b border-[#2a2c30]">
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value as ViewAsRoleFilter)}
+              aria-label="Role"
+              className="w-full mb-2 px-2.5 py-1.5 text-xs bg-[#22242a] text-paper border border-[#2a2c30] rounded-lg focus:outline-none focus:border-yellow"
+            >
+              <option value="all">All roles</option>
+              <option value="kasper_admin">Kasper admin</option>
+              <option value="kasper_ops">Kasper ops</option>
+              <option value="tenant_admin">Tenant admin</option>
+              <option value="site_user">Site user</option>
+            </select>
             <input
               type="text"
               value={query}

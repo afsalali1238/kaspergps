@@ -4,6 +4,9 @@
 
 export type TenantType = 'vendor' | 'client' | 'both';
 export type Role = 'kasper_admin' | 'kasper_ops' | 'tenant_admin' | 'site_user';
+
+/** The View as menu's role dropdown: one role, or every role. */
+export type ViewAsRoleFilter = Role | 'all';
 export type Adapter = 'none' | 'LVCAN200' | 'ALL-CAN300';
 export type AssetStatus = 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker';
 export type AssetClass = 'truck' | 'light_vehicle' | 'plant' | 'lifting' | 'power';
