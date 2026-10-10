@@ -1,6 +1,6 @@
 // AppShell render test (H2.6): a page the user may not see reads "Page not found".
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { LocaleProvider } from '@/i18n';
 import { db } from '@/server/db';
 import type { Session } from '@/domain/types';
@@ -57,6 +57,6 @@ describe('AppShell route guard (H2.6)', () => {
     nav.pathname = '/app/certificates';
     renderShell();
     expect(screen.queryByText('page body')).toBeNull();
-    expect(screen.getByText('Page not found')).toBeInTheDocument();
+    expect(screen.getByText('Page not found')).not.toBeNull();
   });
 });
