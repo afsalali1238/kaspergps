@@ -148,3 +148,28 @@ export function hoursSourceLabel(asset: Asset): string {
   }
   return 'Estimated (ignition)';
 }
+
+/** Phase gate on its own: is a feature of this phase in scope for the demo switch? */
+export function phaseInScope(featurePhaseValue: 'day_one' | 'phase2' | 'later', phase: 'day_one' | 'phase2' | 'later'): boolean {
+  if (featurePhaseValue === 'day_one') return true;
+  if (featurePhaseValue === 'phase2') return phase !== 'day_one';
+  return phase === 'later';
+}
+
+const ADAPTER_TIER: Record<string, number> = { 'LVCAN200': 2, 'ALL-CAN300': 3 };
+
+/**
+ * Hardware features this asset does not have, in the current phase. Sales view
+ * shows these as quiet locked cards (spec §10 / H3.3): never as disabled controls.
+ */
+export function lockedFeatures(asset: Asset, phase: 'day_one' | 'phase2' | 'later'): { key: string; label: string; reason: string }[] {
+  return FEATURES
+    .filter(f => f.needs.length > 0 && !hasFeature(asset, f.key) && phaseInScope(f.phase, phase))
+    .map(f => {
+      const adapter = f.adapter?.[0];
+      const reason = adapter
+        ? `Needs ${adapter} (Tier ${ADAPTER_TIER[adapter] ?? '?'})`
+        : `Not supported on ${asset.canProfile.adapter === 'none' ? 'a Tier 1 tracker' : asset.canProfile.adapter}`;
+      return { key: f.key, label: f.label, reason };
+    });
+}

@@ -13,6 +13,7 @@ import { fail, ok } from '@/server/result';
 import type { OpResult } from '@/server/result';
 
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
+import { ecuHoursAt } from '@/server/telemetry/ecu';
 import { hasFeature } from '@/domain/features';
 import { MUC_GAP_RULE, MUC_MAX_GAP_H } from '@/config/thresholds';
 import { canonicalMucPayload, sealMucPayload, sha256Hex, verifyMucPayloadSeal } from '@/server/muc-canonical';
@@ -57,38 +58,8 @@ export function getReplacementMuc(muc: Muc): Muc | null {
 // The prototype's ECU model: hours accumulate with the tracker's ignition-on
 // time, anchored to a deterministic per-asset baseline so it never jumps.
 
-function assetImei(asset: Asset): string {
-  const pairing = db.getState().pairings.find(p => p.assetId === asset.id && p.to === null);
-  const tracker = pairing
-    ? db.getState().trackers.find(t => t.id === pairing.trackerId)
-    : db.getState().trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired');
-  return tracker?.imei ?? '352093100000000';
-}
-
-function ecuBaseHours(asset: Asset): number {
-  const digits = assetImei(asset).slice(-6);
-  return 500 + (parseInt(digits, 10) % 8000);
-}
-
-/** Engine hours per day the simulator puts on each kind of asset. */
-export const BEHAVIOUR_HOURS_PER_DAY: Record<Asset['behaviour'], number> = {
-  parked: 1,
-  works_at_site: 9,
-  drives_between_sites: 6,
-  stationary_24h: 0,
-  light_vehicle_day: 4,
-};
-
-function createdAtMs(asset: Asset): number {
-  return typeof asset.createdAt === 'number' ? asset.createdAt : new Date(asset.createdAt).getTime();
-}
-
 /** ECU engine hours at a moment in time (simulated, monotonic per asset). */
-export function ecuHoursAt(asset: Asset, atMs: number): number {
-  const hoursPerDay = BEHAVIOUR_HOURS_PER_DAY[asset.behaviour] ?? 4;
-  const days = Math.max(0, (atMs - createdAtMs(asset)) / 86400000);
-  return n1(ecuBaseHours(asset) + days * hoursPerDay);
-}
+export { ecuHoursAt, BEHAVIOUR_HOURS_PER_DAY } from '@/server/telemetry/ecu';
 
 export interface EcuDayBucket {
   date: string;

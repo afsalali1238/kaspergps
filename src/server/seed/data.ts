@@ -260,14 +260,24 @@ export const trackers: Tracker[] = trackerRows.map(row => {
 
 // ── Pairings ──────────────────────────────────────────────────────────────────
 
-export const pairings: Pairing[] = [
-  // LD-09's tracker was moved onto PU-41 10 days ago (dated, not asset ids)
-  { id: 'p-ld09-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: new Date(daysAgo(10)).toISOString(), to: null },
-  // CR-08's old tracker ran until the swap 20 days ago, flagged for support
+// Explicit history: tr-pu41 was on LD-09 until 10 days ago, then moved to PU-41;
+// CR-08's old tracker (spare-3) ran until 20 days ago, then its replacement took over;
+// FL-09 paired this morning.
+const explicitPairings: Pairing[] = [
+  { id: 'p-ld09-old', trackerId: 'tr-pu41', assetId: 'a-ld09', from: new Date(daysAgo(60)).toISOString(), to: new Date(daysAgo(10)).toISOString() },
+  { id: 'p-pu41', trackerId: 'tr-pu41', assetId: 'a-pu41', from: new Date(daysAgo(10)).toISOString(), to: null },
   { id: 'p-cr08-old', trackerId: 'tr-spare-3', assetId: 'a-cr08', from: new Date(daysAgo(400)).toISOString(), to: new Date(daysAgo(20)).toISOString() },
-  // FL-09 paired this morning
+  { id: 'p-cr08-new', trackerId: 'tr-cr08', assetId: 'a-cr08', from: new Date(daysAgo(20)).toISOString(), to: null },
   { id: 'p-fl09', trackerId: 'tr-fl09', assetId: 'a-fl09', from: new Date(daysAgo(0.5)).toISOString(), to: null },
 ];
+
+// One open pairing for every other paired tracker (spec H3.2).
+const explicitTrackerIds = new Set(explicitPairings.map(p => p.trackerId));
+const openPairings: Pairing[] = trackers
+  .filter(t => t.stockStatus === 'paired' && t.assetId && !explicitTrackerIds.has(t.id))
+  .map(t => ({ id: `p-${t.assetId}`, trackerId: t.id, assetId: t.assetId as string, from: new Date(daysAgo(30)).toISOString(), to: null }));
+
+export const pairings: Pairing[] = [...explicitPairings, ...openPairings];
 
 // ── Assets ─────────────────────────────────────────────────────────────────────
 

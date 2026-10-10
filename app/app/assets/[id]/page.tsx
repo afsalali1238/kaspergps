@@ -9,10 +9,10 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
+import { isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, TrackingLink } from '@/domain/types';
-import { hasFeature } from '@/domain/features';
+import { hasFeature, lockedFeatures } from '@/domain/features';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
@@ -231,7 +231,16 @@ export default function AssetDetailPage() {
   const params = useParams();
   const assetId = params.id as string;
   const session = useSession();
-  const { phase } = useSwitches();
+  /** The renter's name: the tenant's, or the outside hirer's name for outside hires. */
+  const renterNameOf = (b: { renterTenantId: string | null; renterName?: string }): string =>
+    (b.renterTenantId ? seed.tenants.find(x => x.id === b.renterTenantId)?.name : undefined) ?? b.renterName ?? '';
+  /** "until 20:00" on the same Dubai day, otherwise "until 9 Oct 20:00". */
+  const untilText = (endIso: string | number): string => {
+    const ms = new Date(endIso).getTime();
+    const sameDay = clock.dubaiDateKey(ms) === clock.dubaiDateKey(clock.now());
+    return `until ${sameDay ? '' : clock.formatDubaiDate(ms) + ' '}${clock.formatDubaiTime(ms)}`;
+  };
+  const { phase, salesView } = useSwitches();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [breakdown, setBreakdown] = useState<EcuBreakdown | null>(null);
@@ -382,17 +391,23 @@ export default function AssetDetailPage() {
   const maintenancePlans = isOwnerOrKasper ? plansForAsset(session, asset.id) : [];
   const maintenanceRecords = isOwnerOrKasper ? serviceHistory(session, asset.id) : [];
 
-  const tabs: { id: TabId; key: string; label: string; phase: 'day_one' | 'phase2' | 'later'; enabled: boolean }[] = [
-    { id: 'overview', key: 'asset_detail.tabs.overview', label: 'Overview', phase: 'day_one', enabled: true },
-    { id: 'history', key: 'asset_detail.tabs.history', label: 'History', phase: 'day_one', enabled: true },
-    { id: 'trips', key: 'asset_detail.tabs.trips', label: 'Trips', phase: 'day_one', enabled: true },
-    { id: 'engine', key: 'asset_detail.tabs.engine_fuel', label: 'Engine & fuel', phase: 'phase2', enabled: !isTier1 && phase !== 'day_one' },
-    { id: 'driving', key: 'asset_detail.tabs.driving', label: 'Driving', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'utilisation', key: 'asset_detail.tabs.utilisation', label: 'Utilisation', phase: 'phase2', enabled: phase !== 'day_one' },
-    { id: 'certificates', key: 'asset_detail.tabs.certificates', label: 'Certificates', phase: 'later', enabled: hasFeature(asset, 'muc') && phase !== 'day_one' },
-    { id: 'maintenance', key: 'asset_detail.tabs.maintenance', label: 'Maintenance', phase: 'later', enabled: phase === 'later' && isOwnerOrKasper },
-    { id: 'alerts', key: 'asset_detail.tabs.alerts', label: 'Alerts', phase: 'day_one', enabled: true },
+  // Tabs are hidden, never disabled (spec H3.3). A tab shows only when its feature is visible.
+  const featureShown = (key: string) => isFeatureVisible(session, asset.id, key, phase, salesView);
+  const tabs: { id: TabId; key: string; label: string; visible: boolean }[] = [
+    { id: 'overview', key: 'asset_detail.tabs.overview', label: 'Overview', visible: true },
+    { id: 'history', key: 'asset_detail.tabs.history', label: 'History', visible: true },
+    { id: 'trips', key: 'asset_detail.tabs.trips', label: 'Trips', visible: true },
+    { id: 'engine', key: 'asset_detail.tabs.engine_fuel', label: 'Engine & fuel', visible: !isTier1 && (featureShown('engine.live') || featureShown('fuel.level') || featureShown('fuel.used')) },
+    { id: 'driving', key: 'asset_detail.tabs.driving', label: 'Driving', visible: featureShown('driving.events') },
+    { id: 'utilisation', key: 'asset_detail.tabs.utilisation', label: 'Utilisation', visible: featureShown('utilisation') },
+    { id: 'certificates', key: 'asset_detail.tabs.certificates', label: 'Certificates', visible: featureShown('muc') },
+    { id: 'maintenance', key: 'asset_detail.tabs.maintenance', label: 'Maintenance', visible: phase === 'later' && isOwnerOrKasper },
+    { id: 'alerts', key: 'asset_detail.tabs.alerts', label: 'Alerts', visible: true },
   ];
+  const visibleTabs = tabs.filter(tab => tab.visible);
+  // If the open tab is hidden by a phase or tier change, fall back to Overview.
+  const shownTab: TabId = visibleTabs.some(tab => tab.id === activeTab) ? activeTab : 'overview';
+  const lockedCards = salesView && asset ? lockedFeatures(asset, phase) : [];
 
   return (
     <div className="space-y-4">
@@ -436,16 +451,15 @@ export default function AssetDetailPage() {
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.current', 'Current rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name} ·
-                  {currentBooking.destination?.name ?? t('asset_detail.rental_strip.no_destination', 'No destination')} ·
-                  until {clock.formatDubaiDate(new Date(currentBooking.end).getTime())} {clock.formatDubaiTime(new Date(currentBooking.end).getTime())}
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {renterNameOf(currentBooking)} · {untilText(currentBooking.end)}
+                  {currentBooking.destination && <div className="text-xs text-grey-500 mt-0.5">{currentBooking.destination.name}</div>}
                 </div>
               </div>
             ) : upcomingBooking ? (
               <div>
                 <div className="font-medium text-ink">{t('asset_detail.rental_strip.upcoming', 'Upcoming rental')}</div>
                 <div className="text-grey-700 mt-1">
-                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {seed.tenants.find(x => x.id === upcomingBooking.renterTenantId)?.name} ·
+                  {t('asset_detail.rental_strip.rented_to_prefix', 'Rented to')} {renterNameOf(upcomingBooking)} ·
                   from {clock.formatDubaiDate(new Date(upcomingBooking.start).getTime())} {clock.formatDubaiTime(new Date(upcomingBooking.start).getTime())}
                 </div>
               </div>
@@ -457,7 +471,7 @@ export default function AssetDetailPage() {
                 <div className="font-medium text-ink text-sm">{t('asset_detail.rental_strip.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {seed.tenants.find(x => x.id === b.renterTenantId)?.name} ·
+                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {renterNameOf(b)} ·
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}
@@ -564,18 +578,15 @@ export default function AssetDetailPage() {
       {/* Tabs */}
       <div className="border-b border-line">
         <div className="flex gap-4">
-          {tabs.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => tab.enabled && setActiveTab(tab.id)}
-              disabled={!tab.enabled}
+              onClick={() => setActiveTab(tab.id)}
               className={clsx(
                 'text-sm font-medium transition-colors pb-2 border-b-2',
-                activeTab === tab.id
+                shownTab === tab.id
                   ? 'text-ink border-yellow'
-                  : tab.enabled
-                  ? 'text-grey-500 hover:text-ink border-transparent'
-                  : 'text-grey-300 border-transparent cursor-not-allowed'
+                  : 'text-grey-500 hover:text-ink border-transparent'
               )}
             >
               {t(tab.key, tab.label)}
@@ -597,7 +608,18 @@ export default function AssetDetailPage() {
       )}
 
       {/* Tab content */}
-      {activeTab === 'overview' && (
+      {/* Sales view: hardware features this asset lacks, as quiet locked cards (H3.3). */}
+      {shownTab === 'overview' && lockedCards.length > 0 && (
+        <div data-testid="locked-features" className="grid gap-2 md:grid-cols-2">
+          {lockedCards.map(card => (
+            <div key={card.key} className="bg-surface border border-line rounded-lg p-3 text-sm">
+              <div className="font-medium text-grey-700">{card.label}</div>
+              <div className="text-xs text-grey-500 mt-1">{card.reason}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {shownTab === 'overview' && (
         <div className="space-y-4">
           {/* Mini map */}
           <div className="rounded-xl border border-line bg-paper h-[240px]">
@@ -823,7 +845,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'history' && (
+      {shownTab === 'history' && (
         <div className="space-y-4">
           <div className="bg-surface border border-line rounded-lg p-4">
             <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.history.positions', 'Positions')}</div>
@@ -869,7 +891,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'trips' && (
+      {shownTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.trips', 'Trips')}</div>
           {recentTrips.length === 0 ? (
@@ -902,7 +924,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'engine' && (
+      {shownTab === 'engine' && (
         <div className="bg-surface border border-line rounded-lg p-4">
           <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.engine_fuel', 'Engine & fuel')}</div>
           {isTier1 ? (
@@ -930,7 +952,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'driving' && (
+      {shownTab === 'driving' && (
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.driving_events', 'Driving events')}</div>
           {drivingEvents.length === 0 ? (
@@ -955,7 +977,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'utilisation' && (
+      {shownTab === 'utilisation' && (
         <div className="space-y-4">
           {hasFeature(asset, 'muc') ? (
             <>
@@ -1073,7 +1095,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'certificates' && (
+      {shownTab === 'certificates' && (
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
@@ -1137,7 +1159,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'maintenance' && (
+      {shownTab === 'maintenance' && (
         <div className="space-y-3">
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-line flex items-center justify-between">
@@ -1223,7 +1245,7 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {activeTab === 'alerts' && (
+      {shownTab === 'alerts' && (
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.alerts', 'Alerts')}</div>
           {assetAlerts.length === 0 ? (

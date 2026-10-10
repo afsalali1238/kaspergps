@@ -10,7 +10,7 @@ import {
   TierChip, Badge, EmptyState, Skeleton,
   Button, SourceLabel,
 } from '@/components/ui';
-import { useDb, type DbState, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor } from '@/server/api';
+import { useDb, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor, computeStatus } from '@/server/api';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
 import type { Asset, LatLng } from '@/domain/types';
@@ -74,21 +74,6 @@ interface AssetMarker {
   engineHoursToday: number | null;
   hoursSource: ReturnType<typeof hoursSourceFor>;
   openAlerts: number;
-}
-
-function computeStatus(asset: Asset, data: Pick<DbState, 'pairings' | 'trackers'>, sessionMs: number = clock.now()): 'live' | 'idle' | 'stale' | 'offline' | 'unknown' | 'no_tracker' {
-  const pairing = data.pairings.find(p => p.assetId === asset.id && p.to === null);
-  if (!pairing) return 'no_tracker';
-  const tracker = data.trackers.find(t => t.id === pairing.trackerId);
-  if (!tracker || tracker.stockStatus !== 'paired') return 'no_tracker';
-  const reading = getReadingForAsset(asset);
-  if (!reading) return 'no_tracker';
-  const lastMs = new Date(reading.deviceTime).getTime();
-  const ageSec = (sessionMs - lastMs) / 1000;
-  if (ageSec > 1800) return 'offline';
-  if (ageSec > 600) return 'stale';
-  if (reading.speedKmh < 3) return 'idle';
-  return 'live';
 }
 
 function lastUpdatedStr(asset: Asset, locale: Locale): string {
@@ -173,7 +158,7 @@ export default function MapPage() {
 
     return seed.assets.filter(a => {
       if (!isAssetVisible(session, a.id)) return false;
-      const status = computeStatus(a, seed);
+      const status = computeStatus(a);
       if (statusFilter !== 'all' && status !== statusFilter) return false;
       if (selectedSite && a.homeSiteId !== selectedSite) return false;
       if (selectedClass && a.assetClass !== selectedClass) return false;
@@ -192,7 +177,7 @@ export default function MapPage() {
       }
       return true;
     }).map(a => {
-      const status = computeStatus(a, seed);
+      const status = computeStatus(a);
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       const site = seed.sites.find(s => s.id === a.homeSiteId);
       const rel = getRelationship(session!, a.id);
