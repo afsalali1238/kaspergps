@@ -87,6 +87,7 @@ const navItems: NavItem[] = [
     label: 'Certificates',
     capability: 'muc.view',
     phase: 'phase2',
+    featureKey: 'muc',
     icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6h2M4 8h6M4 10h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   },
   {
@@ -349,7 +350,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {showMobileNav && (
           <button
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            className="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
+            aria-expanded={mobileNavOpen}
+            aria-label={t('shell.open_menu', 'Open menu')}
+            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -404,31 +407,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* Mobile bottom nav */}
-        {showMobileNav && (
-          <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-line z-40 flex lg:hidden overflow-x-auto">
-            <div className="flex w-full">
-              {visibleNavItems.slice(0, 5).map(item => {
-                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href.replace('/app/', '/app/')));
+        {/* Phones: every allowed item lives in a bottom sheet (spec 11), opened from the header. */}
+        {showMobileNav && mobileNavOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t('shell.open_menu', 'Open menu')}>
+            <button
+              type="button"
+              aria-label={t('common.close', 'Close')}
+              onClick={() => setMobileNavOpen(false)}
+              className="absolute inset-0 bg-ink/40"
+            />
+            <div className="absolute bottom-0 inset-x-0 bg-surface rounded-t-xl border-t border-line p-2 max-h-[80vh] overflow-y-auto">
+              {visibleNavItems.map(item => {
+                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
                 return (
                   <Link
                     key={item.href}
                     href={href(item.href)}
+                    onClick={() => setMobileNavOpen(false)}
                     className={clsx(
-                      'flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors min-w-[60px]',
-                      isActive
-                        ? 'text-ink'
-                        : 'text-grey-500 hover:text-ink'
+                      'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors',
+                      isActive ? 'text-ink bg-paper-2' : 'text-grey-700 hover:bg-paper-2'
                     )}
                   >
                     {item.icon}
                     {t(item.labelKey, item.label)}
-                    {isActive && <span className="h-0.5 w-5 bg-yellow rounded-full" />}
                   </Link>
                 );
               })}
             </div>
-          </nav>
+          </div>
         )}
 
         {/* Main content */}
