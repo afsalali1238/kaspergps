@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useDb, tamperWithMuc, runDueSchedules, clockPresets } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { exportDemoState, importDemoState, resetDemoState } from '@/lib/demo-state';
 import { useSession, useSwitches, useNow, useClockOffsetMs, useWalkthrough, useWalkthroughsDone, storeActions } from '@/hooks';
+import { stripLocale } from '@/i18n';
 import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
 import { SCENARIOS, startScenario, type Scenario } from '@/components/demo/scenarios';
 import { ViewAsMenu } from '@/components/demo/ViewAsMenu';
@@ -38,6 +39,17 @@ export function DemoBar() {
   const mucs = useDb(s => s.mucs);
   // Presets depend on bookings, links, readings and invoices: recompute when any of them change.
   const dbSnapshot = useDb(s => s);
+
+  // Public pages (tracking link, verify) show the bar as a small floating pill (spec 10.9).
+  const pathname = stripLocale(usePathname() ?? '');
+  const publicPage = pathname.startsWith('/t/') || pathname.startsWith('/verify/');
+  const [pillExpanded, setPillExpanded] = useState(false);
+  useEffect(() => {
+    const collapsed = publicPage && !pillExpanded;
+    if (collapsed) document.body.dataset.demoCollapsed = 'true';
+    else delete document.body.dataset.demoCollapsed;
+    return () => { delete document.body.dataset.demoCollapsed; };
+  }, [publicPage, pillExpanded]);
 
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
@@ -97,6 +109,20 @@ export function DemoBar() {
     storeActions.resetClock();
     afterClockMove();
   };
+
+  if (publicPage && !pillExpanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPillExpanded(true)}
+        aria-label="Show the demo bar"
+        className="demo-bar fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
+      >
+        <span className="demo-tag text-[9px]">DEMO</span>
+        <span className="text-[11px]">Prototype</span>
+      </button>
+    );
+  }
 
   return (
     <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: 'var(--demo-bar-h)' }}>
