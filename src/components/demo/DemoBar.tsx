@@ -225,9 +225,9 @@ export function DemoBar() {
       {/* Features button */}
       <button
         onClick={() => setFeaturesOpen(!featuresOpen)}
-        className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+        className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
           <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 8l3-3 3 3M2 5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         Features
@@ -251,9 +251,9 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setScenariosOpen(!scenariosOpen)}
-          className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
             <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 7l3-3 3 3M2 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Scenarios
@@ -304,9 +304,9 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setToolsOpen(!toolsOpen)}
-          className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
             <path d="M3 2l5 5-5 5M3 6l4 4M2 3a1 1 0 100 2 1 1 0 000-2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Tools
