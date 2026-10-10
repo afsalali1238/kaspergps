@@ -2,7 +2,7 @@
 
 // Global search / command palette (spec §11.3 Search, S40): searches the
 // assets the user can see (code, name, site, plate, IMEI) and the app's pages.
-// Opens from the top-bar button or Ctrl/Cmd + K.
+// Opens from the top-bar button. Ctrl/Cmd + K is View as's (spec §10.1).
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -45,13 +45,9 @@ export function SearchCommand({ session }: SearchCommandProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Ctrl/Cmd + K toggles the palette.
+  // Escape closes the palette. Ctrl/Cmd + K is bound only by View as.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setOpen(v => !v);
-      }
       if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', onKey);
@@ -104,7 +100,6 @@ export function SearchCommand({ session }: SearchCommandProps) {
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1" /><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
         <span className="flex-1 text-start">{t('shell.search_placeholder', 'Type to search assets…')}</span>
-        <kbd className="text-[10px] text-grey-500 border border-line rounded px-1">Ctrl K</kbd>
       </button>
 
       {open && (

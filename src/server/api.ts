@@ -7,6 +7,7 @@ import { db, type DbRow, touch } from '@/server/db';
 import { computeStatus } from '@/server/telemetry/simulator';
 
 import { can, isKasperStaff } from '@/server/capabilities';
+import { recordCrossTenantView } from '@/server/audit';
 import * as clock from '@/lib/clock';
 
 export interface ApiResult<T> {
@@ -90,7 +91,7 @@ export async function getAsset(session: Session, assetId: string): Promise<ApiRe
     return { success: false, error: 'Asset not found' };
   }
   if (session.isKasper && asset.ownerTenantId !== session.tenantId) {
-    // audit entry would go here
+    recordCrossTenantView(session, asset);
   }
   return { success: true, data: assetToView(asset, session) };
 }
@@ -173,7 +174,7 @@ export { anyAssetHasFeature, getRelationship, isAssetVisible, visibleAssetIds } 
 export { ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fitAdapter, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, stockAdapters } from './adapters';
 export { acknowledgeAlert, alertTypesIn, bellAlerts, visibleAlerts } from './alerts';
 export type { AlertView } from './alerts';
-export { actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, recordAuditForSession, tenantName } from './audit';
+export { actorName, assetCode, auditActions, auditEntriesToCsv, queryAuditEntries, recordAuditForSession, recordCrossTenantView, tenantName } from './audit';
 export { aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, generateStatement, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, lastMonthStatements, mucForInvoice, paidTotal, payInvoice, paymentsFor, receivedInvoices, recordPayment, recordStatementPayment, statementById, statementsFor, voidInvoice, voidStatement } from './billing';
 export type { InvoiceView } from './billing';
 export { canManageBookings, cancelBooking, closeBooking, createBooking, endEarly, extendBooking, shortenBooking } from './bookings';
@@ -200,7 +201,7 @@ export type { TrackerRequestView } from './requests';
 export { createSchedule, deleteSchedule, runDueSchedules, schedulesFor, setScheduleActive } from './schedules';
 export type { ScheduleFrequency } from './schedules';
 export { searchAssets } from './search';
-export { createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole } from './team';
+export { createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole, updateUserSites } from './team';
 export { computeStatus, getReadingForAsset, getReadingsForAsset } from './telemetry/simulator';
 export { createTenant, suspendTenant, unsuspendTenant, updateTenant } from './tenants';
 export { assetsWithoutTracker, currentPairingForTracker, currentTrackerForAsset, markTrackerFaulty, pairTracker, pairingHistory, pairingTargetsFor, registerTracker, retireTracker, stockTrackers, unpairTracker, updateTrackerSettings } from './trackers';

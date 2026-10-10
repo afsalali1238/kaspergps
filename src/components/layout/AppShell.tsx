@@ -10,6 +10,7 @@ import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useSession, useSwitches } from '@/hooks';
+import type { Session } from '@/domain/types';
 
 interface NavItem {
   href: string;
@@ -20,6 +21,23 @@ interface NavItem {
   phase: 'day_one' | 'phase2' | 'later';
   featureKey?: string;
   icon: React.ReactNode;
+}
+
+/**
+ * The §11 nav rule, shared by the nav and by every page under its href: a
+ * page shows only when its nav item would show. Otherwise the route reads
+ * "Page not found" (H2.6). Phase is the demo bar's current phase.
+ */
+export function navItemAllowed(session: Session | null, item: NavItem, phase: string): boolean {
+  if (!session) return true;
+  if (!can(session, item.capability)) return false;
+  if (item.phase === 'phase2' && phase === 'day_one') return false;
+  if (item.phase === 'later' && phase !== 'later') return false;
+  if (item.featureKey) {
+    if (visibleAssetIds(session).length === 0) return false;
+    return anyAssetHasFeature(session, item.featureKey);
+  }
+  return true;
 }
 
 const navItems: NavItem[] = [
@@ -129,19 +147,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const bellCount = unread + openAlerts.length;
 
 
-  const visibleNavItems = navItems.filter(item => {
-    // §11 nav rule: each item appears only if the user has the capability.
-    const hasCap = session ? can(session, item.capability) : true;
-    if (!hasCap) return false;
-    if (item.phase === 'phase2' && currentPhase === 'day_one') return false;
-    if (item.phase === 'later' && currentPhase !== 'later') return false;
-    if (item.featureKey) {
-      const ids = visibleAssetIds(session!);
-      if (ids.length === 0) return false;
-      return anyAssetHasFeature(session!, item.featureKey!);
-    }
-    return true;
-  });
+  // §11 nav rule: each item appears only if the user may see it.
+  const visibleNavItems = navItems.filter(item => navItemAllowed(session, item, currentPhase));
+
+  // H2.6: the page under a nav href follows the same rule as its nav item.
+  const routeItem = navItems.find(item =>
+    pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href + '/'))
+  );
+  const pageAllowed = !routeItem || navItemAllowed(session, routeItem, currentPhase);
 
   const isCustomer = session && !session.isKasper;
   const showMobileNav = isCustomer;
@@ -422,7 +435,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 sm:pb-6">
           {/* Keyed by user: a switch of user remounts the page, so no state
               from the previous user's screen survives it. */}
-          <div key={session?.userId ?? 'signed-out'}>{children}</div>
+          <div key={session?.userId ?? 'signed-out'}>
+            {pageAllowed ? children : (
+              <div className="flex items-center justify-center py-24">
+                <div className="text-center">
+                  <div className="text-sm font-semibold text-ink">{t('common.page_not_found', 'Page not found')}</div>
+                  <div className="text-sm text-grey-500 mt-1">{t('shell.not_in_your_role', "This page isn't available for your role.")}</div>
+                </div>
+              </div>
+            )}
+          </div>
         </main>
       </div>
     </div>

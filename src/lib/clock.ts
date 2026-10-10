@@ -3,7 +3,7 @@
 // Architecture rule 9.
 
 import { startOfDay, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
-import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { ANCHOR_MS } from '@/server/seed/data';
 
 const DUBAI_TZ = 'Asia/Dubai';
@@ -108,8 +108,9 @@ export function formatDubaiDateTime(ms: number): string {
   return `${formatDubaiDate(ms)} ${formatDubaiTime(ms)}`;
 }
 
+/** Dubai wall-clock time with its offset, e.g. 2026-10-09T19:00:00+04:00. Correct on any machine time zone. */
 export function dubaiToIso(ms: number): string {
-  return toZonedTime(new Date(ms), DUBAI_TZ).toISOString();
+  return formatInTimeZone(new Date(ms), DUBAI_TZ, "yyyy-MM-dd'T'HH:mm:ssXXX");
 }
 
 export function isoFromDubai(iso: string): number {

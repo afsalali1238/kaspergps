@@ -40,24 +40,24 @@ describe('team — inviting users', () => {
   });
 
   it('validates the email and the company scope', () => {
-    expect(createUser(omar(), { tenantId: 't-alnoor', name: 'No Email', email: 'nope', role: 'site_user' }).error)
+    expect(createUser(omar(), { tenantId: 't-alnoor', name: 'No Email', email: 'nope', role: 'site_user', siteIds: ['s-alnoor-ja'] }).error)
       .toBe('Enter a valid email address.');
-    expect(createUser(omar(), { tenantId: 't-alnoor', name: '', email: 'x@y.ae', role: 'site_user' }).error)
+    expect(createUser(omar(), { tenantId: 't-alnoor', name: '', email: 'x@y.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).error)
       .toBe('Name required.');
-    expect(createUser(omar(), { tenantId: 't-alnoor', name: 'Copy', email: 'omar@alnoor.ae', role: 'site_user' }).error)
+    expect(createUser(omar(), { tenantId: 't-alnoor', name: 'Copy', email: 'omar@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).error)
       .toBe('This email is already in use.');
     // Another company's admin can't invite into Al Noor; Kasper can.
-    expect(createUser(khalid(), { tenantId: 't-alnoor', name: 'Sneaky', email: 'sneaky@x.ae', role: 'site_user' }).error)
+    expect(createUser(khalid(), { tenantId: 't-alnoor', name: 'Sneaky', email: 'sneaky@x.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).error)
       .toContain('your own company');
-    expect(createUser(sara(), { tenantId: 't-alnoor', name: 'Kasper Added', email: 'added@alnoor.ae', role: 'site_user' }).ok).toBe(true);
+    expect(createUser(sara(), { tenantId: 't-alnoor', name: 'Kasper Added', email: 'added@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).ok).toBe(true);
     // Ops has no users.manage.
-    expect(createUser(ravi(), { tenantId: 't-alnoor', name: 'Ops Added', email: 'ops@alnoor.ae', role: 'site_user' }).ok).toBe(false);
+    expect(createUser(ravi(), { tenantId: 't-alnoor', name: 'Ops Added', email: 'ops@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).ok).toBe(false);
   });
 });
 
 describe('team — editing users', () => {
   it('renames only when the name actually changes', () => {
-    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Rename Me', email: 'rename@alnoor.ae', role: 'site_user' }).data!;
+    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Rename Me', email: 'rename@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).data!;
     expect(updateUserName(omar(), user.id, '   ').error).toBe('Name required.');
     const unchanged = updateUserName(omar(), user.id, 'Rename Me');
     expect(unchanged.ok).toBe(true);
@@ -85,7 +85,7 @@ describe('team — editing users', () => {
   });
 
   it('deactivates, refuses sign-in status changes and reactivates', () => {
-    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Temp Person', email: 'temp@alnoor.ae', role: 'site_user' }).data!;
+    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Temp Person', email: 'temp@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).data!;
     // New users are 'invited': make them active the way the demo does (seed users only).
     expect(userById(user.id)!.status).toBe('invited');
     const deactivated = deactivateUser(omar(), user.id);
@@ -99,7 +99,7 @@ describe('team — editing users', () => {
   });
 
   it('moves a Site User between their company’s sites', () => {
-    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Site Mover', email: 'mover@alnoor.ae', role: 'site_user' }).data!;
+    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Site Mover', email: 'mover@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).data!;
     expect(updateUserSites(omar(), user.id, ['s-alnoor-ja', 's-alnoor-dip']).ok).toBe(true);
     expect(userById(user.id)!.siteIds).toEqual(['s-alnoor-ja', 's-alnoor-dip']);
     // Sites from another company are dropped.
@@ -111,7 +111,7 @@ describe('team — editing users', () => {
   });
 
   it('promotes a Site User to Tenant Admin', () => {
-    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Promo Person', email: 'promo@alnoor.ae', role: 'site_user' }).data!;
+    const user = createUser(omar(), { tenantId: 't-alnoor', name: 'Promo Person', email: 'promo@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'] }).data!;
     const promoted = updateUserRole(omar(), user.id, 'tenant_admin');
     expect(promoted.ok).toBe(true);
     expect(userById(user.id)!.role).toBe('tenant_admin');
