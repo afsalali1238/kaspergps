@@ -68,7 +68,7 @@ describe('AppShell nav (H4.7)', () => {
     renderShell();
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
     const dialog = screen.getByRole('dialog', { name: 'Open menu' });
-    expect(dialog).toBeInTheDocument();
+    expect(dialog).not.toBeNull();
     expect(dialog.textContent).toContain('Cost & ROI');
     expect(dialog.textContent).toContain('Billing');
   });
@@ -78,6 +78,6 @@ describe('AppShell nav (H4.7)', () => {
     nav.pathname = '/app/certificates';
     renderShell();
     expect(screen.queryByText('page body')).toBeNull();
-    expect(screen.getByText('Page not found')).toBeInTheDocument();
+    expect(screen.getByText('Page not found')).not.toBeNull();
   });
 });
