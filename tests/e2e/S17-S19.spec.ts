@@ -22,7 +22,7 @@ test.describe('S18 — Sara onboards a tenant with a Tier 3 asset', () => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await demo(page, { email: USERS.sara, on: '/console/onboarding' });
     await expect(page.getByRole('heading', { name: 'Onboard a company' })).toBeVisible();
-    await expect(page.getByText('Company')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Company', exact: true })).toBeVisible();
     await expect(page.getByText('Sites')).toBeVisible();
     await expect(page.getByText('People')).toBeVisible();
   });

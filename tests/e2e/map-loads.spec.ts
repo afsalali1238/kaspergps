@@ -20,7 +20,8 @@ for (const key of ['omar', 'lina', 'khalid', 'fatima', 'sara'] as const) {
     await signIn(page, USERS[key]);
     await page.goto('/app');
     await expect(page.getByText("This page couldn't load")).toHaveCount(0);
-    await expect(page.locator('.leaflet-container, [data-testid="today-tiles"], main')).toBeVisible();
+    // .first(): any one of the map, the tiles or <main> being visible is the check.
+    await expect(page.locator('.leaflet-container, [data-testid="today-tiles"], main').first()).toBeVisible();
     expect(errors, errors.join('\n')).toEqual([]);
   });
 }

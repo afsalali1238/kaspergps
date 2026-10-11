@@ -41,7 +41,7 @@ test.describe('S11 — Priya: a rented-in asset with a fault code', () => {
     await goTo(page, '/app/assets/a-bd02');
     await expect(page.getByText('BD-02').first()).toBeVisible();
     await expect(page.getByText('Fault code').first()).toBeVisible();
-    await expect(page.getByText('Rented')).toBeVisible();
+    await expect(page.getByText('Rented').first()).toBeVisible();
 
     await goTo(page, '/app');
     await expect(page.getByText('FL-09').first()).toBeVisible();

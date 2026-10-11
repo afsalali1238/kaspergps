@@ -11,7 +11,7 @@ test.describe('sign-in and role homes', () => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await signIn(page, USERS.sara);
     await expect(page).toHaveURL(/\/console$/);
-    await expect(page.getByText('Kasper Console')).toBeVisible();
+    await expect(page.getByText('Kasper Console').first()).toBeVisible();
 
     await signIn(page, USERS.khalid);
     await expect(page).toHaveURL(/\/app$/);

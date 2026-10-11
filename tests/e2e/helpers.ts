@@ -65,9 +65,12 @@ export async function setPhase(page: Page, phase: 'Day 1' | 'Phase 2' | 'Later')
 
 /** Sales view toggle (separate from Show hidden). */
 export async function setSalesView(page: Page, on: boolean): Promise<void> {
-  const label = `Sales view: ${on ? 'ON' : 'OFF'}`;
-  await page.locator('.demo-bar').getByRole('button', { name: label, exact: true }).click();
-  await expect(page.locator('.demo-bar').getByRole('button', { name: `Sales view: ${on ? 'ON' : 'OFF'}`, exact: true })).toBeVisible();
+  // The button shows the CURRENT state, so to reach `on` we click the button
+  // labelled with the opposite state.
+  const bar = page.locator('.demo-bar');
+  const current = on ? 'OFF' : 'ON';
+  await bar.getByRole('button', { name: `Sales view: ${current}`, exact: true }).click();
+  await expect(bar.getByRole('button', { name: `Sales view: ${on ? 'ON' : 'OFF'}`, exact: true })).toBeVisible();
 }
 
 /** Start one of the S1–S50 guided walkthroughs from the Scenarios menu. */

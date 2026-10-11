@@ -1,76 +1,70 @@
-import type { Metadata } from 'next';
-import { resolveTrackingLink, getTrackingLinkState } from '@/server/api';
-import * as clock from '@/lib/clock';
-import { AutoRefresh } from './AutoRefresh';
-import { headers } from 'next/headers';
-import { translate, type Locale } from '@/i18n/dictionary';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Track your asset — Kasper GPS',
-  description: 'Live GPS tracking for your rental equipment',
-  robots: { index: false, follow: false },
-  other: { referrer: 'no-referrer' },
-};
+// Public tracking page (spec 11.6, H5). A client page so that it reads the same
+// browser db as the rest of the demo:
+//  - it re-renders every 30 s;
+//  - it rehydrates on a `storage` event, so a revoke made in another tab
+//    (the owner's) reaches the hirer's open tab;
+//  - an inactive, unknown or altered link shows exactly one sentence.
+// Architecture rule 8: the resolver returns location + optional ETA, nothing else.
+
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useDb, getTrackingLinkState, resolveTrackingLink, hydrateDb } from '@/server/api';
+import * as clock from '@/lib/clock';
+import { useT } from '@/i18n';
+
+const REFRESH_MS = 30_000;
+const INACTIVE = 'This tracking link is no longer active.';
 
 function formatTime(ts: string | number): string {
   const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
   return clock.formatDubaiTime(t);
 }
 
-const INACTIVE_COPY: Record<string, string> = {
-  expired: 'This link has expired.',
-  revoked: 'This link was revoked.',
-  booking_cancelled: 'This booking was cancelled.',
-  job_closed: 'This job has been closed.',
-  access_ended: 'Access to this asset has ended.',
-};
+export default function TrackingPage() {
+  const params = useParams<{ token: string }>();
+  const token = params?.token ?? '';
+  const t = useT();
+  // Subscribing to the whole db re-renders this page when the db changes.
+  useDb(s => s);
+  const [, setTick] = useState(0);
 
-/** The public page is a server component; the locale comes from the proxy header. */
-async function requestLocale(): Promise<Locale> {
-  const h = await headers();
-  return h.get('x-kasper-locale') === 'ar' ? 'ar' : 'en';
-}
-
-function Inactive({ reason, locale }: { reason: string; locale: Locale }) {
-  return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red/10 flex items-center justify-center">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-red">
-            <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 001.71 3h15.44a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold text-ink mb-2">{translate(locale, 'tracking.inactive_title', 'This tracking link is no longer active')}</h1>
-        <p className="text-sm text-grey-500">{translate(locale, `tracking.inactive.${reason}`, INACTIVE_COPY[reason] ?? 'The link is no longer shared.')}</p>
-      </div>
-    </div>
-  );
-}
-
-export default async function TrackingPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const locale = await requestLocale();
+  // Refresh on a timer, and when another tab writes the db.
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), REFRESH_MS);
+    const onStorage = (e: StorageEvent) => {
+      // The demo db is stored under a `kasper.` key; null means storage was cleared.
+      if (e.key === null || e.key.startsWith('kasper.')) {
+        void hydrateDb().then(() => setTick(n => n + 1));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   const state = getTrackingLinkState(token);
-  if (state !== 'active') return <Inactive reason={state} locale={locale} />;
+  if (state !== 'active') {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <p className="text-base text-ink text-center" data-testid="tracking-inactive">
+          {t('tracking.inactive_title', INACTIVE)}
+        </p>
+      </div>
+    );
+  }
 
-  // Architecture rule 8: the resolver returns location + optional ETA — nothing else.
   const resolved = resolveTrackingLink(token);
   if (!resolved) {
     return (
       <div className="min-h-screen bg-bg">
-        <AutoRefresh />
-        <header className="bg-ink text-white px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-yellow">
-              <rect width="24" height="24" rx="5" fill="#141518" />
-              <text x="0" y="18" fontSize="14" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
-            </svg>
-            <span className="text-sm font-semibold">Kasper GPS</span>
-          </div>
-          <div className="text-xs text-grey-500">{translate(locale, 'tracking.waiting', 'Waiting for update')}</div>
+        <header className="bg-ink text-white px-4 py-3">
+          <span className="text-sm font-semibold">Kasper GPS</span>
         </header>
-        <div className="p-6 text-center text-sm text-grey-500">{translate(locale, 'tracking.waiting_first', 'Waiting for the first position…')}</div>
+        <div className="p-6 text-center text-sm text-grey-500">{t('tracking.waiting_first', 'Waiting for the first position…')}</div>
       </div>
     );
   }
@@ -80,9 +74,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ token
 
   return (
     <div className="min-h-screen bg-bg">
-      <AutoRefresh />
-
-      {/* No app shell. Phone-first: wordmark, asset name, one marker, live dot, updated at. */}
+      {/* No app shell. Phone-first: wordmark, asset name, arrival, updated at. */}
       <header className="bg-ink text-white px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-yellow">
@@ -91,23 +83,17 @@ export default async function TrackingPage({ params }: { params: Promise<{ token
           </svg>
           <span className="text-sm font-semibold">Kasper GPS</span>
         </div>
-        <div className="text-xs text-grey-500">{translate(locale, 'tracking.updated', 'Updated {time}', { time: formatTime(resolved.at) })}</div>
+        <div className="text-xs text-grey-500">{t('tracking.updated', 'Updated {time}', { time: formatTime(resolved.at) })}</div>
       </header>
 
       <div className="flex flex-col md:flex-row">
         <div className="flex-1 h-[60vh] md:h-[70vh] relative bg-paper-2 flex items-center justify-center">
           <div className="text-center text-grey-500">
-            <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ink/10 flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-ink/40">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
-                <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              </svg>
-            </div>
-            <p className="text-sm">{translate(locale, 'tracking.live_map', 'Live map')}</p>
+            <p className="text-sm">{t('tracking.live_map', 'Live map')}</p>
           </div>
           <div className="absolute top-3 left-3 flex items-center gap-2 bg-white/90 px-2 py-1 rounded-md shadow-sm">
             <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
-            <span className="text-xs font-medium text-ink">{translate(locale, 'tracking.live', 'Live')}</span>
+            <span className="text-xs font-medium text-ink">{t('tracking.live', 'Live')}</span>
           </div>
         </div>
 
@@ -118,27 +104,27 @@ export default async function TrackingPage({ params }: { params: Promise<{ token
 
           {eta && (
             <div className="bg-yellow/5 border border-yellow/20 rounded-lg p-3">
-              <div className="text-xs text-yellow-dark font-medium mb-1">{translate(locale, 'tracking.arrival', 'Arrival')}</div>
+              <div className="text-xs text-yellow-dark font-medium mb-1">{t('tracking.arrival', 'Arrival')}</div>
               {eta.state === 'arrived' ? (
-                <div className="text-sm text-ink font-medium">{translate(locale, 'tracking.arrived', 'Arrived {time}', { time: formatTime(eta.etaAt) })}</div>
+                <div className="text-sm text-ink font-medium">{t('tracking.arrived', 'Arrived {time}', { time: formatTime(eta.etaAt) })}</div>
               ) : eta.state === 'en_route' ? (
                 <div className="text-sm text-ink">
-                  {translate(locale, 'tracking.arriving_about', 'Arriving about {time}', { time: formatTime(eta.etaAt) })}
+                  {t('tracking.arriving_about', 'Arriving about {time}', { time: formatTime(eta.etaAt) })}
                   {eta.etaAt > clock.now() && (
                     <span className="text-xs text-grey-500">
                       {' '}
-                      {translate(locale, 'tracking.in_min', '(in {minutes} min)', {
+                      {t('tracking.in_min', '(in {minutes} min)', {
                         minutes: Math.max(1, Math.round((eta.etaAt - clock.now()) / 60000)),
                       })}
                     </span>
                   )}
                 </div>
               ) : (
-                <div className="text-sm text-grey-700">{translate(locale, 'tracking.eta_unavailable', 'ETA unavailable — waiting for update')}</div>
+                <div className="text-sm text-grey-700">{t('tracking.eta_unavailable', 'ETA unavailable — waiting for update')}</div>
               )}
               {hasEta && (
                 <div className="text-xs text-grey-500 mt-1">
-                  {translate(locale, 'tracking.destination', 'Destination: {name}', { name: eta.destinationName })}
+                  {t('tracking.destination', 'Destination: {name}', { name: eta.destinationName })}
                 </div>
               )}
             </div>

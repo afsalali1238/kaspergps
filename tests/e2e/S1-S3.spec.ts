@@ -20,8 +20,9 @@ test.describe('S1 — Omar: a no-CAN fleet stays Tier 1', () => {
     await demo(page, { email: USERS.omar, on: '/app/assets/a-fb12' });
 
     await expect(page.getByText('FB-12').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Engine & fuel' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Certificates' })).toBeDisabled();
+    // Tabs a user can't use are hidden, not greyed out (spec 'UI rules', H3.3).
+    await expect(page.getByRole('button', { name: 'Engine & fuel' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Certificates' })).toHaveCount(0);
 
     await goTo(page, '/app/reports');
     await expect(page.getByText('Fuel', { exact: true })).toHaveCount(0);
@@ -46,7 +47,7 @@ test.describe('S2 — Khalid: EX-04, a Tier 3 asset', () => {
     await expect(page.getByText('ECU · today')).toBeVisible();
     await expect(page.getByText('Fuel level')).toBeVisible();
     // The asset is on hire to Marina Builders.
-    await expect(page.getByText(/^Rented to /)).toBeVisible();
+    await expect(page.getByText(/^Rented to /).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Utilisation' }).click();
     await expect(page.getByText('ECU engine hours')).toBeVisible();
@@ -71,6 +72,6 @@ test.describe('S3 — Khalid: GR-01 shows fuel used but no fuel level', () => {
     await expect(page.getByText('GR-01').first()).toBeVisible();
     await expect(page.getByText('Fuel level')).toBeVisible();
     await expect(page.getByText('Not measured').first()).toBeVisible();
-    await expect(page.getByText('Not available')).toBeVisible();
+    await expect(page.getByText('Not available').first()).toBeVisible();
   });
 });

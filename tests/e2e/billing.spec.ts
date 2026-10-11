@@ -41,7 +41,7 @@ test.describe('S34 — the customer pays (simulated)', () => {
 
     // The seeded invoice to Palm is INV-EE-0412 (already paid); the open one is
     // INV-EE-0415 for Marina. Pay whatever is open.
-    const row = page.getByRole('row', { name: /INV-EE-04/ }).filter({ has: page.getByRole('button', { name: /^Pay AED/ }) }).first();
+    const row = page.getByRole('row', { name: /INV-/ }).filter({ has: page.getByRole('button', { name: /^Pay AED/ }) }).first();
     await expect(row).toBeVisible();
     const number = (await row.locator('td').first().innerText()).trim();
 
@@ -67,7 +67,7 @@ test.describe('S36 — console billing', () => {
     await signIn(page, USERS.sara);
     await page.goto('/console/billing');
 
-    await expect(page.getByText('GPS statements')).toBeVisible();
+    await expect(page.getByText('GPS statements').first()).toBeVisible();
     const gulfLift = page.getByRole('row', { name: /Gulf Lift Rentals/ }).first();
     await expect(gulfLift).toBeVisible();
     await expect(gulfLift.getByText('not issued')).toBeVisible();

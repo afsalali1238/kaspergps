@@ -436,7 +436,9 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
             onClick={() => {
               const result = logService(session, {
                 planId: plan.id,
-                doneAt: new Date(`${doneAt}T12:00:00+04:00`).getTime(),
+                // Noon of the chosen day, but never later than now: a service logged
+                // today before noon must not be refused as "in the future".
+                doneAt: Math.min(new Date(`${doneAt}T12:00:00+04:00`).getTime(), clock.now()),
                 value: Number(value),
                 notes,
                 costAed: Number(cost || 0),

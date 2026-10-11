@@ -8,7 +8,7 @@ import { demo, goTo, tamperWithCertificate, USERS } from './helpers';
 test.describe('S31 — Khalid issues and reissues a MUC', () => {
   test('the certificates screen lists the seeded September certificate', async ({ page }) => {
     await demo(page, { email: USERS.khalid, on: '/app/certificates' });
-    await expect(page.getByRole('heading', { name: 'Certificates' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Certificates' }).first()).toBeVisible();
     await expect(page.getByText('MUC-2026-09-EX-04-01')).toBeVisible();
     await expect(page.getByText('Sealed').first()).toBeVisible();
     // A Tier 3 fleet can issue (BD-02 is on hire to Gulf Lift).
@@ -65,7 +65,7 @@ test.describe('S36 — Kasper issues GPS statements', () => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await demo(page, { email: USERS.sara, scenario: 36 });
     await expect(page).toHaveURL(/\/console\/billing$/);
-    await expect(page.getByText('GPS statements')).toBeVisible();
+    await expect(page.getByText('GPS statements').first()).toBeVisible();
     await expect(page.getByRole('row', { name: /Gulf Lift Rentals/ }).first()).toBeVisible();
 
     await demo(page, { email: USERS.ravi });

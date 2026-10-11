@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { anyAssetHasFeature, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
+import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
@@ -38,6 +39,44 @@ export function navItemAllowed(session: Session | null, item: NavItem, phase: st
     return anyAssetHasFeature(session, item.featureKey);
   }
   return true;
+}
+
+/** What a locked screen says, per route (spec 11.3 / phase ladder). */
+const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: string }> = {
+  '/app/certificates': {
+    phase: 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.',
+    feature: 'Certificates need Tier 3 assets with ECU engine hours only.',
+  },
+  '/app/geofences': { phase: 'Geofences are available in Phase 2.' },
+  '/app/billing': {
+    phase: 'Billing is available in Phase 2.',
+    feature: 'Billing needs Tier 3 assets with ECU engine hours only.',
+    role: 'Your access doesn’t include billing.',
+  },
+  '/app/maintenance': { phase: 'Maintenance arrives in the Later phase.' },
+  '/app/cost': { phase: 'Cost & ROI arrives in the Later phase.' },
+};
+
+/**
+ * How a route renders for this session (spec 11.3, phase ladder):
+ *  - role denied (no capability)  → "Page not found" (unchanged; the role never sees it);
+ *  - phase or Tier denied          → a locked "Not available" screen with the reason;
+ *  - otherwise                     → the page.
+ */
+export function routeGate(
+  session: Session | null,
+  item: NavItem | undefined,
+  phase: string,
+): { kind: 'ok' } | { kind: 'not_found'; role?: string } | { kind: 'locked'; reason: string } {
+  if (!session || !item) return { kind: 'ok' };
+  const copy = LOCK_COPY[item.href] ?? {};
+  if (!can(session, item.capability)) return copy.role ? { kind: 'not_found', role: copy.role } : { kind: 'not_found' };
+  if (item.phase === 'phase2' && phase === 'day_one') return { kind: 'locked', reason: copy.phase ?? 'Not available in this phase.' };
+  if (item.phase === 'later' && phase !== 'later') return { kind: 'locked', reason: copy.phase ?? 'Arrives in the Later phase.' };
+  if (item.featureKey && (visibleAssetIds(session).length === 0 || !anyAssetHasFeature(session, item.featureKey))) {
+    return { kind: 'locked', reason: copy.feature ?? 'Not available for your assets.' };
+  }
+  return { kind: 'ok' };
 }
 
 const navItems: NavItem[] = [
@@ -155,7 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const routeItem = navItems.find(item =>
     pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href + '/'))
   );
-  const pageAllowed = !routeItem || navItemAllowed(session, routeItem, currentPhase);
+  const gate = routeGate(session, routeItem, currentPhase);
 
   const isCustomer = session && !session.isKasper;
   const showMobileNav = isCustomer;
@@ -443,11 +482,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Keyed by user: a switch of user remounts the page, so no state
               from the previous user's screen survives it. */}
           <div key={session?.userId ?? 'signed-out'}>
-            {pageAllowed ? children : (
+            {gate.kind === 'ok' && children}
+            {gate.kind === 'not_found' && (
               <div className="flex items-center justify-center py-24">
                 <div className="text-center">
                   <div className="text-sm font-semibold text-ink">{t('common.page_not_found', 'Page not found')}</div>
-                  <div className="text-sm text-grey-500 mt-1">{t('shell.not_in_your_role', "This page isn't available for your role.")}</div>
+                  <div className="text-sm text-grey-500 mt-1">
+                    {gate.role ?? t('shell.not_in_your_role', "This page isn't available for your role.")}
+                  </div>
+                </div>
+              </div>
+            )}
+            {gate.kind === 'locked' && (
+              <div className="p-4" data-testid="locked-screen">
+                <div className="bg-surface border border-line rounded-lg">
+                  <EmptyState title={t('common.not_available', 'Not available')} description={gate.reason} />
                 </div>
               </div>
             )}
