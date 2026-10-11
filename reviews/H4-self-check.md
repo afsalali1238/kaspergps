@@ -49,8 +49,8 @@ Commands (each run on its own, exit codes checked):
 | npm run typecheck | pass |
 | npm run lint | pass |
 | npm run build | pass |
-| TZ=UTC npx vitest run | pass, 629/629 (before access tests: 616 → 629 with history tests; +3 access tests included) |
-| TZ=Asia/Dubai npx vitest run | pass, 629/629 |
+| TZ=UTC npx vitest run | pass, 632/632 |
+| TZ=Asia/Dubai npx vitest run | pass, 632/632 |
 | npm run test:e2e | NOT RUN (browser download blocked) |
 
 Built:
