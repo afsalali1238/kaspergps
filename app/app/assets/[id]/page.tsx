@@ -12,7 +12,8 @@ import {
 import { isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, TrackingLink } from '@/domain/types';
-import { hasFeature, lockedFeatures } from '@/domain/features';
+import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
+import { TripPlayer } from '@/components/playback/TripPlayer';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
@@ -252,6 +253,8 @@ export default function AssetDetailPage() {
   const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  // Trip currently open in the playback player (spec 11.15).
+  const [playWindow, setPlayWindow] = useState<{ startMs: number; endMs: number } | null>(null);
 
   const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [seed.assets, assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
@@ -273,6 +276,12 @@ export default function AssetDetailPage() {
     if (!asset) return [];
     return detectTrips(asset, clock.now() - 7 * 86_400_000, clock.now()).slice(-5);
   }, [asset]);
+
+  // Readings for the open trip, with a minute of padding either side (spec 11.15).
+  const playReadings = useMemo(() => {
+    if (!asset || !playWindow) return [];
+    return getReadingsForAsset(asset, playWindow.startMs - 60_000, playWindow.endMs + 60_000);
+  }, [asset, playWindow]);
 
   const assetAlerts = useMemo(
     () => (session && asset ? visibleAlerts(session, phase).filter(a => a.assetId === asset.id) : []),
@@ -894,6 +903,18 @@ export default function AssetDetailPage() {
       {shownTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.trips', 'Trips')}</div>
+          {asset && playWindow && (
+            <div className="p-3 border-b border-line">
+              <TripPlayer
+                assetLabel={asset.code}
+                tier={tierForAsset(asset)}
+                readings={playReadings}
+                fromMs={playWindow.startMs}
+                toMs={playWindow.endMs}
+                onClose={() => setPlayWindow(null)}
+              />
+            </div>
+          )}
           {recentTrips.length === 0 ? (
             <div className="p-4 text-sm text-grey-500">
               {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
@@ -906,6 +927,7 @@ export default function AssetDetailPage() {
                   <th className="px-3 py-2 text-left font-medium">{t('asset_detail.trips.end', 'End')}</th>
                   <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.distance', 'Distance')}</th>
                   <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.top_speed', 'Top speed')}</th>
+                  <th className="px-3 py-2 text-right font-medium"><span className="sr-only">{t('asset_detail.trips.play_col', 'Playback')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -915,6 +937,15 @@ export default function AssetDetailPage() {
                     <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{clock.formatDubaiDateTime(tr.endMs)}</td>
                     <td className="px-3 py-2 border-b border-line text-right font-mono text-ink">{tr.distanceKm.toFixed(1)} km</td>
                     <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{tr.maxSpeedKmh.toFixed(0)} km/h</td>
+                    <td className="px-3 py-2 border-b border-line text-right">
+                      <button
+                        type="button"
+                        onClick={() => setPlayWindow({ startMs: tr.startMs, endMs: tr.endMs })}
+                        className="px-2 py-1 border border-line rounded text-xs text-ink hover:bg-paper-2"
+                      >
+                        {t('asset_detail.trips.play', 'Play')}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
