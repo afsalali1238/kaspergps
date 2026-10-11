@@ -4,15 +4,23 @@
 import { test, expect } from '@playwright/test';
 import { USERS, signIn } from './helpers';
 
-const IGNORED = [/tile\.openstreetmap\.org/, /Failed to load resource.*(tile|openstreetmap)/i];
+const TILE_HOST = /tile\.openstreetmap\.org/;
 
 for (const key of ['omar', 'lina', 'khalid', 'fatima', 'sara'] as const) {
   test(`/app loads for ${key} with no error boundary and no console errors`, async ({ page }) => {
     const errors: string[] = [];
+    // Chromium reports a refused tile request as "Failed to load resource" with no URL
+    // in the text, so the request's own URL decides: tile failures are expected offline.
+    const failedTiles = new Set<string>();
+    page.on('requestfailed', req => {
+      if (TILE_HOST.test(req.url())) failedTiles.add(req.url());
+    });
     page.on('console', msg => {
       if (msg.type() !== 'error') return;
       const text = msg.text();
-      if (IGNORED.some(re => re.test(text))) return;
+      const at = msg.location().url;
+      if (TILE_HOST.test(at)) return;
+      if (/Failed to load resource/.test(text) && failedTiles.size > 0) return;
       errors.push(text);
     });
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));

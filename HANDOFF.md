@@ -1,81 +1,184 @@
 # Kasper GPS — Project Handoff
 
-## 1. Project Status: all 14 phases built — one class of verification outstanding
-Every phase in `BUILD_PROMPT.md` has implementation work in the tree. What the
-prototype has **never** had is a browser run: `npm run test:e2e` has not been
-executed anywhere (no CI until 2026-10-09, and the sandbox that built the phases
-could not download Chromium). So read "E2E coverage" below as *specs written*, and
-read `reviews/STATUS-REVIEW.md` (Revisions R1–R2) plus `reviews/P1-self-check.md` …
-`P13-self-check.md` for what each phase's acceptance checks can and cannot point to.
-Known unimplemented spec items are listed in §6 — "fully implemented" was never
-accurate, and this file used to say it.
+Status as of 2026-10-12, branch `h4-spec-features`. This file replaces the 2026-10-09 handoff.
 
-The application is a full-stack Next.js prototype with:
-- **Client-Side State**: Zustand and `localStorage` simulate a backend API and database.
-- **Strict Access Control**: Comprehensive RBAC limits visibility based on hardware tiers, user roles (Kasper Admin vs. Tenant Admin vs. Site User), and active rental grants.
-- **Hardware Simulation**: deterministic, on-demand tracking generation (the
-  Mulberry32 PRNG seeded per tracker IMEI in `src/server/telemetry/simulator.ts`)
-  with working-day patterns, injected gaps, and the scenario overrides §8 wants
-  (GN-01 fuel drop, BD-02 DTC, TP-23 power cut, FB-14 replay). ECU engine hours
-  are computed for the MUC tier. CAN values the simulator does *not* generate
-  (fuel used, RPM, coolant, engine load, AdBlue, DTCs) render as "Not measured" —
-  that is the §4 rule working, not a bug to hide.
-- **Multi-tenant UI**: Full customer dashboard, tracking links, and administrative console.
-- **Internationalization**: Complete Arabic (RTL) localization for customer-facing interfaces.
+## 1. Where things stand
 
-## 2. Codebase Overview
-- `app/`: Next.js App Router for UI views (customer portal, public tracking, admin console).
-- `src/server/`: The "simulated backend".
-  - `src/server/api.ts`: Central permission gateway.
-  - `src/server/access.ts` & `src/server/capabilities.ts`: Enforces strict capability mapping.
-  - `src/server/seed/`: Mulberry32 deterministic random number generator defining 5 tenants, 36 assets, and simulated tracking data.
-  - `src/server/telemetry/`: Live vehicle movement simulator creating trips and CAN reading states.
-- `src/domain/`: Shared types and features. 
-- `tests/e2e/`: Full Playwright E2E coverage mapping exactly to the 50 Scenarios specified in the spec.
+- All 14 phases of `BUILD_PROMPT.md` are in the tree. The H4 (features), H5 (public tracking
+  and verify pages), H6 (CI) and H7 (screenshots, this file) work is done.
+- Checks run in this sandbox on 2026-10-12. Each command below was run and its result is
+  the one shown:
 
-## 3. Local Development
-To run the prototype locally:
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | clean |
+| `npm run lint` | clean |
+| `npm test` under `TZ=UTC` and `TZ=Asia/Dubai` | 697 / 697 passed, 50 files, both zones |
+| `npm run test:coverage` (85 % line floor) | 85.62 % lines, passes |
+| `npx playwright test` (desktop + phone, Chromium) | 253 passed, 0 failed, 75 skipped by design |
+| Screenshots (`tests/e2e/screenshots.spec.ts`) | 26 PNGs in `reviews/screenshots/P14/` |
+
+- **The GitHub Actions run has not happened yet.** The workflow changes below are untested on
+  GitHub. The same commands pass locally, but treat the first CI run as the real check.
+- The 75 skips are intentional: console specs and desktop-only specs skip on the phone
+  project, the phone layout spec and the screenshot spec skip on desktop, and the S18
+  "Onboard a company" test skips below 900 px.
+
+## 2. What changed this round
+
+- **Map (H4.3, H4.6):** labels on assets (create, rename, delete, bulk add and remove);
+  clustering with `leaflet.markercluster`; map filters are kept in the address bar and come back on Back.
+- **Geofences (H4.4):** circle and polygon drawing with `@geoman-io/leaflet-geoman-free`,
+  a radius of 50–5,000 m and 3–30 polygon points, an overlay switch on the map, and events that
+  need the next reading to confirm them.
+- **Settings (H4.5):** Add asset and Add site create records; retire and reinstate work;
+  a site's delete is blocked while anything depends on it; the labels tab.
+- **Demo bar (H4.7):** the bar wraps on a phone instead of hiding its right-hand controls in a
+  scrolling box. The page offset follows the bar's measured height.
+- **Cost & ROI (H4.8):** tagged "Draft".
+- **Verify page (H5.4):** `app/verify/[number]/page.tsx` shows the exact tamper and voided copy;
+  `tests/e2e/certificate.spec.ts` covers the voided-and-replaced path.
+- **Clock fix:** formatted times and dates were shifted by Dubai's offset twice on any machine
+  outside Dubai's time zone, so the same moment could show as 23:00 instead of 19:00. Times are
+  now formatted in Dubai directly, and `isoFromDubai` reads an offset-bearing string as written.
+  Covered by `src/lib/clock.test.ts` under three zones.
+- **Real bugs found by the new tests:** a share link closed the panel before it could be copied
+  (fixed); creating a geofence crashed the page (fixed).
+
+## 3. How to run it
+
 ```bash
-npm install
-npm run dev
+npm ci
+npm run dev                       # http://localhost:3000
+npm test                          # unit tests
+npx playwright install chromium   # once
+npx playwright test               # desktop + phone e2e (CI uses next build && next start)
+npx playwright test tests/e2e/screenshots.spec.ts --project=desktop   # regenerates reviews/screenshots/P14
 ```
-The prototype runs at `http://localhost:3000`. You can sign in using any of the dummy user emails defined in the codebase (e.g., `sara@kasper.ae`, `omar@alnoor.ae`) with *any* password. Use the persistent **Demo Bar** at the top of the UI to easily switch user contexts, test phase-gates, or time-travel through the simulated data.
 
-## 4. Testing
-- **Unit Tests & Types**: `npm test` runs the comprehensive Vitest suite (~91% coverage). `npm run typecheck` and `npm run lint` enforce strict adherence.
-- **E2E Tests**: 15 Playwright files covering Scenarios 1–50 plus the demo shell,
-  billing and certificates live in `tests/e2e/`. Run them via `npm run test:e2e`
-  (needs Chromium). They have **never** been executed — `.github/workflows/ci.yml`
-  is the job that will. Until it is green, treat any selector as unverified.
-- **Selector drift is partially guarded**: `src/e2e-contract.test.ts` runs in
-  `npm test` and fails if a `getByLabel`/`getByRole` name in `tests/e2e` has no
-  matching control in `app/`. It caught three real ones (Settings forms, S19's
-  "Full name"). It cannot judge layout, overflow or RTL.
-- **Coverage**: `npm run test:coverage` enforces an 85 % line floor; the run on
-  2026-10-09 measured **87.97 %** across 329 tests / 29 files.
+Sign in with any dummy user email (for example `sara@kasper.ae`, `omar@alnoor.ae`) and any password.
+The demo bar's "View as" menu switches users.
 
-## 5. Next Steps for Production
-Because this is a prototype, real infrastructure needs to replace the simulated data layer. The next steps for the engineering team taking this over would be:
-1. **Database Integration**: Replace `src/server/store.ts` (currently an in-memory/localStorage mock) with an ORM (e.g., Prisma/Drizzle) mapped to PostgreSQL.
-2. **Real Authentication**: Replace the mock `session` layer with NextAuth or a provider like Auth0/Clerk.
-3. **Telemetry Ingestion**: Hook up Teltonika FMC130 webhooks to feed real GPS/CAN data directly into the application, replacing `src/server/telemetry/`.
-4. **Backend Security**: Ensure `src/server/api.ts` translates identically to real server-side REST/tRPC/GraphQL endpoint guards.
+## 4. CI
 
-## 6. Known Gaps
-- **No green E2E run yet.** `.github/workflows/ci.yml` (added 2026-10-09) installs
-  Chromium and runs the suite against a production build on PRs and `main`; nobody
-  has seen it pass. Expect fixes the first time.
-- **Spec items deliberately left open** (details and evidence in the per-phase
-  self-checks): map filter/search state in the URL (§11.2, `reviews/P5-self-check.md`);
-  the geofence report behind the `report.geofence` capability label
-  (`reviews/P11-self-check.md`); polygon geofence drawing — typed coordinates only,
-  and `@geoman-io/leaflet-geoman-free` is an unused dependency; Settings → Sites /
-  Assets forms that do not create records (§11.8, `reviews/P10-self-check.md`);
-  customer nav that drops Certificates/Billing/Maintenance/Cost for tenants at
-  every width (`reviews/P4-self-check.md`).
-- **No screenshots.** `BUILD_PROMPT.md` §16 wants them per phase; `reviews/screenshots/`
-  does not exist yet.
-- **Deep Translation Review**: The Arabic translations (`public/locales/ar.json`) are currently a first draft and will need review by a native speaker.
+`.github/workflows/ci.yml`:
 
----
-*Generated by Arena Agent — 2026-10-09*
+- `checks`: typecheck, lint, unit tests and the 85 % coverage floor.
+- `e2e`: three matrix shards (`npx playwright test --shard=N/3`), each running desktop and
+  phone. Each shard uploads its own `playwright-report-shard-N` artifact, on success and on failure.
+
+## 5. Known gaps and open decisions
+
+- **Hosting is undecided.** The prototype runs from a production build on a machine. Either a
+  deployment or a run guide for the team is still to be chosen.
+- **Arabic is a first draft.** See section 6. A native reviewer has to check it before it ships.
+- **Not re-verified this round:** the customer nav for tenants (`reviews/P4-self-check.md`
+  flagged that Certificates, Billing and Maintenance can drop out at some widths). Check it on the
+  first walkthrough.
+- **Production work** (from section 5 of the original handoff, unchanged): a real database in
+  place of `src/server/db.ts` and the seed; real authentication in place of the mock session;
+  telemetry ingestion from Teltonika FMC130 trackers in place of `src/server/telemetry/`;
+  server-side enforcement of `src/server/api.ts` as REST, tRPC or GraphQL guards.
+- **Coverage margin is small** (85.62 % against a 85 % floor). New code needs tests with it.
+
+## 6. Draft Arabic keys (`public/locales/ar.json`)
+
+`_meta.status` is "Draft — needs native review". Every Arabic string in the file is a
+first draft, not only the keys below. The list is every key added since the 8 October merge
+(`eb70c32`). The 35 marked *(uncommitted)* were added this round and were not yet in a commit.
+
+- `asset_detail.overview.km`
+- `asset_detail.overview.since_midnight`
+- `asset_detail.overview.tracker_battery`
+- `asset_detail.trips.play`
+- `asset_detail.trips.play_col`
+- `asset_detail.utilisation.day_split`
+- `asset_detail.utilisation.ignition_note`
+- `asset_detail.utilisation.not_billing_grade`
+- `asset_detail.utilisation.source_ignition`
+- `asset_detail.utilisation.split`
+- `cost.roi_calc`
+- `cost.roi_cost_to_date`
+- `cost.roi_cumulative`
+- `cost.roi_drawer_title`
+- `cost.roi_edit_profile`
+- `cost.roi_net`
+- `cost.roi_payback`
+- `cost.roi_payback_months`
+- `cost.roi_percentage`
+- `cost.roi_profile_finance`
+- `cost.roi_profile_insurance`
+- `cost.roi_profile_operator`
+- `cost.roi_profile_purchase`
+- `cost.roi_profile_save`
+- `cost.roi_profile_saved`
+- `cost.roi_profile_title`
+- `cost.roi_purchase_value`
+- `cost.roi_revenue_to_date`
+- `geofences.draw_first` *(uncommitted)*
+- `geofences.draw_hint` *(uncommitted)*
+- `geofences.no_shape` *(uncommitted)*
+- `geofences.radius_hint` *(uncommitted)*
+- `maintenance.confirm_log`
+- `maintenance.confirm_log_success`
+- `maintenance.cost_label`
+- `maintenance.date_label`
+- `maintenance.log_service_reset_note`
+- `maintenance.log_service_title`
+- `maintenance.notes_label`
+- `maintenance.notes_placeholder`
+- `maintenance.plan_basis_label`
+- `maintenance.plan_due_soon_hint`
+- `maintenance.plan_due_soon_label`
+- `maintenance.plan_interval_label`
+- `maintenance.plan_last_done_date`
+- `maintenance.plan_last_done_value`
+- `maintenance.plan_name_label`
+- `maintenance.plan_name_placeholder`
+- `maintenance.plan_save`
+- `maintenance.plan_saved_success`
+- `maintenance.plan_title_edit`
+- `maintenance.plan_title_new`
+- `maintenance.reading_label`
+- `maintenance.tier_note`
+- `map.bulk.add_label` *(uncommitted)*
+- `map.bulk.clear` *(uncommitted)*
+- `map.bulk.label_name` *(uncommitted)*
+- `map.bulk.pick_label` *(uncommitted)*
+- `map.bulk.remove_action` *(uncommitted)*
+- `map.bulk.remove_label` *(uncommitted)*
+- `map.bulk.selected` *(uncommitted)*
+- `map.filters.all_sites` *(uncommitted)*
+- `map.filters.geofences` *(uncommitted)*
+- `map.filters.labels` *(uncommitted)*
+- `map.kpi.litres_short`
+- `reports.pick_label` *(uncommitted)*
+- `reports.scope_label` *(uncommitted)*
+- `settings.assets.add_title` *(uncommitted)*
+- `settings.assets.plate` *(uncommitted)*
+- `settings.assets.reinstate` *(uncommitted)*
+- `settings.assets.starts_as` *(uncommitted)*
+- `settings.assets.tank` *(uncommitted)*
+- `settings.assets.year` *(uncommitted)*
+- `settings.labels.assets` *(uncommitted)*
+- `settings.labels.confirm_delete` *(uncommitted)*
+- `settings.labels.empty` *(uncommitted)*
+- `settings.labels.hint` *(uncommitted)*
+- `settings.labels.name` *(uncommitted)*
+- `settings.labels.title` *(uncommitted)*
+- `settings.sites.add_title` *(uncommitted)*
+- `settings.sites.edit` *(uncommitted)*
+- `settings.sites.no_location` *(uncommitted)*
+- `settings.sites.picked` *(uncommitted)*
+- `settings.sites.search_area` *(uncommitted)*
+- `settings.sites.search_placeholder` *(uncommitted)*
+- `settings.tabs.labels` *(uncommitted)*
+- `settings.users.edit_sites`
+- `shell.not_in_your_role`
+
+## 7. Files to know
+
+- `BUILD_PROMPT.md`: the spec. It wins over this file.
+- `reviews/P<n>-self-check.md` and `reviews/H<n>-self-check.md`: the acceptance evidence per phase and per H item.
+- `reviews/screenshots/P14/`: `<user>-<screen>-<width>.png` at 1440 and 390 px.
+- `docs/demo-script.md` and `docs/test-matrix.md`: the walkthrough and the scenario-to-test map.

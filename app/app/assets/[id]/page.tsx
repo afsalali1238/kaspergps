@@ -9,11 +9,12 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
 import { TripPlayer } from '@/components/playback/TripPlayer';
+import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -431,6 +432,21 @@ export default function AssetDetailPage() {
           <div className="text-sm text-grey-500">
             {site?.name} · {ownerTenant?.name}
           </div>
+          {session && (
+            <AssetLabels
+              labels={labelsOnAsset(session, asset.id).map(l => ({ id: l.id, name: l.name }))}
+              options={labelsVisibleTo(session).map(l => ({ id: l.id, name: l.name }))}
+              canEdit={can(session, 'label.manage', asset.id)}
+              onAdd={choice => {
+                const r = addLabelToAssets(session, choice, [asset.id]);
+                return r.ok ? null : (r.error ?? 'The label could not be added.');
+              }}
+              onRemove={id => {
+                const r = removeLabelFromAssets(session, id, [asset.id]);
+                return r.ok ? null : (r.error ?? 'The label could not be removed.');
+              }}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
@@ -539,7 +555,8 @@ export default function AssetDetailPage() {
           </div>
 
           {panel === 'share' && (
-            <SharePanel asset={asset} onClose={() => setPanel(null)} onDone={message => { showAssetToast('ok', message); setPanel(null); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
+            <SharePanel asset={asset} onClose={() => setPanel(null)} // Stay open: the new link and its suggested message are what the owner needs next.
+            onDone={message => { showAssetToast('ok', message); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
           )}
 
           {panel === 'end' && currentBooking && (

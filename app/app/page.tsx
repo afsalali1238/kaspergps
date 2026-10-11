@@ -3,20 +3,27 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, EmptyState, Skeleton,
   Button, SourceLabel,
 } from '@/components/ui';
-import { useDb, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor, computeStatus } from '@/server/api';
+import { ClusterLayer, escapeHtml, type ClusterMarker } from '@/components/map/ClusterLayer';
+import { FilterMenu } from '@/components/filters/FilterMenu';
+import { LabelCombobox } from '@/components/labels/LabelCombobox';
+import { GeofenceOverlayLayer, type OverlayFence } from '@/components/geofences/GeofenceMap';
+import {
+  useDb, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor, computeStatus,
+  can, labelIdsByAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, visibleGeofences,
+} from '@/server/api';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
-import type { Asset, LatLng } from '@/domain/types';
+import type { Asset, Label, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';
-import { useSession, useSwitches } from '@/hooks';
+import { useSession, useSwitches, useNow } from '@/hooks';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +81,8 @@ interface AssetMarker {
   engineHoursToday: number | null;
   hoursSource: ReturnType<typeof hoursSourceFor>;
   openAlerts: number;
+  /** Labels this viewer may see on the asset (none for a renter). */
+  labels: Label[];
 }
 
 function lastUpdatedStr(asset: Asset, locale: Locale): string {
@@ -125,6 +134,8 @@ export default function MapPage() {
   const href = useHref();
   const locale = useLocale();
   const session = useSession();
+  // The clock moves rentals in and out of view; the memos below re-run on each tick.
+  const now = useNow();
   const { phase } = useSwitches();
   const { showHidden } = useSwitches();
   const { salesView } = useSwitches();
@@ -135,11 +146,68 @@ export default function MapPage() {
   const [selectedTier, setSelectedTier] = useState<'all' | 1 | 2 | 3>('all');
   const [rentedFilter, setRentedFilter] = useState<'all' | 'owned' | 'rented'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [labelVersion, setLabelVersion] = useState(0);
+  const [labelNotice, setLabelNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [urlReady, setUrlReady] = useState(false);
+  const [removeLabelId, setRemoveLabelId] = useState('');
+  const [showGeofences, setShowGeofences] = useState(false);
 
   useEffect(() => {
     setLoading(false);
   }, []);
+
+  // Filters live in the URL (spec §11.2): read them once on arrival, then keep the
+  // address bar in step, so Back to this page brings the same filters back.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const status = q.get('status');
+    if (status && (STATUS_KEYS as readonly string[]).includes(status)) setStatusFilter(status as StatusKey);
+    if (q.get('site')) setSelectedSite(q.get('site'));
+    if (q.get('class')) setSelectedClass(q.get('class'));
+    const tier = q.get('tier');
+    if (tier === '1' || tier === '2' || tier === '3') setSelectedTier(Number(tier) as 1 | 2 | 3);
+    const rented = q.get('rented');
+    if (rented === 'owned' || rented === 'rented') setRentedFilter(rented);
+    if (q.get('q')) setSearchQuery(q.get('q') ?? '');
+    const labels = q.get('labels');
+    if (labels) setSelectedLabelIds(labels.split(',').filter(Boolean));
+    setUrlReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+    const q = new URLSearchParams();
+    if (statusFilter !== 'all') q.set('status', statusFilter);
+    if (selectedSite) q.set('site', selectedSite);
+    if (selectedClass) q.set('class', selectedClass);
+    if (selectedTier !== 'all') q.set('tier', String(selectedTier));
+    if (rentedFilter !== 'all') q.set('rented', rentedFilter);
+    if (searchQuery) q.set('q', searchQuery);
+    if (selectedLabelIds.length) q.set('labels', selectedLabelIds.join(','));
+    const search = q.toString();
+    const next = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(null, '', next);
+  }, [urlReady, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, selectedLabelIds]);
+
+  // Labels: the company's own labels on the assets this viewer can see. Renters get none.
+  const labelMap = useMemo(() => (session ? labelIdsByAsset(session) : new Map<string, string[]>()), [session, labelVersion, now]);
+  const labelOptions = useMemo(() => (session ? labelsVisibleTo(session) : []), [session, labelVersion]);
+  const labelById = useMemo(() => new Map(labelOptions.map(l => [l.id, l])), [labelOptions]);
+  const canLabel = useMemo(() => (session ? can(session, 'label.manage') : false), [session]);
+  const labelsUsedOnVisible = useMemo(() => {
+    const ids = new Set<string>();
+    labelMap.forEach(list => list.forEach(id => ids.add(id)));
+    return labelOptions.filter(l => ids.has(l.id));
+  }, [labelMap, labelOptions]);
+  // Labels on the current selection, offered for removal.
+  const bulkRemovable = useMemo(() => {
+    const ids = new Set<string>();
+    bulkIds.forEach(id => (labelMap.get(id) ?? []).forEach(l => ids.add(l)));
+    return labelOptions.filter(l => ids.has(l.id));
+  }, [bulkIds, labelMap, labelOptions]);
 
   // Open alerts per asset, for the list badges and the "Open alerts" tile.
   // Declared before visibleAssets, which reads it (main crashed here).
@@ -151,7 +219,7 @@ export default function MapPage() {
       counts.set(alert.assetId, (counts.get(alert.assetId) ?? 0) + 1);
     }
     return counts;
-  }, [session, phase]);
+  }, [session, phase, now]);
 
   const visibleAssets: AssetMarker[] = useMemo(() => {
     if (!session) return [];
@@ -174,6 +242,11 @@ export default function MapPage() {
         if (!a.code.toLowerCase().includes(q) && !a.name.toLowerCase().includes(q) && !a.plateOrSerial.toLowerCase().includes(q)) {
           return false;
         }
+      }
+      if (selectedLabelIds.length) {
+        // Any-of: the asset shows if it carries at least one chosen label.
+        const ids = labelMap.get(a.id) ?? [];
+        if (!selectedLabelIds.some(id => ids.includes(id))) return false;
       }
       return true;
     }).map(a => {
@@ -205,9 +278,43 @@ export default function MapPage() {
         engineHoursToday: engineHoursToday(a),
         hoursSource: hoursSourceFor(a),
         openAlerts: openAlerts.get(a.id) ?? 0,
+        labels: (labelMap.get(a.id) ?? []).map(id => labelById.get(id)).filter((l): l is Label => Boolean(l)),
       };
     });
-  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, phase, showHidden, salesView, locale, openAlerts]);
+  }, [session, statusFilter, selectedSite, selectedClass, selectedTier, rentedFilter, searchQuery, selectedLabelIds, phase, showHidden, salesView, locale, openAlerts, now, labelMap, labelById]);
+
+  // The user's geofences, for the optional overlay (spec §11.12).
+  const geofenceOverlay: OverlayFence[] = useMemo(() => {
+    if (!session || !showGeofences) return [];
+    return visibleGeofences(session)
+      .filter(g => (g.shape === 'circle' ? g.center : (g.points?.length ?? 0) >= 3))
+      .map(g => ({
+        id: g.id,
+        name: g.name,
+        colour: g.kind === 'restricted' ? '#D64545' : g.kind === 'site' ? '#1F9A6D' : '#B89000',
+        shape: g.shape === 'circle'
+          ? { type: 'circle' as const, center: g.center!, radiusM: g.radiusM ?? 0 }
+          : { type: 'polygon' as const, points: g.points! },
+      }));
+  }, [session, showGeofences, now, seed.geofences]);
+
+  // Clustered markers (spec §11.2): status-coloured pins merge into count bubbles.
+  const clusterMarkers: ClusterMarker[] = useMemo(() => visibleAssets.map(a => ({
+    id: a.id,
+    lat: a.lat,
+    lng: a.lng,
+    icon: createMarkerIcon(a.status, a.isRentedIn),
+    popupHtml: `<div style="text-align:left;min-width:160px">
+      <div style="font-size:14px;font-weight:600;color:#141518">${escapeHtml(a.code)} <span style="font-size:12px;font-weight:400;color:#6b6e75">— ${escapeHtml(a.name)}</span></div>
+      <div style="font-size:12px;color:#3b3d44;margin-top:4px">${escapeHtml(t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status))}</div>
+      <div style="font-size:12px;color:#6b6e75;margin-top:2px">${escapeHtml(a.lastUpdated)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span style="font-size:11px;color:#6b6e75">T${a.tier}</span>
+        <a href="${escapeHtml(href(`/app/assets/${a.id}`))}" style="font-size:12px;color:#b89000;font-weight:500">${escapeHtml(t('map.open', 'Open'))} →</a>
+      </div>
+      ${a.isRentedIn ? `<div style="font-size:12px;color:#b89000;font-weight:500;margin-top:4px">${escapeHtml(t('common.status.rented', 'Rented'))}</div>` : ''}
+    </div>`,
+  })), [visibleAssets, t, href]);
 
   const visibleOpenAlerts = useMemo(
     () => visibleAssets.reduce((sum, a) => sum + (openAlerts.get(a.id) ?? 0), 0),
@@ -327,7 +434,7 @@ export default function MapPage() {
         <EmptyState
           title={t('map.no_assets_match', 'No assets match these filters')}
           description={t('map.no_assets_match_hint', 'Try clearing some filters to see your assets.')}
-          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); }}>{t('common.clear_filters', 'Clear filters')}</Button>}
+          action={<Button variant="secondary" size="sm" onClick={() => { setStatusFilter('all'); setSelectedSite(null); setSelectedClass(null); setSelectedTier('all'); setRentedFilter('all'); setSearchQuery(''); setSelectedLabelIds([]); }}>{t('common.clear_filters', 'Clear filters')}</Button>}
         />
       ) : (
         <>
@@ -343,56 +450,22 @@ export default function MapPage() {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {visibleAssets.map(a => (
-                <Marker
-                  key={a.id}
-                  position={[a.lat, a.lng]}
-                  icon={createMarkerIcon(a.status, a.isRentedIn)}
-                >
-                  <Popup>
-                    <div className="text-left">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-ink">{a.code}</span>
-                        <span className="text-xs text-grey-500">— {a.name}</span>
-                      </div>
-                      <div className="text-xs text-grey-700 mb-1">{t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status)}</div>
-                      <div className="text-xs text-grey-500 mb-2">{a.lastUpdated}</div>
-                      <div className="flex items-center justify-between">
-                        <TierChip tier={a.tier} />
-                        <Link
-                          href={href(`/app/assets/${a.id}`)}
-                          className="text-xs text-yellow hover:text-ink font-medium"
-                        >
-                          {t('map.open', 'Open')} <span className="arrow-forward">→</span>
-                        </Link>
-                      </div>
-                      {a.isRentedIn && (
-                        <div className="mt-1 text-xs text-yellow font-medium">{t('common.status.rented', 'Rented')}</div>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
+              <ClusterLayer markers={clusterMarkers} />
+              {showGeofences && <GeofenceOverlayLayer fences={geofenceOverlay} />}
               <MapBoundsUpdater assets={visibleAssets} />
             </MapContainer>
           </div>
 
           {/* Filters */}
           {siteOptions.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-grey-500 font-medium">{t('map.filters.site', 'Site:')}</span>
-              {siteOptions.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedSite(selectedSite === s.id ? null : s.id)}
-                  className={clsx(
-                    'px-2 py-1 text-xs rounded-lg border transition-colors capitalize',
-                    selectedSite === s.id ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                  )}
-                >
-                  {s.name}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2 items-center">
+              <FilterMenu
+                label={t('map.filters.site', 'Site:')}
+                value={selectedSite}
+                allLabel={t('map.filters.all_sites', 'All sites')}
+                options={siteOptions.map(s => ({ value: s.id, label: s.name }))}
+                onChange={setSelectedSite}
+              />
             </div>
           )}
           {classOptions.length > 1 && (
@@ -421,6 +494,41 @@ export default function MapPage() {
               <TierFilterButton label="T3" selected={selectedTier === 3} onClick={() => setSelectedTier(3)} tier={3} />
             </div>
           )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-pressed={showGeofences}
+              onClick={() => setShowGeofences(v => !v)}
+              className={clsx(
+                'px-2 py-1 text-xs rounded-lg border transition-colors',
+                showGeofences ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+              )}
+            >
+              {t('map.filters.geofences', 'Geofences')}
+            </button>
+          </div>
+          {labelsUsedOnVisible.length > 0 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Labels">
+              <span className="text-xs text-grey-500 font-medium">{t('map.filters.labels', 'Labels:')}</span>
+              {labelsUsedOnVisible.map(l => {
+                const on = selectedLabelIds.includes(l.id);
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSelectedLabelIds(on ? selectedLabelIds.filter(x => x !== l.id) : [...selectedLabelIds, l.id])}
+                    className={clsx(
+                      'px-2 py-1 text-xs rounded-lg border transition-colors',
+                      on ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                    )}
+                  >
+                    {l.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {hasRented && (
             <div className="flex flex-wrap gap-2">
               <span className="text-xs text-grey-500 font-medium">{t('map.filters.show', 'Show:')}</span>
@@ -446,14 +554,74 @@ export default function MapPage() {
             <button onClick={() => setSearchQuery('')} className="text-xs text-grey-500 hover:text-ink">{t('common.clear_search', 'Clear search')}</button>
           )}
 
+          {labelNotice && (
+            <p role={labelNotice.tone === 'error' ? 'alert' : 'status'} className={clsx('text-xs px-3 py-2 rounded-lg border', labelNotice.tone === 'error' ? 'text-red border-red/40 bg-red/5' : 'text-ink border-yellow-dark/40 bg-yellow/10')}>
+              {labelNotice.text}
+            </p>
+          )}
+
+          {canLabel && bulkIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg border border-line bg-paper-2 text-xs" role="region" aria-label="Bulk actions">
+              <span className="font-medium text-ink">{t('map.bulk.selected', '{count} selected', { count: bulkIds.length })}</span>
+              <LabelCombobox
+                options={labelOptions.map(l => ({ id: l.id, name: l.name }))}
+                buttonLabel={t('map.bulk.add_label', 'Add label')}
+                placeholder={t('map.bulk.label_name', 'Label name')}
+                onChoose={choice => {
+                  const result = addLabelToAssets(session, choice, bulkIds);
+                  setLabelNotice({ tone: result.ok ? 'ok' : 'error', text: (result.ok ? result.message : result.error) ?? '' });
+                  if (result.ok) setLabelVersion(v => v + 1);
+                }}
+              />
+              {bulkRemovable.length > 0 && (
+                <>
+                  <label className="flex items-center gap-1 text-grey-500">
+                    <span className="sr-only">{t('map.bulk.remove_label', 'Remove label')}</span>
+                    <select
+                      aria-label={t('map.bulk.remove_label', 'Remove label')}
+                      value={removeLabelId}
+                      onChange={e => setRemoveLabelId(e.target.value)}
+                      className="px-2 py-1 rounded-lg border border-line bg-paper text-grey-700"
+                    >
+                      <option value="">{t('map.bulk.pick_label', 'Pick a label')}</option>
+                      {bulkRemovable.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </label>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!removeLabelId}
+                    onClick={() => {
+                      const result = removeLabelFromAssets(session, removeLabelId, bulkIds);
+                      setLabelNotice({ tone: result.ok ? 'ok' : 'error', text: (result.ok ? result.message : result.error) ?? '' });
+                      if (result.ok) { setLabelVersion(v => v + 1); setRemoveLabelId(''); }
+                    }}
+                  >
+                    {t('map.bulk.remove_action', 'Remove label')}
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => setBulkIds([])}>{t('map.bulk.clear', 'Clear selection')}</Button>
+            </div>
+          )}
+
           {/* List panel */}
           <div className="rounded-xl border border-line bg-surface overflow-hidden max-h-[360px] overflow-y-auto mt-2">
             <div className="divide-y divide-line">
               {visibleAssets.map(a => (
+                <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-paper-2/50 transition-colors">
+                {canLabel && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${a.code}`}
+                    checked={bulkIds.includes(a.id)}
+                    onChange={e => setBulkIds(ids => (e.target.checked ? [...ids, a.id] : ids.filter(x => x !== a.id)))}
+                    className="accent-yellow flex-shrink-0"
+                  />
+                )}
                 <Link
-                  key={a.id}
                   href={href(`/app/assets/${a.id}`)}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-paper-2/50 transition-colors"
+                  className="flex flex-1 min-w-0 items-center gap-3"
                 >
                   <div className={clsx(
                     'w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-semibold border',
@@ -473,6 +641,13 @@ export default function MapPage() {
                     <div className="text-xs text-grey-500 mt-0.5">
                       {a.siteName} · {a.lastUpdated}
                     </div>
+                    {a.labels.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {a.labels.map(l => (
+                          <span key={l.id} className="px-1.5 py-0.5 rounded border border-line bg-paper text-[10px] text-grey-700">{l.name}</span>
+                        ))}
+                      </div>
+                    )}
                     {phase !== 'day_one' && (a.fuelPct !== null || a.engineHoursToday !== null || a.openAlerts > 0) && (
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-grey-500 mt-1">
                         {a.fuelPct !== null && (
@@ -509,6 +684,7 @@ export default function MapPage() {
                     </span>
                   </div>
                 </Link>
+                </div>
               ))}
             </div>
           </div>

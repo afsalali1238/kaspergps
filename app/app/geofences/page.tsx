@@ -8,6 +8,7 @@ import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
 import { useDb, isAssetVisible, visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence, can } from '@/server/api';
+import { GeofenceEditor, type ShapeValue, type OverlayFence } from '@/components/geofences/GeofenceMap';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -34,9 +35,9 @@ export default function GeofencesPage() {
   // Create form state
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'site' | 'job' | 'yard' | 'restricted'>('job');
-  const [centerLat, setCenterLat] = useState('25.1972');
-  const [centerLng, setCenterLng] = useState('55.2744');
-  const [radiusM, setRadiusM] = useState('500');
+  // The shape is drawn on the map (circle or polygon, §11.12); the radius field edits a circle.
+  const [shape, setShape] = useState<ShapeValue | null>({ type: 'circle', center: { lat: 25.1972, lng: 55.2744 }, radiusM: 500 });
+  const [radiusText, setRadiusText] = useState('500');
   const [alertEnter, setAlertEnter] = useState(false);
   const [alertExit, setAlertExit] = useState(true);
   const [scope, setScope] = useState<'all' | string>('all');
@@ -52,6 +53,17 @@ export default function GeofencesPage() {
     [session, version]
   );
   const canManage = session ? can(session, 'geofence.manage') : false;
+  // Existing fences, drawn dashed behind the editor, in a colour per kind.
+  const overlay: OverlayFence[] = geofences
+    .filter(g => g.shape === 'circle' ? g.center : (g.points?.length ?? 0) >= 3)
+    .map(g => ({
+      id: g.id,
+      name: g.name,
+      colour: g.kind === 'restricted' ? '#D64545' : g.kind === 'site' ? '#1F9A6D' : '#B89000',
+      shape: g.shape === 'circle'
+        ? { type: 'circle' as const, center: g.center!, radiusM: g.radiusM ?? 0 }
+        : { type: 'polygon' as const, points: g.points! },
+    }));
 
   if (!session) return null;
 
@@ -62,11 +74,14 @@ export default function GeofencesPage() {
 
   const handleCreate = () => {
     setFormError(null);
+    if (!shape) {
+      setFormError(t('geofences.draw_first', 'Draw a circle or a polygon on the map.'));
+      return;
+    }
     const result = createGeofence(session, {
       name,
       kind,
-      center: { lat: Number(centerLat), lng: Number(centerLng) },
-      radiusM: Number(radiusM),
+      shape,
       alertOnEnter: alertEnter,
       alertOnExit: alertExit,
       assetIds: scope === 'all' ? 'all' : [scope],
@@ -145,37 +160,32 @@ export default function GeofencesPage() {
                     <option value="restricted">{t('geofences.kinds.restricted', 'Restricted')}</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label htmlFor="gf-lat" className="text-xs text-grey-500 font-medium">{t('geofences.center_lat', 'Centre latitude')}</label>
-                    <input
-                      id="gf-lat"
-                      type="text"
-                      value={centerLat}
-                      onChange={e => setCenterLat(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 font-mono focus:outline-none focus:border-ink"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="gf-lng" className="text-xs text-grey-500 font-medium">{t('geofences.center_lng', 'Centre longitude')}</label>
-                    <input
-                      id="gf-lng"
-                      type="text"
-                      value={centerLng}
-                      onChange={e => setCenterLng(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 font-mono focus:outline-none focus:border-ink"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="gf-radius" className="text-xs text-grey-500 font-medium">{t('geofences.radius', 'Radius (m)')}</label>
-                    <input
-                      id="gf-radius"
-                      type="text"
-                      value={radiusM}
-                      onChange={e => setRadiusM(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 font-mono focus:outline-none focus:border-ink"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-grey-500 font-medium">{t('geofences.shape', 'Shape')}</div>
+                  <p className="text-xs text-grey-500">
+                    {t('geofences.draw_hint', 'Use the toolbar on the map to draw a circle or polygon (3–30 points). Drag or edit the points, or remove the shape.')}
+                  </p>
+                  <GeofenceEditor shape={shape} onChange={next => { setShape(next); if (next?.type === 'circle') setRadiusText(String(next.radiusM)); }} overlay={overlay} />
+                  {shape?.type === 'circle' && (
+                    <div>
+                      <label htmlFor="gf-radius" className="text-xs text-grey-500 font-medium">{t('geofences.radius', 'Radius (m)')}</label>
+                      <input
+                        id="gf-radius"
+                        type="number"
+                        min={50}
+                        max={5000}
+                        value={radiusText}
+                        onChange={e => {
+                          setRadiusText(e.target.value);
+                          const n = Number(e.target.value);
+                          if (Number.isFinite(n) && n > 0) setShape({ ...shape, radiusM: n });
+                        }}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 font-mono focus:outline-none focus:border-ink"
+                      />
+                      <p className="text-[11px] text-grey-500 mt-1">{t('geofences.radius_hint', '50 to 5,000 m')}</p>
+                    </div>
+                  )}
+                  {!shape && <p className="text-xs text-grey-500">{t('geofences.no_shape', 'No shape yet. Draw one on the map.')}</p>}
                 </div>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 text-xs text-grey-700">

@@ -69,33 +69,22 @@ export function resetOffset(): void {
 }
 
 export function setDubaiTime(iso: string): void {
-  const d = new Date(iso);
-  const anchorDate = fromZonedTime(d, DUBAI_TZ);
-  setAnchor(anchorDate.getTime());
-  _offsetMs = 0;
+  setAnchor(isoFromDubai(iso));
 }
 
 export function dubaiMsToDate(ms: number): Date {
   return toZonedTime(new Date(ms), DUBAI_TZ);
 }
 
+// formatInTimeZone formats the instant in Dubai directly. Converting to a
+// "Dubai-shaped" Date first and then formatting with a Dubai zone would shift the
+// time twice on any machine outside Dubai.
 export function formatDubaiTime(ms: number): string {
-  const d = toZonedTime(new Date(ms), DUBAI_TZ);
-  return d.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: DUBAI_TZ,
-  });
+  return formatInTimeZone(new Date(ms), DUBAI_TZ, 'HH:mm');
 }
 
 export function formatDubaiDate(ms: number): string {
-  const d = toZonedTime(new Date(ms), DUBAI_TZ);
-  return d.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: DUBAI_TZ,
-  });
+  return formatInTimeZone(new Date(ms), DUBAI_TZ, 'd MMM');
 }
 
 /** Machine-readable Dubai calendar day (YYYY-MM-DD) — use this for keys, never formatDubaiDate. */
@@ -113,8 +102,14 @@ export function dubaiToIso(ms: number): string {
   return formatInTimeZone(new Date(ms), DUBAI_TZ, "yyyy-MM-dd'T'HH:mm:ssXXX");
 }
 
+/**
+ * The instant for a Dubai wall-clock string. Dubai has no daylight saving, so a
+ * string without an offset is read at +04:00; one with an offset is taken as written.
+ * Parsing the offset ourselves keeps this the same on every machine time zone.
+ */
 export function isoFromDubai(iso: string): number {
-  return fromZonedTime(new Date(iso), DUBAI_TZ).getTime();
+  const hasOffset = /(Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+  return Date.parse(hasOffset ? iso : `${iso}+04:00`);
 }
 
 export function startOfDubaiDay(ms: number): number {

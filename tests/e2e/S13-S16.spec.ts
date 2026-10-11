@@ -12,11 +12,12 @@ test.describe('S13 — Omar: share FB-12, then revoke', () => {
     await page.getByRole('button', { name: 'Share tracking link' }).click();
     await expect(page.getByRole('heading', { name: 'Share tracking link' })).toBeVisible();
     await page.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(page.getByText('Link created.')).toBeVisible();
+    // The toast spells out the effect and the expiry (spec 11.x: "toasts spell out their effect").
+    await expect(page.getByText(/^FB-12 link created — expires /)).toBeVisible();
     await expect(page.getByText(/^Track FB-12 live: /)).toBeVisible();
 
     await page.getByRole('button', { name: 'Revoke' }).first().click();
-    await expect(page.getByText('Link revoked.')).toBeVisible();
+    await expect(page.getByText(/^FB-12 link revoked\.$/)).toBeVisible();
   });
 });
 

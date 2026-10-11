@@ -51,6 +51,19 @@ export function DemoBar() {
     return () => { delete document.body.dataset.demoCollapsed; };
   }, [publicPage, pillExpanded]);
 
+  // The bar wraps onto more rows on a phone, so its real height (not a fixed 36 px)
+  // sets the offset the page and the sticky header sit below.
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const sync = () => document.documentElement.style.setProperty('--demo-bar-h', `${el.offsetHeight}px`);
+    sync();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [publicPage, pillExpanded]);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(false);
@@ -125,7 +138,7 @@ export function DemoBar() {
   }
 
   return (
-    <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: 'var(--demo-bar-h)' }}>
+    <div ref={barRef} className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
       {/* DEMO tag */}
       <span className="demo-tag flex-shrink-0 text-[9px]">DEMO</span>
 

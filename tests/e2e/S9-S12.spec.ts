@@ -11,7 +11,8 @@ test.describe('S9 — Deepa: two sites, a fuel-drop alert', () => {
     await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
     await expect(page.getByText(/Fuel dropped/).first()).toBeVisible();
     // A Site User is read-only: no Acknowledge button anywhere.
-    await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
+    // exact: the "Acknowledged" status tab would otherwise match.
+    await expect(page.getByRole('button', { name: 'Acknowledge', exact: true })).toHaveCount(0);
     // The site name travels with the alert line.
     await expect(page.getByText(/^Since /).first()).toBeVisible();
   });

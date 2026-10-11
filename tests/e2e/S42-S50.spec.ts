@@ -65,7 +65,7 @@ test.describe('S47 — transferring CP-03', () => {
     await page.waitForURL(/\/console\/assets\//);
     await page.getByRole('button', { name: 'Transfer' }).click();
     await expect(page.getByText('Transfer to another tenant')).toBeVisible();
-    await expect(page.getByText(/report-only from the transfer date/)).toBeVisible();
+    await expect(page.getByText(/report-only from the transfer date/).first()).toBeVisible();
   });
 });
 

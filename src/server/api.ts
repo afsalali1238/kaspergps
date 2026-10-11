@@ -204,6 +204,8 @@ export { searchAssets } from './search';
 export { createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole, updateUserSites } from './team';
 export { computeStatus, getReadingForAsset, getReadingsForAsset } from './telemetry/simulator';
 export { createTenant, suspendTenant, unsuspendTenant, updateTenant } from './tenants';
+export { createAsset, createSite, deleteSite, reinstateAsset, retireAsset, transferAsset, updateSite } from './asset-admin';
+export { addLabelToAssets, deleteLabel, labelIdsByAsset, labelUsage, labelsOnAsset, labelsVisibleTo, removeLabelFromAssets, renameLabel } from './labels';
 export { assetsWithoutTracker, currentPairingForTracker, currentTrackerForAsset, markTrackerFaulty, pairTracker, pairingHistory, pairingTargetsFor, registerTracker, retireTracker, stockTrackers, unpairTracker, updateTrackerSettings } from './trackers';
 export { activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink } from './tracking-links';
 export { detectTrips } from './trips';

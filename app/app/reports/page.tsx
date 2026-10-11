@@ -8,7 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Button, EmptyState } from '@/components/ui';
-import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can } from '@/server/api';
+import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo } from '@/server/api';
 import * as clock from '@/lib/clock';
 
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
@@ -21,7 +21,7 @@ const DATE_PRESETS: { key: string; label: string; days: number }[] = [
   { key: 'last_30d', label: 'Last 30 days', days: 30 },
 ];
 
-type ScopeType = 'single_asset' | 'multiple_assets' | 'site';
+type ScopeType = 'single_asset' | 'multiple_assets' | 'site' | 'label';
 
 export default function ReportsPage() {
   const seed = useDb(s => s);
@@ -33,6 +33,7 @@ export default function ReportsPage() {
   const [scope, setScope] = useState<ScopeType>('multiple_assets');
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [siteId, setSiteId] = useState<string>('');
+  const [labelId, setLabelId] = useState<string>('');
   const [format, setFormat] = useState<'xlsx' | 'pdf'>('xlsx');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -48,10 +49,15 @@ export default function ReportsPage() {
 
   const assets = useMemo(() => (session ? reportableAssets(session) : []), [session]);
 
+  // "Assets with label …" (spec §11.11): the scope is the assets this viewer can see that carry the label.
+  const labelOptions = useMemo(() => (session ? labelsVisibleTo(session) : []), [session]);
+  const labelMap = useMemo(() => (session ? labelIdsByAsset(session) : new Map<string, string[]>()), [session]);
+
   const scopeAssetIds = useMemo(() => {
     if (scope === 'site') return assets.filter(a => a.homeSiteId === siteId).map(a => a.id);
+    if (scope === 'label') return assets.filter(a => (labelMap.get(a.id) ?? []).includes(labelId)).map(a => a.id);
     return selectedAssetIds;
-  }, [scope, siteId, selectedAssetIds, assets]);
+  }, [scope, siteId, labelId, labelMap, selectedAssetIds, assets]);
 
   // §11.5: a report type is listed only if at least one selected (or visible)
   // asset supports it, and the phase allows it.
@@ -182,7 +188,7 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="text-sm font-medium text-ink mb-2">{t('reports.scope', 'Scope')}</div>
           <div className="flex flex-wrap gap-2">
-            {(['single_asset', 'multiple_assets', 'site'] as ScopeType[]).map(s => (
+            {(['single_asset', 'multiple_assets', 'site', ...(labelOptions.length > 0 ? ['label' as const] : [])] as ScopeType[]).map(s => (
               <button
                 key={s}
                 onClick={() => setScope(s)}
@@ -193,12 +199,23 @@ export default function ReportsPage() {
               >
                 {s === 'single_asset' ? t('reports.scope_single', 'Single asset')
                   : s === 'multiple_assets' ? t('reports.scope_multiple', 'Multiple assets')
+                  : s === 'label' ? t('reports.scope_label', 'Assets with label')
                   : t('reports.scope_site', 'Site')}
               </button>
             ))}
           </div>
 
-          {scope === 'site' ? (
+          {scope === 'label' ? (
+            <select
+              aria-label={t('reports.scope_label', 'Assets with label')}
+              value={labelId}
+              onChange={e => setLabelId(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-ink"
+            >
+              <option value="">{t('reports.pick_label', 'Pick a label')}</option>
+              {labelOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          ) : scope === 'site' ? (
             <select
               value={siteId}
               onChange={e => setSiteId(e.target.value)}

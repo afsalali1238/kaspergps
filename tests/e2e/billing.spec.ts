@@ -50,7 +50,7 @@ test.describe('S34 — the customer pays (simulated)', () => {
     await page.getByRole('button', { name: 'Confirm payment' }).click();
 
     await expect(page.getByText('Paid', { exact: false }).first()).toBeVisible();
-    await expect(page.getByRole('row', { name: new RegExp(number) }).first().getByText('Paid')).toBeVisible();
+    await expect(page.getByRole('row', { name: new RegExp(number) }).first().getByText('Paid', { exact: true }).first()).toBeVisible();
   });
 
   test('the received tab links the certificate that backs the hours', async ({ page }) => {
