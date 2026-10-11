@@ -203,3 +203,21 @@ describe('access — getRelationship', () => {
     expect(access.getRelationship(s, 'a-ex07')).toBe('none');
   });
 });
+
+describe('access — historyFloor (spec 11.3)', () => {
+  it('a renter is floored at the start of their active rental', () => {
+    const s = sessionFor('u-lina');
+    const booking = db.getState().bookings.find(b => b.id === 'b-1001')!;
+    expect(access.historyFloor(s, 'a-ex04')).toBe(new Date(booking.start).getTime());
+  });
+
+  it('an owner has no floor on their own asset', () => {
+    const s = sessionFor('u-khalid');
+    expect(access.historyFloor(s, 'a-ex04')).toBeNull();
+  });
+
+  it('a company with no rental of the asset has no floor', () => {
+    const s = sessionFor('u-omar');
+    expect(access.historyFloor(s, 'a-ex04')).toBeNull();
+  });
+});

@@ -9,11 +9,12 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
 import { TripPlayer } from '@/components/playback/TripPlayer';
+import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
@@ -262,12 +263,8 @@ export default function AssetDetailPage() {
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);
   const reading = useMemo(() => asset ? getReadingForAsset(asset) : null, [asset]);
 
-  // Real telemetry-backed tab data (never fabricated).
-  const historyRows = useMemo(() => {
-    if (!asset) return [];
-    const end = clock.now();
-    return getReadingsForAsset(asset, end - 24 * 3600_000, end).slice(-24);
-  }, [asset]);
+  // Earliest history a renter may see (spec 11.3); null for owners.
+  const historyFloorMs = useMemo(() => (asset && session ? historyFloor(session, asset.id) : null), [asset, session]);
 
   // Today's distance and ignition-on time (spec 11.3 Overview).
   const today = useMemo(() => (asset ? todayFor(asset) : null), [asset]);
@@ -854,50 +851,13 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {shownTab === 'history' && (
-        <div className="space-y-4">
-          <div className="bg-surface border border-line rounded-lg p-4">
-            <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.history.positions', 'Positions')}</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-line">
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.time', 'Time')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.speed', 'Speed')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.ignition', 'Ignition')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.heading', 'Heading')}</th>
-                    {asset.canProfile.supported.includes('fuelLevel') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.fuel_pct', 'Fuel %')}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyRows.length > 0 ? (
-                    historyRows.map(r => (
-                      <tr key={r.deviceTime} className="border-b border-line">
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {clock.formatDubaiDateTime(new Date(r.deviceTime).getTime())}
-                        </td>
-                        <td className="px-3 py-2 font-mono">{r.speedKmh.toFixed(0)} km/h</td>
-                        <td className="px-3 py-2">{r.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
-                        <td className="px-3 py-2 font-mono">{Math.round(r.heading)}°</td>
-                        {asset.canProfile.supported.includes('fuelLevel') && (
-                          <td className="px-3 py-2 font-mono">
-                            {r.fuelLevelPct !== undefined ? `${r.fuelLevelPct.toFixed(0)}%` : '—'}
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">{t('common.no_data', 'No data')}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+      {shownTab === 'history' && asset && (
+        <HistoryPanel
+          supported={asset.canProfile.supported}
+          nowMs={clock.now()}
+          floorMs={historyFloorMs}
+          readingsFor={(from, to) => getReadingsForAsset(asset, from, to)}
+        />
       )}
 
       {shownTab === 'trips' && (

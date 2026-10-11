@@ -170,7 +170,7 @@ export type { Session };
 // Screens (app/** and src/components/**) import server code only from this file
 // (architecture test, rule 6). Every function below enforces its own access check
 // through can(); this file is a list of re-exports, not a second permission layer.
-export { anyAssetHasFeature, getRelationship, isAssetVisible, visibleAssetIds } from './access';
+export { anyAssetHasFeature, getRelationship, historyFloor, isAssetVisible, visibleAssetIds } from './access';
 export { ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fitAdapter, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, stockAdapters } from './adapters';
 export { acknowledgeAlert, alertTypesIn, bellAlerts, visibleAlerts } from './alerts';
 export type { AlertView } from './alerts';

@@ -40,3 +40,43 @@ Not built yet in H4.1 (spec items still open):
 ## Known gaps
 - No e2e or screenshot evidence for any H4 item, including the already-merged "done" items. Treat as unproven.
 - Stale branches arena/* and Windows-clone uncommitted files untouched, per handoff.
+
+# H4.2 — History tab (§11.3)
+
+Commands (each run on its own, exit codes checked):
+| Command | Result |
+| --- | --- |
+| npm run typecheck | pass |
+| npm run lint | pass |
+| npm run build | pass |
+| TZ=UTC npx vitest run | pass, 629/629 (before access tests: 616 → 629 with history tests; +3 access tests included) |
+| TZ=Asia/Dubai npx vitest run | pass, 629/629 |
+| npm run test:e2e | NOT RUN (browser download blocked) |
+
+Built:
+- Period picker: 24 h (default), 7 days, Custom (Dubai time inputs).
+- Renter floor: `historyFloor(session, assetId)` in src/server/access.ts, exported through api.ts (gated: first parameter is Session). A range starting before the floor is clamped and labelled "History starts …"; a range wholly before it shows "No history before your rental window."
+- Track on map, split at gaps (no line bridges a gap).
+- Positions table: time, speed, ignition, heading, plus CAN columns the asset supports (fuel %, fuel rate, RPM, coolant, load, AdBlue). Unsupported columns are not shown; a supported field that is missing on a row shows "Not measured".
+- Gap rows: "No data 13:05 – 15:40" in time order, no interpolation.
+- Shows 100 rows at a time with "Show more".
+
+Decisions made without the spec saying so (review these):
+- Custom ranges capped at 31 days, to bound one query.
+- Gap rows only for silences of at least 60 s, so leading seconds before the first reading are not shown.
+- Table paginates at 100 rows.
+- The fuel-rate column is included as a CAN column (spec lists fuel %, RPM, coolant, load).
+
+Not built in H4.2:
+- "Play this period" button in History (the playback player exists; it is not yet launched from History).
+- Event pins on the track.
+- Positions table is not sorted or exportable.
+
+Acceptance checks:
+| Check | Status |
+| --- | --- |
+| Renter cannot pick before window | Pass (unit: clamp and refusal); not browser-verified |
+| Track breaks at gaps | Pass (unit via trailUntil split) |
+| Gap rows present | Pass (unit) |
+| Screenshots 1440 px and 390 px | NOT DONE |
+| Playwright scenarios | NOT RUN |
