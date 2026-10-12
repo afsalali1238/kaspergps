@@ -183,6 +183,8 @@ export { canManageBookings, cancelBooking, closeBooking, createBooking, endEarly
 export { can, hasRole, isFeatureVisible, isKasperStaff } from './capabilities';
 export type { Capability } from './capabilities';
 export { reasonFor } from './capability-reasons';
+export { ALL_CAPABILITIES, CAPABILITY_GROUPS, CAPABILITY_LABELS, ROLE_PURPOSE, ROLE_WORDS, capabilityLabel, capabilityRows, featureAvailability, rightNowCounts, scopeWords, siteWords, tierOf, tierSummary } from './capability-catalog';
+export type { CapabilityGroup, CapabilityRow, FeatureRow, Relationship, RightNowCounts, Tier, TierSummary } from './capability-catalog';
 export { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice } from './cost';
 export type { AssetCostRow, CostPeriod } from './cost';
 export { append, hydrateDb, nextRowNumber, useDb } from './db';
@@ -211,6 +213,6 @@ export { addLabelToAssets, deleteLabel, labelIdsByAsset, labelUsage, labelsOnAss
 export { assetsWithoutTracker, currentPairingForTracker, currentTrackerForAsset, markTrackerFaulty, pairTracker, pairingHistory, pairingTargetsFor, registerTracker, retireTracker, stockTrackers, unpairTracker, updateTrackerSettings } from './trackers';
 export { activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink } from './tracking-links';
 export { detectTrips } from './trips';
-export { engineHoursToday, fleetTodayTotals, hoursSourceFor, last7DaysIgnition, todayFor, fuelToday, showsUtilisation, buildIgnitionBreakdown } from './utilisation';
-export type { FleetTodayTotals, HoursSource, IgnitionBreakdown, TodayView, FuelToday } from './utilisation';
+export { engineHoursToday, fleetTodayTotals, hoursSourceFor, last7DaysIgnition, todayFor, fuelToday, fuelWeekFor, showsUtilisation, buildIgnitionBreakdown } from './utilisation';
+export type { FleetTodayTotals, HoursSource, IgnitionBreakdown, TodayView, FuelToday, FuelWeek, FuelWeekDay } from './utilisation';
 export { viewAsGroups } from './view-as';

@@ -154,6 +154,8 @@ export default function MapPage() {
   const [urlReady, setUrlReady] = useState(false);
   const [removeLabelId, setRemoveLabelId] = useState('');
   const [showGeofences, setShowGeofences] = useState(false);
+  // Phones show one of the map or the list (spec §11.2). Desktop shows both.
+  const [phoneView, setPhoneView] = useState<'map' | 'list'>('list');
   // Map tiles: after three failed tiles in a row the map steps aside, so the list
   // takes the screen. A Retry remounts the map.
   const [tilesFailed, setTilesFailed] = useState(false);
@@ -447,40 +449,28 @@ export default function MapPage() {
         />
       ) : (
         <>
-          {/* Map */}
-          {tilesFailed && (
-            <div role="alert" className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg border border-red/40 bg-red/5 text-xs text-ink">
-              <span>{t('map.tiles_failed', 'The map could not load. Every asset is still in the list below.')}</span>
-              <Button size="sm" variant="secondary" onClick={() => { tileErrors.current = 0; setTilesFailed(false); setMapKey(k => k + 1); }}>
-                {t('common.retry', 'Retry')}
-              </Button>
-            </div>
-          )}
-          <div className={clsx('rounded-xl border border-line bg-paper overflow-hidden h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px]', tilesFailed && 'hidden')}>
-            <MapContainer
-              key={mapKey}
-              center={[25.2048, 55.2708]}
-              zoom={10}
-              scrollWheelZoom={true}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                eventHandlers={{
-                  tileerror: () => {
-                    tileErrors.current += 1;
-                    if (tileErrors.current >= 3) setTilesFailed(true);
-                  },
-                  tileload: () => { tileErrors.current = 0; },
-                }}
-              />
-              <ClusterLayer markers={clusterMarkers} />
-              {showGeofences && <GeofenceOverlayLayer fences={geofenceOverlay} />}
-              <MapBoundsUpdater assets={visibleAssets} />
-            </MapContainer>
+          {/* Map | List on phones (spec §11.2). The list is the phone default so the
+              assets are on screen without a tap; the map is one tap away. */}
+          <div className="lg:hidden flex gap-1" role="tablist" aria-label="Map or list">
+            {(['map', 'list'] as const).map(view => (
+              <button
+                key={view}
+                type="button"
+                role="tab"
+                aria-selected={phoneView === view}
+                onClick={() => setPhoneView(view)}
+                className={clsx(
+                  'px-3 py-1.5 text-xs rounded-lg border transition-colors',
+                  phoneView === view ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                )}
+              >
+                {view === 'map' ? t('map.map_tab', 'Map') : t('map.list_tab', 'List')}
+              </button>
+            ))}
           </div>
 
+          {/* Filters: above the map and the list on desktop (spec §11.2). */}
+          <div className={clsx('space-y-3', phoneView === 'map' && 'hidden lg:block')} data-testid="map-filters">
           {/* Filters */}
           {siteOptions.length > 1 && (
             <div className="flex flex-wrap gap-2 items-center">
@@ -630,8 +620,48 @@ export default function MapPage() {
             </div>
           )}
 
+          </div>
+
+          <div className={clsx('lg:items-start lg:gap-4', tilesFailed ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_22rem]')}>
+            <div className={clsx(phoneView === 'list' && 'hidden lg:block')}>
+          {/* Map */}
+          {tilesFailed && (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg border border-red/40 bg-red/5 text-xs text-ink">
+              <span>{t('map.tiles_failed', 'The map could not load. Every asset is still in the list below.')}</span>
+              <Button size="sm" variant="secondary" onClick={() => { tileErrors.current = 0; setTilesFailed(false); setMapKey(k => k + 1); }}>
+                {t('common.retry', 'Retry')}
+              </Button>
+            </div>
+          )}
+          <div className={clsx('rounded-xl border border-line bg-paper overflow-hidden h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px]', tilesFailed && 'hidden')}>
+            <MapContainer
+              key={mapKey}
+              center={[25.2048, 55.2708]}
+              zoom={10}
+              scrollWheelZoom={true}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                eventHandlers={{
+                  tileerror: () => {
+                    tileErrors.current += 1;
+                    if (tileErrors.current >= 3) setTilesFailed(true);
+                  },
+                  tileload: () => { tileErrors.current = 0; },
+                }}
+              />
+              <ClusterLayer markers={clusterMarkers} />
+              {showGeofences && <GeofenceOverlayLayer fences={geofenceOverlay} />}
+              <MapBoundsUpdater assets={visibleAssets} />
+            </MapContainer>
+          </div>
+
+            </div>
+            <div className={clsx('mt-2 lg:mt-0', phoneView === 'map' && 'hidden lg:block')}>
           {/* List panel */}
-          <div className="rounded-xl border border-line bg-surface overflow-hidden max-h-[360px] overflow-y-auto mt-2">
+          <div data-testid="asset-list" className="rounded-xl border border-line bg-surface overflow-hidden max-h-[360px] lg:max-h-[560px] overflow-y-auto lg:mt-0 mt-2">
             <div className="divide-y divide-line">
               {visibleAssets.map(a => (
                 <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-paper-2/50 transition-colors">
@@ -649,7 +679,7 @@ export default function MapPage() {
                   className="flex flex-1 min-w-0 items-center gap-3"
                 >
                   <div className={clsx(
-                    'w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono font-semibold border',
+                    'min-w-8 h-8 px-1.5 rounded-lg flex items-center justify-center text-[10px] font-mono font-semibold border whitespace-nowrap',
                     a.status === 'live' ? 'bg-live/10 text-live border-live/20' :
                     a.status === 'idle' ? 'bg-idle/10 text-[#B89000] border-idle/20' :
                     a.status === 'offline' ? 'bg-red/10 text-red border-red/20' :
@@ -711,6 +741,8 @@ export default function MapPage() {
                 </Link>
                 </div>
               ))}
+            </div>
+          </div>
             </div>
           </div>
         </>

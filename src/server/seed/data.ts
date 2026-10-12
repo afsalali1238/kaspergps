@@ -472,7 +472,7 @@ export const geofences: Geofence[] = [
   // Al Noor — job circle
   { id: 'g-an-port-gate', tenantId: 't-alnoor', name: 'Jebel Ali Port gate 4', kind: 'job', shape: { type: 'circle', center: { lat: 25.0130, lng: 55.1150 }, radiusM: 400 }, siteId: undefined, alertOnEnter: true, alertOnExit: true, assetIds: 'all', createdBy: 'u-omar', createdAt: new Date(daysAgo(30)).toISOString() },
   // Emirates — after-hours yard polygon
-  { id: 'g-em-afterhours', tenantId: 't-emirates', name: 'Al Quoz Yard — after hours', kind: 'yard', shape: { type: 'polygon', points: [{ lat: 25.1370, lng: 55.2305 }, { lat: 25.1362, lng: 55.2318 }, { lat: 25.1358, lng: 55.2308 }, { lat: 25.1365, lng: 55.2300 }] }, siteId: undefined, alertOnEnter: false, alertOnExit: true, afterHoursOnly: { from: '19:00', to: '06:00' }, assetIds: 'all', createdBy: 'u-khalid', createdAt: new Date(daysAgo(60)).toISOString() },
+  { id: 'g-em-afterhours', tenantId: 't-emirates', name: 'Al Quoz Yard — after hours', kind: 'yard', shape: { type: 'polygon', points: [{ lat: 25.1401, lng: 55.2273 }, { lat: 25.1401, lng: 55.2349 }, { lat: 25.1331, lng: 55.2349 }, { lat: 25.1331, lng: 55.2273 }] }, siteId: undefined, alertOnEnter: false, alertOnExit: true, afterHoursOnly: { from: '19:00', to: '06:00' }, assetIds: 'all', createdBy: 'u-khalid', createdAt: new Date(daysAgo(60)).toISOString() },
   // Emirates — Hatta Quarry
   { id: 'g-em-hatta', tenantId: 't-emirates', name: 'Hatta Quarry', kind: 'job', shape: { type: 'circle', center: { lat: 24.8128, lng: 56.1175 }, radiusM: 600 }, siteId: undefined, alertOnEnter: false, alertOnExit: false, assetIds: 'all', createdBy: 'u-khalid', createdAt: new Date(daysAgo(20)).toISOString() },
   // Palm — job polygon (6 points)
@@ -485,8 +485,9 @@ export const geofences: Geofence[] = [
 export const geofenceEvents: GeofenceEvent[] = [
   { id: 'ge-001', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'exit', at: dubaiAt(1, 19, 10) },
   { id: 'ge-002', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'enter', at: dubaiAt(1, 19, 55) },
-  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-lb05', type: 'exit', at: dubaiAt(1, 23, 40) },
+  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-gr01', type: 'exit', at: dubaiAt(1, 23, 40) },
   { id: 'ge-004', geofenceId: 'g-em-hatta', assetId: 'a-bh05', type: 'enter', at: daysFromNow(1) + 10.5*3600000 },
+  { id: 'ge-005', geofenceId: 'g-em-afterhours', assetId: 'a-gr01', type: 'enter', at: dubaiAt(1, 23, 55) },
 ];
 
 // ── Alerts ─────────────────────────────────────────────────────────────────────
@@ -506,7 +507,7 @@ export const alerts: Alert[] = [
   { id: 'al-lb05-towing', assetId: 'a-lb05', type: 'towing', openedAt: dubaiAt(1, 23, 40), closedAt: dubaiAt(1, 23, 50), detail: 'Moved with ignition off — 400 m' },
   // Tenant-owned alerts
   { id: 'al-wl06-geo', assetId: 'a-wl06', tenantId: 't-palm', type: 'geofence_exit', openedAt: dubaiAt(1, 19, 10), closedAt: dubaiAt(1, 19, 55), detail: 'Left Palm Crescent works at 19:10' },
-  { id: 'al-lb05-afterhours', assetId: 'a-lb05', tenantId: 't-emirates', type: 'after_hours_move', openedAt: dubaiAt(1, 23, 40), closedAt: dubaiAt(1, 23, 50), detail: 'Moved out of Al Quoz Yard after hours (23:40)' },
+  { id: 'al-gr01-afterhours', assetId: 'a-gr01', tenantId: 't-emirates', type: 'after_hours_move', openedAt: dubaiAt(1, 23, 40), closedAt: dubaiAt(1, 23, 55), detail: 'GR-01 moved out of Al Quoz Yard after hours (23:40)' },
   { id: 'al-bd02-maint', assetId: 'a-bd02', tenantId: 't-emirates', type: 'maintenance_overdue', openedAt: dubaiAt(0, 5, 40), detail: 'Maintenance overdue: BD-02 250 h service (30 h overdue)' },
   { id: 'al-cr08-maint', assetId: 'a-cr08', tenantId: 't-gulflift', type: 'maintenance_overdue', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance overdue: CR-08 annual crane inspection (5 days overdue)' },
   { id: 'al-ex04-maint', assetId: 'a-ex04', tenantId: 't-emirates', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: EX-04 500 h service (80 h left)' },

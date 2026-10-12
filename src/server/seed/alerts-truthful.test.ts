@@ -1,13 +1,15 @@
-// J3 proof: seeded alerts tell the truth about the readings (spec §8.7, §8.10).
-// Each alert that the readings can show is checked against them: the time it
-// opened, the time it closed, and the time written in its detail text.
-// Alerts whose event the readings do not yet show are listed as todo, not passed.
+// J3/J5 proof: seeded alerts tell the truth about the readings (spec §8.7, §8.10).
+// Each alert is checked against them: the time it opened, the time it closed, and the
+// time written in its detail text. The four scripted events the simulator had to learn
+// for J5 (TP-21 harsh driving, PU-51 idling, EX-11's power cut, GR-01 after hours) are
+// checked here too, so no alert stays in the seed without readings behind it.
 import { describe, expect, it } from 'vitest';
 import { db } from '@/server/db';
 import { ANCHOR_MS, dubaiAt } from '@/server/seed/data';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { refuelTimesFor } from '@/server/telemetry/fuel';
 import { haversineKm } from '@/server/telemetry/movement';
+import { insideShape, eventsFromReadings, type GeofenceShape } from '@/server/geofences';
 import { formatDubaiTime } from '@/lib/clock';
 import type { Alert, Asset, Reading } from '@/domain/types';
 
@@ -159,10 +161,100 @@ describe('scripted events the readings now show (spec §8.7, §9)', () => {
   });
 });
 
-// Events the readings do not show yet. They stay todo until the simulator produces them
-// (spec §9 scripted movements). Do not turn these into passing tests by weakening the check.
-describe.todo('seeded alerts the readings do not show yet');
-it.todo('LB-05 after-hours exit from Al Quoz Yard, 5 Oct 23:40 (spec §8.7, §9) — LB-05 is homed at DIP, not at the Al Quoz Yard fence, so the crossing needs the spec resolved first');
-it.todo('EX-11 power cut at Ras Al Khor Yard (seed alert) — external voltage stays on in readings');
-it.todo('PU-51 idle at Dubai Hills (seed alert) — readings show ignition off, not idling');
-it.todo('TP-21 harsh driving, 3 events (spec §8.7) — readings carry no accelerometer events');
+describe('seeded alerts the readings now show (spec §8.7, §9)', () => {
+  it('TP-21 harsh driving: three events in the two days the alert names', () => {
+    const a = alertOf('al-tp21-harsh');
+    const from = new Date(a.openedAt).getTime();
+    const events = readings('TP-21', from, ANCHOR_MS).filter(r => r.event?.startsWith('harsh'));
+    expect(events).toHaveLength(3);
+    for (const r of events) {
+      // An accelerometer event can only happen while the truck is driving.
+      expect(r.moving).toBe(true);
+      expect(r.ignition).toBe(true);
+      expect(ts(r)).toBeGreaterThanOrEqual(from);
+      expect(ts(r)).toBeLessThanOrEqual(ANCHOR_MS);
+    }
+    expect(a.detail).toContain('3 events');
+    expect(a.detail).toContain('last 2 days');
+  });
+
+  it('PU-51 idle: 2.5 hours with the engine on, standing at Dubai Hills, 21:00–23:30', () => {
+    const a = alertOf('al-pu51-idle');
+    const from = dubaiAt(1, 21, 0);
+    const to = dubaiAt(1, 23, 30);
+    expect(new Date(a.openedAt).getTime()).toBe(from);
+    expect(closedMs('al-pu51-idle')).toBe(to);
+    // The window's samples, minus the one at the closing time (the engine is off again then).
+    const during = readings('PU-51', from, to - MIN);
+    expect(during.length).toBeGreaterThan(0);
+    expect(during.every(r => r.ignition && !r.moving && r.speedKmh < 3)).toBe(true);
+    // It idles from the opened time to the closed time, not for a minute of it.
+    expect(ts(during[0]) - from).toBeLessThanOrEqual(TOL);
+    expect(to - ts(during.at(-1)!)).toBeLessThanOrEqual(TOL);
+    expect(ts(during.at(-1)!) - ts(during[0])).toBeGreaterThan(140 * MIN);
+    // Standing at the Dubai Hills site, not driving around it.
+    const site = db.getState().sites.find(s => s.id === assetOf('PU-51').homeSiteId)!;
+    expect(Math.max(...during.map(r => haversineKm(site.center, r) * 1000))).toBeLessThan(site.radiusM);
+    expect(a.detail).toContain('2.5 hours');
+    expect(a.detail).toContain('Dubai Hills');
+  });
+
+  it('EX-11 power cut: external voltage is 0 at Ras Al Khor Yard, 03:30–04:15', () => {
+    const a = alertOf('al-ex11-power');
+    const at = new Date(a.openedAt).getTime();
+    const to = closedMs('al-ex11-power');
+    expect(at).toBe(dubaiAt(0, 3, 30));
+    expect(to).toBe(dubaiAt(0, 4, 15));
+    const before = readings('EX-11', at - 60 * MIN, at - MIN);
+    const during = readings('EX-11', at, to - MIN);
+    const after = readings('EX-11', to + 5 * MIN, to + 60 * MIN);
+    expect(before.length).toBeGreaterThan(0);
+    expect(Math.min(...before.map(r => r.extVoltage))).toBeGreaterThan(10);
+    expect(during.length).toBeGreaterThan(0);
+    expect(Math.max(...during.map(r => r.extVoltage))).toBeLessThan(1);
+    expect(after.length).toBeGreaterThan(0);
+    expect(Math.min(...after.map(r => r.extVoltage))).toBeGreaterThan(10);
+    // Running on the tracker's own battery while the vehicle feed is dead (the TP-23 pattern).
+    expect(Math.max(...during.map(r => r.intBattery))).toBeLessThan(3.9);
+    expect(Math.min(...before.map(r => r.intBattery))).toBeGreaterThanOrEqual(3.9);
+    expect(Math.min(...after.map(r => r.intBattery))).toBeGreaterThanOrEqual(3.9);
+    // A power cut is not a journey: the truck stays in the yard.
+    const yard = db.getState().sites.find(s => s.id === assetOf('EX-11').homeSiteId)!;
+    expect(Math.max(...during.map(r => haversineKm(yard.center, r) * 1000))).toBeLessThan(yard.radiusM);
+    expect(a.detail).toContain('Ras Al Khor');
+  });
+
+  it('GR-01 after hours: out of Al Quoz Yard at 23:40, back inside by 23:55', () => {
+    const a = alertOf('al-gr01-afterhours');
+    expect(a.assetId).toBe('a-gr01');
+    expect(new Date(a.openedAt).getTime()).toBe(dubaiAt(1, 23, 40));
+    expect(closedMs('al-gr01-afterhours')).toBe(dubaiAt(1, 23, 55));
+    const fence = db.getState().geofences.find(g => g.id === 'g-em-afterhours')!;
+    const shape = fence.shape as GeofenceShape;
+    // The fence still holds the yard: the machines parked there are inside it before the move.
+    expect(insideShape(shape, db.getState().sites.find(s => s.id === 's-emirates-alq')!.center)).toBe(true);
+    const night = readings('GR-01', dubaiAt(1, 20, 0), dubaiAt(0, 2, 0));
+    const crossed = eventsFromReadings(shape, night);
+    expect(crossed.map(e => e.type)).toEqual(['exit', 'enter']);
+    // Two minutes of travel before the grader is clear of the yard fence, and the same back.
+    expect(Math.abs(crossed[0].at - dubaiAt(1, 23, 40))).toBeLessThanOrEqual(3 * MIN);
+    expect(Math.abs(crossed[1].at - dubaiAt(1, 23, 55))).toBeLessThanOrEqual(3 * MIN);
+    const away = night.filter(r => ts(r) >= crossed[0].at && ts(r) <= crossed[1].at);
+    expect(away.every(r => r.ignition)).toBe(true);
+    expect(away.some(r => r.speedKmh > 0)).toBe(true);
+    // It was inside before it left, and inside again after it came back.
+    const before = night.filter(r => ts(r) < crossed[0].at);
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.every(r => insideShape(shape, r))).toBe(true);
+    const after = night.filter(r => ts(r) > crossed[1].at);
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every(r => insideShape(shape, r))).toBe(true);
+    // The seeded event and the alert agree with the crossing.
+    const seeded = db.getState().geofenceEvents.filter(e => e.geofenceId === 'g-em-afterhours' && e.assetId === 'a-gr01');
+    expect(seeded.map(e => e.type)).toEqual(['exit', 'enter']);
+    expect(new Date(seeded[0].at).getTime()).toBe(dubaiAt(1, 23, 40));
+    expect(new Date(seeded[1].at).getTime()).toBe(dubaiAt(1, 23, 55));
+    expect(a.detail).toContain('23:40');
+    expect(a.detail).toContain('Al Quoz Yard');
+  });
+});

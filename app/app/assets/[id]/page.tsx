@@ -14,6 +14,7 @@ import * as clock from '@/lib/clock';
 import type { Asset, Reading, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
 import { TripPlayer } from '@/components/playback/TripPlayer';
+import { EngineFuelPanel } from '@/components/assets/EngineFuelPanel';
 import { buildPins } from '@/domain/playback';
 import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
@@ -770,7 +771,7 @@ export default function AssetDetailPage() {
                     : t('common.not_measured', 'Not measured')}
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('fuelLevel') ? t('asset_detail.overview.fuel_gauge', 'Fuel gauge') : t('common.not_available', 'Not available')}
+                  {asset.canProfile.supported.includes('fuelLevel') ? <SourceLabel source="ECU" inline /> : t('common.not_available', 'Not available')}
                 </div>
               </div>
               <div className="bg-surface border border-line rounded-lg p-4">
@@ -780,7 +781,7 @@ export default function AssetDetailPage() {
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('rpm') && reading?.rpm !== undefined
-                    ? t('asset_detail.overview.live_value', 'Live value')
+                    ? <SourceLabel source="ECU" inline />
                     : t('common.not_available', 'Not available')}
                 </div>
               </div>
@@ -804,7 +805,7 @@ export default function AssetDetailPage() {
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('coolantTemp')
-                    ? t('asset_detail.engine.can_source', 'CAN')
+                    ? <SourceLabel source="ECU" inline />
                     : t('common.not_available', 'Not available')}
                 </div>
               </div>
@@ -817,7 +818,7 @@ export default function AssetDetailPage() {
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('engineLoad')
-                    ? t('asset_detail.engine.can_source', 'CAN')
+                    ? <SourceLabel source="ECU" inline />
                     : t('common.not_available', 'Not available')}
                 </div>
               </div>
@@ -830,7 +831,7 @@ export default function AssetDetailPage() {
                 </div>
                 <div className="text-xs text-grey-500 mt-1">
                   {asset.canProfile.supported.includes('adBlue')
-                    ? t('asset_detail.engine.can_source', 'CAN')
+                    ? <SourceLabel source="ECU" inline />
                     : t('common.not_available', 'Not available')}
                 </div>
               </div>
@@ -981,31 +982,7 @@ export default function AssetDetailPage() {
       )}
 
       {shownTab === 'engine' && (
-        <div className="bg-surface border border-line rounded-lg p-4">
-          <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.tabs.engine_fuel', 'Engine & fuel')}</div>
-          {isTier1 ? (
-            <div className="text-sm text-grey-500">
-              {t('asset_detail.no_can_tier1', "Tier 1 assets don't have CAN data available.")}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: t('asset_detail.engine.fuel_level', 'Fuel level'), value: asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined ? `${reading.fuelLevelPct.toFixed(0)}%` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.fuel_gauge', 'Fuel gauge') },
-                { label: t('asset_detail.engine.fuel_rate', 'Fuel rate'), value: reading?.fuelRateLph !== undefined ? `${reading.fuelRateLph.toFixed(1)} L/h` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
-                { label: t('asset_detail.engine.coolant', 'Coolant'), value: reading?.coolantC !== undefined ? `${reading.coolantC.toFixed(0)} °C` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
-                { label: t('asset_detail.engine.load', 'Engine load'), value: reading?.engineLoadPct !== undefined ? `${reading.engineLoadPct.toFixed(0)}%` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
-                { label: t('asset_detail.engine.rpm', 'Engine RPM'), value: reading?.rpm !== undefined ? `${Math.round(reading.rpm)} rpm` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
-                { label: t('asset_detail.engine.can_odo', 'CAN odometer'), value: reading?.canOdometerKm !== undefined ? `${reading.canOdometerKm.toFixed(0)} km` : t('common.not_measured', 'Not measured'), source: t('asset_detail.engine.can_source', 'CAN') },
-              ].map(cell => (
-                <div key={cell.label} className="border border-line rounded-lg p-3">
-                  <div className="text-xs text-grey-500 font-medium uppercase">{cell.label}</div>
-                  <div className="text-lg font-semibold text-ink mt-1 font-mono">{cell.value}</div>
-                  <div className="text-xs text-grey-500 mt-1">{cell.source}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <EngineFuelPanel asset={asset} reading={reading} />
       )}
 
       {shownTab === 'driving' && (
