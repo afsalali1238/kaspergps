@@ -1,12 +1,28 @@
 import type { Metadata } from 'next';
+// Brand fonts, self-hosted from npm (@fontsource). The old Google Fonts @import in
+// globals.css was dropped by the production build, so production showed system fonts;
+// next/font/google would need Google at build time, which sandboxes and CI may block.
+import '@fontsource/hanken-grotesk/400.css';
+import '@fontsource/hanken-grotesk/500.css';
+import '@fontsource/hanken-grotesk/600.css';
+import '@fontsource/hanken-grotesk/700.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/600.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/space-mono/400.css';
+import '@fontsource/space-mono/700.css';
+import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
+import '@fontsource/ibm-plex-sans-arabic/arabic-500.css';
+import '@fontsource/ibm-plex-sans-arabic/arabic-600.css';
 import './globals.css';
+import { PRODUCT_NAME } from '@/config/brand';
 import { headers } from 'next/headers';
 import { DemoBar } from '@/components/demo/DemoBar';
 import { LocaleProvider, type Locale } from '@/i18n';
 import { DbProvider } from '@/components/providers/DbProvider';
 
 export const metadata: Metadata = {
-  title: 'Kasper GPS',
+  title: `${PRODUCT_NAME} GPS`,
   description: 'Equipment tracking and rental management',
   icons: {
     icon: [

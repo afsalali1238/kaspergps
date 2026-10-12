@@ -25,6 +25,7 @@ Repo: `https://github.com/afsalali1238/kaspergps`. Branch from the latest `main`
 | After-hours asset | **GR-01** at Al Quoz (as merged in PR #24). |
 | Phases | Gone: no Phase switch, no Show hidden, no "Day one / Phase 2" labels anywhere. |
 | Sign-in | Role-first (5 roles); keep it. |
+| **Navigation (13 Oct, 00:36)** | **Pages go in a top navigation bar, like fleetx. There's no left sidebar.** See `UI-UPGRADE.md` §5.1. The map page keeps its fleet list as a left panel inside the page (§6). |
 
 ## 2. Already done (don't redo)
 
