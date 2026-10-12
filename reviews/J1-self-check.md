@@ -59,6 +59,6 @@ Playwright ran as three foreground shards. Two background full runs were killed 
   ("at least 10 of the 50"). Not a J1 change.
 - Sam's welcome text is not asserted.
 - Only the desktop and phone projects were run for J1; the Karim refusal is also in `S20-S22.spec.ts` via the email form.
-- CI on `main` for `93f00ff` is listed in the handoff's J7 "green CI on main" check; it is not claimed here beyond the PR checks above.
+- GitHub CI on `main` @ `93f00ff`: typecheck/lint/unit and all three Playwright shards completed with success.
 
 Phase J1 is ready for review.
