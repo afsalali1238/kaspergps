@@ -11,12 +11,21 @@ import {
 import { useDb, type InvoiceView, aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice, receivedInvoices, recordPayment, statementsFor, voidInvoice, can } from '@/server/api';
 
 import { GPS_SUBSCRIPTION_PER_MONTH } from '@/config/pricing';
+import { billingTabs, chooseBillingTab, type BillingTabCounts, type BillingTabId } from '@/lib/billing-tabs';
 import { downloadBoth, downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
-type TabId = 'issued' | 'received' | 'gps' | 'reports';
+type TabId = BillingTabId;
+
+/** i18n key and English label per tab; the order comes from billingTabs(). */
+const TAB_META: Record<TabId, { key: string; label: string }> = {
+  issued: { key: 'billing.tabs.issued', label: 'Issued' },
+  received: { key: 'billing.tabs.received', label: 'Received' },
+  gps: { key: 'billing.tabs.gps', label: 'GPS subscription' },
+  reports: { key: 'billing.tabs.reports', label: 'Reports' },
+};
 
 function statusBadge(
   status: string,
@@ -60,7 +69,10 @@ export default function BillingPage() {
   const session = useSession();
   const { phase } = useSwitches();
 
-  const [tab, setTab] = useState<TabId>('received');
+  // null until the visitor picks a tab: the page opens on the first tab that has
+  // content (Agent A / U0). Khalid issues invoices and receives none, so opening
+  // on 'received' used to show an empty table.
+  const [tab, setTab] = useState<TabId | null>(null);
   const [version, setVersion] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
@@ -120,13 +132,17 @@ export default function BillingPage() {
     );
   }
 
-  const tabs: { id: TabId; key: string; label: string }[] = [
-    ...(issued.length > 0 || session.isKasper ? [{ id: 'issued' as TabId, key: 'billing.tabs.issued', label: 'Issued' }] : []),
-    ...(received.length > 0 || !session.isKasper ? [{ id: 'received' as TabId, key: 'billing.tabs.received', label: 'Received' }] : []),
-    { id: 'gps' as TabId, key: 'billing.tabs.gps', label: 'GPS subscription' },
-    ...(!session.isKasper ? [{ id: 'reports' as TabId, key: 'billing.tabs.reports', label: 'Reports' }] : []),
-  ];
-  const activeTab: TabId = tabs.some(t => t.id === tab) ? tab : tabs[0].id;
+  const tabCounts: BillingTabCounts = {
+    issued: issued.length,
+    received: received.length,
+    gps: statements.length,
+  };
+  const tabIds = billingTabs(session.isKasper, tabCounts);
+  const tabs: { id: TabId; key: string; label: string }[] = tabIds.map(id => ({ id, ...TAB_META[id] }));
+  // The Reports tab summarises what the visitor issued, so it counts as having
+  // content only when something was issued.
+  const tabContent: Record<TabId, number> = { ...tabCounts, reports: issued.length };
+  const activeTab: TabId = chooseBillingTab(tab, tabIds, tabContent) ?? 'issued';
 
   const customers = [...new Set(issued.map(i => i.customerName))].sort();
   const filteredIssued = issued.filter(inv =>
@@ -266,6 +282,7 @@ export default function BillingPage() {
           <button
             key={tabItem.id}
             onClick={() => setTab(tabItem.id)}
+            aria-current={activeTab === tabItem.id ? 'true' : undefined}
             className={
               activeTab === tabItem.id
                 ? 'px-3 py-2 text-sm text-ink border-b-2 border-yellow -mb-[1px] whitespace-nowrap'

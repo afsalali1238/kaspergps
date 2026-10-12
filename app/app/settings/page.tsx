@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { useDb, hasRole, computeStatus, createUser, updateUserSites, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
+import { useDb, hasRole, computeStatus, createUser, updateUserSites, deactivateUser, reactivateUser, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
 import { searchPlaces } from '@/domain/places';
 import { renameLabel, deleteLabel, labelUsage, labelsVisibleTo } from '@/server/api';
 import { useT, useHref } from '@/i18n';
@@ -80,6 +80,8 @@ export default function SettingsPage() {
   const [invite, setInvite] = useState(EMPTY_INVITE);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [userActionError, setUserActionError] = useState<string | null>(null);
+  const [userActionNotice, setUserActionNotice] = useState<string | null>(null);
 
   if (!session) return null;
 
@@ -211,6 +213,22 @@ export default function SettingsPage() {
     setShowInvite(false);
   };
 
+  // Deactivate / reactivate go through src/server/team.ts, which also owns the
+  // refusal rules (last active Tenant Admin, "already deactivated", and the
+  // self-deactivate refusal). The UI simply surfaces what it says.
+  const handleUserStatus = (userId: string, next: 'deactivated' | 'active') => {
+    const result = next === 'deactivated'
+      ? deactivateUser(session, userId)
+      : reactivateUser(session, userId);
+    if (!result.ok) {
+      setUserActionError(result.error ?? 'That change could not be made.');
+      setUserActionNotice(null);
+      return;
+    }
+    setUserActionError(null);
+    setUserActionNotice(result.message ?? null);
+  };
+
   return (
     <div className="space-y-4 p-4">
       <div>
@@ -243,6 +261,14 @@ export default function SettingsPage() {
 
           {inviteNotice && (
             <p role="status" className="text-xs text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2 mb-3">{inviteNotice}</p>
+          )}
+
+          {userActionNotice && (
+            <p role="status" className="text-xs text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2 mb-3">{userActionNotice}</p>
+          )}
+
+          {userActionError && (
+            <p role="alert" className="text-xs text-red mb-3">{userActionError}</p>
           )}
 
           {showInvite && (
@@ -328,7 +354,7 @@ export default function SettingsPage() {
               </thead>
               <tbody>
                 {myUsers.map(u => (
-                  <tr key={u.id} className="bg-paper hover:bg-paper-2">
+                  <tr key={u.id} data-user-id={u.id} className="bg-paper hover:bg-paper-2">
                     <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
                     <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
                     <td className="px-3 py-2 border-b border-line">{roleBadge(u.role, t)}</td>
@@ -350,10 +376,28 @@ export default function SettingsPage() {
                             {t('common.edit', 'Edit')}
                           </Button>
                         )}
+                        {/* You can't deactivate yourself: the button is absent on
+                            your own row, and team.ts refuses it anyway. */}
                         {u.status === 'active' ? (
-                          <Button variant="danger" size="sm">{t('settings.users.actions.deactivate', 'Deactivate')}</Button>
+                          u.id === session.userId ? (
+                            <span className="text-xs text-grey-400">—</span>
+                          ) : (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleUserStatus(u.id, 'deactivated')}
+                            >
+                              {t('settings.users.actions.deactivate', 'Deactivate')}
+                            </Button>
+                          )
                         ) : (
-                          <Button variant="secondary" size="sm">{t('settings.users.actions.reactivate', 'Reactivate')}</Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleUserStatus(u.id, 'active')}
+                          >
+                            {t('settings.users.actions.reactivate', 'Reactivate')}
+                          </Button>
                         )}
                       </div>
                     </td>
