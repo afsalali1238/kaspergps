@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { anyAssetHasFeature, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
+import { anyAssetHasFeature, ownsAnyAsset, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
 import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
@@ -21,6 +21,8 @@ interface NavItem {
   capability: Capability;
   phase: 'day_one' | 'phase2' | 'later';
   featureKey?: string;
+  /** Only for a company that owns assets: maintenance and costs are the owner's (J4.6). */
+  ownerOnly?: boolean;
   icon: React.ReactNode;
 }
 
@@ -34,6 +36,7 @@ export function navItemAllowed(session: Session | null, item: NavItem, phase: st
   if (!can(session, item.capability)) return false;
   if (item.phase === 'phase2' && phase === 'day_one') return false;
   if (item.phase === 'later' && phase !== 'later') return false;
+  if (item.ownerOnly && !ownsAnyAsset(session)) return false;
   if (item.featureKey) {
     if (visibleAssetIds(session).length === 0) return false;
     return anyAssetHasFeature(session, item.featureKey);
@@ -51,7 +54,7 @@ export function settingsAllowed(session: Session | null): boolean {
 }
 
 /** What a locked screen says, per route (spec 11.3 / phase ladder). */
-const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: string }> = {
+const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: string; owner?: string }> = {
   '/app/certificates': {
     phase: 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.',
     feature: 'Certificates need Tier 3 assets with ECU engine hours only.',
@@ -62,8 +65,14 @@ const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: strin
     feature: 'Billing needs Tier 3 assets with ECU engine hours only.',
     role: 'Your access doesn’t include billing.',
   },
-  '/app/maintenance': { phase: 'Maintenance arrives in the Later phase.' },
-  '/app/cost': { phase: 'Cost & ROI arrives in the Later phase.' },
+  '/app/maintenance': {
+    phase: 'Maintenance arrives in the Later phase.',
+    owner: 'Maintenance is for assets your company owns. Your company rents its equipment, so there is nothing to service here.',
+  },
+  '/app/cost': {
+    phase: 'Cost & ROI arrives in the Later phase.',
+    owner: 'Cost & ROI is for assets your company owns. Your company rents its equipment; its costs are on your invoices.',
+  },
 };
 
 /**
@@ -82,6 +91,7 @@ export function routeGate(
   if (!can(session, item.capability)) return copy.role ? { kind: 'not_found', role: copy.role } : { kind: 'not_found' };
   if (item.phase === 'phase2' && phase === 'day_one') return { kind: 'locked', reason: copy.phase ?? 'Not available in this phase.' };
   if (item.phase === 'later' && phase !== 'later') return { kind: 'locked', reason: copy.phase ?? 'Arrives in the Later phase.' };
+  if (item.ownerOnly && !ownsAnyAsset(session)) return { kind: 'locked', reason: copy.owner ?? 'Only for companies that own assets.' };
   if (item.featureKey && (visibleAssetIds(session).length === 0 || !anyAssetHasFeature(session, item.featureKey))) {
     return { kind: 'locked', reason: copy.feature ?? 'Not available for your assets.' };
   }
@@ -152,6 +162,7 @@ const navItems: NavItem[] = [
     label: 'Maintenance',
     capability: 'maintenance.view',
     phase: 'later',
+    ownerOnly: true,
     icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 10h14L8 1zm0 4l3 3-3 3M8 7V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
   {
@@ -160,6 +171,7 @@ const navItems: NavItem[] = [
     label: 'Cost & ROI',
     capability: 'cost.view',
     phase: 'later',
+    ownerOnly: true,
     icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14l4-4 3 3 3-6 1 1 3 3M4 2v3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   },
 ];

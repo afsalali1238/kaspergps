@@ -5,6 +5,7 @@
 import type { Asset, Booking, Role, Site, Tenant, User, ViewAsRoleFilter } from '@/domain/types';
 import { tierForAsset } from '@/domain/features';
 import { hasRole, isKasperStaff } from '@/server/capabilities';
+import * as clock from '@/lib/clock';
 
 export interface ViewAsBadge {
   label: string;
@@ -31,6 +32,8 @@ export interface ViewAsState {
   sites: Site[];
   assets: Asset[];
   bookings: Booking[];
+  /** Early cut-offs (Ended early). Passed in so the badges update when one is made. */
+  grantOverrides?: ReadonlyArray<{ bookingId: string; endedAt: string | number }>;
 }
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -41,6 +44,22 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 const LIVE_BOOKING: ReadonlyArray<Booking['status']> = ['scheduled', 'active'];
+
+const toMs = (v: string | number) => (typeof v === 'number' ? v : new Date(v).getTime());
+
+/**
+ * Whether a rental gives access right now: inside its grant window (start to the
+ * end, cancel, close or early cut-off, whichever comes first), the same rule as
+ * asset visibility. A booking still marked active after an early cut-off is over.
+ */
+function inGrantWindow(state: ViewAsState, b: Booking, now: number): boolean {
+  if (!LIVE_BOOKING.includes(b.status)) return false;
+  const override = state.grantOverrides?.find(o => o.bookingId === b.id);
+  const ends = [toMs(b.end), b.cancelledAt, b.closedAt, override?.endedAt]
+    .filter((v): v is string | number => v !== undefined && v !== null)
+    .map(toMs);
+  return toMs(b.start) <= now && now <= Math.min(...ends);
+}
 
 /** The assets a user can see on the map, as a plain count basis for the badges. */
 function visibleAssets(state: ViewAsState, user: User): Asset[] {
@@ -67,16 +86,19 @@ function badgesFor(state: ViewAsState, user: User): ViewAsBadge[] {
     badges.push({ label: mix, tone: 'muted' });
   }
 
+  const now = clock.now();
+  // What this user sees as rented right now: a site user only at their own sites.
   const renting = new Set(
     state.bookings
-      .filter(b => LIVE_BOOKING.includes(b.status) && b.renterTenantId === user.tenantId)
+      .filter(b => b.renterTenantId === user.tenantId && inGrantWindow(state, b, now))
+      .filter(b => !hasRole(user, 'site_user') || (b.renterSiteId != null && user.siteIds.includes(b.renterSiteId)))
       .map(b => b.assetId)
   );
   if (renting.size > 0) badges.push({ label: `renting ${renting.size}`, tone: 'info' });
 
   const rentedOut = new Set(
     state.bookings
-      .filter(b => LIVE_BOOKING.includes(b.status) && b.ownerTenantId === user.tenantId && b.renterTenantId && b.renterTenantId !== b.ownerTenantId)
+      .filter(b => b.ownerTenantId === user.tenantId && b.renterTenantId && b.renterTenantId !== b.ownerTenantId && inGrantWindow(state, b, now))
       .map(b => b.assetId)
   );
   if (rentedOut.size > 0) badges.push({ label: `rented out ${rentedOut.size}`, tone: 'info' });

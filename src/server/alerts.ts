@@ -6,7 +6,7 @@
 import type { Alert, AlertType, Session } from '@/domain/types';
 import { db, touch } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
-import { isAssetVisible, getRelationship } from '@/server/access';
+import { isAssetVisible, getRelationship, viewerSiteName } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
@@ -51,25 +51,6 @@ function toMs(v: string | number): number {
   return typeof v === 'number' ? v : new Date(v).getTime();
 }
 
-/**
- * The site an alert line names, as this viewer may see it. The owner and Kasper
- * staff see the asset's home site. A renter sees only the site on their own
- * rental (H2.7): never the owner's yard.
- */
-function siteNameFor(session: Session, asset: { id: string; ownerTenantId: string; homeSiteId: string }): string {
-  const sites = db.getState().sites;
-  if (session.isKasper || asset.ownerTenantId === session.tenantId) {
-    return sites.find(s => s.id === asset.homeSiteId)?.name ?? '';
-  }
-  const rental = db.getState().bookings.find(b =>
-    b.assetId === asset.id &&
-    b.renterTenantId === session.tenantId &&
-    (b.status === 'active' || b.status === 'scheduled')
-  );
-  if (!rental?.renterSiteId) return '';
-  return sites.find(s => s.id === rental.renterSiteId)?.name ?? '';
-}
-
 function toView(alert: Alert, session: Session): AlertView {
   const asset = alert.assetId ? db.getState().assets.find(a => a.id === alert.assetId) : undefined;
   return {
@@ -77,7 +58,7 @@ function toView(alert: Alert, session: Session): AlertView {
     assetId: alert.assetId ?? '',
     assetCode: asset?.code ?? '—',
     assetName: asset?.name ?? '',
-    siteName: asset ? siteNameFor(session, asset) : '',
+    siteName: asset ? viewerSiteName(session, asset.id) : '',
     type: alert.type,
     typeLabel: TYPE_LABELS[alert.type] ?? alert.type,
     typeWords: alert.detail,

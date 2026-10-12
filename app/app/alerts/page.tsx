@@ -9,7 +9,7 @@ import clsx from 'clsx';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView, visibleAssetIds, useDb, can } from '@/server/api';
+import { visibleAlerts, alertTypesIn, acknowledgeAlert, type AlertView, visibleAssetIds, viewerSiteId, useDb, can } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -35,7 +35,7 @@ export default function AlertsPage() {
   // Site filter: only sites the user actually sees alerts at (S9 — Deepa's two sites).
   const siteOptions = useMemo(() => {
     if (!session) return [];
-    const ids = new Set(visibleAssetIds(session).map(id => seed.assets.find(a => a.id === id)?.homeSiteId ?? ''));
+    const ids = new Set(visibleAssetIds(session).map(id => viewerSiteId(session, id) ?? ''));
     return Array.from(ids)
       .filter(Boolean)
       .map(id => ({ id, name: seed.sites.find(s => s.id === id)?.name ?? id }));
@@ -47,12 +47,11 @@ export default function AlertsPage() {
       if (alertFilter === 'acknowledged' && a.status !== 'acknowledged') return false;
       if (typeFilter !== 'all' && a.type !== typeFilter) return false;
       if (siteFilter !== 'all') {
-        const asset = seed.assets.find(x => x.id === a.assetId);
-        if (!asset || asset.homeSiteId !== siteFilter) return false;
+        if (!session || !a.assetId || viewerSiteId(session, a.assetId) !== siteFilter) return false;
       }
       return true;
     });
-  }, [alerts, alertFilter, typeFilter, siteFilter]);
+  }, [alerts, alertFilter, typeFilter, siteFilter, session]);
 
   const openCount = useMemo(() => alerts.filter(a => a.status === 'open').length, [alerts]);
   const canAcknowledge = (assetId?: string | null) => (session ? can(session, 'alert.acknowledge', assetId ?? undefined) : false);

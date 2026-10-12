@@ -37,6 +37,7 @@ export function ViewAsMenu() {
   const sites = useDb(s => s.sites);
   const assets = useDb(s => s.assets);
   const bookings = useDb(s => s.bookings);
+  const grantOverrides = useDb(s => s.grantOverrides);
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,7 +58,7 @@ export function ViewAsMenu() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const groups = open ? viewAsGroups({ users, tenants, sites, assets, bookings }, query, role) : [];
+  const groups = open ? viewAsGroups({ users, tenants, sites, assets, bookings, grantOverrides }, query, role) : [];
 
   const selectUser = (userId: string) => {
     const result = signInAs(userId);
