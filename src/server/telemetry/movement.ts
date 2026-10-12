@@ -34,8 +34,8 @@ export interface Segment {
   jitter: number;
   cruiseKmh?: number;
   clamp?: boolean;
-  /** Set by an anchor tail (spec §8.2) that must hold even where the asset is rented. */
-  forced?: 'idle';
+  /** Set by an anchor tail (spec §8.2) or a scripted event (spec §8.7) that must hold even where the asset is rented. */
+  forced?: 'idle' | 'off';
   /** Plant moves within this radius of its site, in short moves (spec §9), in degrees. */
   moveRadius?: number;
 }
@@ -127,7 +127,7 @@ export function generatorDay(home: Point, dayMs: number, jitter: number, offWind
   if (!offWindow) return [{ mode: 'work', fromMs: dayMs, toMs: dayMs + DAY, from: home, to: home, jitter }];
   return [
     { mode: 'work', fromMs: dayMs, toMs: offWindow.fromMs, from: home, to: home, jitter },
-    off(home, offWindow.fromMs, offWindow.toMs, jitter),
+    { ...off(home, offWindow.fromMs, offWindow.toMs, jitter), forced: 'off' },
     { mode: 'work', fromMs: offWindow.toMs, toMs: dayMs + DAY, from: home, to: home, jitter },
   ];
 }

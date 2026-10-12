@@ -345,7 +345,11 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
       // Rented: works at the renter's site, shift times as plant (generators run 24 h).
       // An idle tail (spec §8.2) keeps the machine idling there rather than working.
       const stayed = stayedSegment(asset, stay, stayMoveRadius(asset));
-      const c = segmentAt(segs, t)?.forced === 'idle' ? { mode: 'idle' as Mode, speed: 0 } : stayMode(asset, t, prng);
+      // A scripted engine-off window (GN-01, spec §8.7) holds even where the machine is rented.
+      const planned = segmentAt(segs, t);
+      const c: { mode: Mode; speed: number } = planned?.forced === 'idle'
+        ? { mode: 'idle', speed: 0 }
+        : planned?.forced === 'off' ? { mode: 'off', speed: 0 } : stayMode(asset, t, prng);
       mode = c.mode; speed = c.speed;
       const place = placeAt(stayed, t, prng);
       const wob = mode === 'work' && place.speedKmh > 0 ? (prng() - 0.5) * stayed.jitter * 0.01 : 0;
@@ -390,7 +394,9 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
     // Stopped machines keep the heading they had (spec §9: the heading does not spin while parked).
     const running = heavy ? 24.0 + prng() * 4.4 : 12.4 + prng() * 1.8;
     const extVoltage = ignition ? running : running - 0.5;
-    const intBattery = 3.9 + prng() * 0.2;
+    // GN-02's tracker battery has been low since three days before the anchor (spec §8.7, LOW_BATTERY_V 3.6).
+    const lowBattery = asset.code === 'GN-02' && t >= ANCHOR_MS - 3 * DAY;
+    const intBattery = lowBattery ? 3.45 + prng() * 0.05 : 3.9 + prng() * 0.2;
     const gsm = Math.floor(2 + prng() * 4) as 0 | 1 | 2 | 3 | 4 | 5;
     const satellites = Math.floor(7 + prng() * 8);
     // The odometer adds the distance actually covered since the last reading, so the
