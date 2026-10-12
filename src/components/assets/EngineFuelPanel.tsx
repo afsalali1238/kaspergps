@@ -133,7 +133,9 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={week.days} margin={{ top: 12, right: 12, bottom: 0, left: -18 }}>
+              {/* left: 0, not a negative margin: a negative one shifts the Y axis (and its
+                  "100%" labels) outside the SVG, where it is clipped to "0%". */}
+              <LineChart data={week.days} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="#E8E8E3" strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9A9CA1" />
                 <YAxis
@@ -177,7 +179,7 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
               <tr className="text-grey-500 text-left">
                 <th className="py-1 font-medium">{t('asset_detail.utilisation.day', 'Day')}</th>
                 <th className="py-1 font-medium text-right">{t('asset_detail.engine.used_l', 'Used (L)')}</th>
-                <th className="py-1 font-medium">{t('asset_detail.engine.source', 'Source')}</th>
+                <th className="py-1 pl-3 font-medium">{t('asset_detail.engine.source', 'Source')}</th>
                 <th className="py-1 font-medium">{t('asset_detail.engine.events', 'Refuel / drop')}</th>
               </tr>
             </thead>
@@ -186,7 +188,7 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
                 <tr key={day.key} className="border-t border-line">
                   <td className="py-1.5 text-grey-700">{day.date}</td>
                   <td className="py-1.5 text-right font-mono text-ink">{day.usedL === null ? '—' : n1(day.usedL)}</td>
-                  <td className="py-1.5">{day.usedL === null ? <span className="text-grey-500">{t('common.not_measured', 'Not measured')}</span> : <SourceLabel source={day.usedSource} inline />}</td>
+                  <td className="py-1.5 pl-3">{day.usedL === null ? <span className="text-grey-500">{t('common.not_measured', 'Not measured')}</span> : <SourceLabel source={day.usedSource} inline />}</td>
                   <td className="py-1.5 text-grey-700">
                     {day.refuel && <span className="text-green mr-2" title={t('asset_detail.engine.refuel', 'Refuel')}>▲ {t('asset_detail.engine.refuel', 'Refuel')}</span>}
                     {day.drop && <span className="text-red" title={t('asset_detail.engine.drop', 'Fuel drop')}>▼ {t('asset_detail.engine.drop', 'Fuel drop')}</span>}
