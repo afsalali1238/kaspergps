@@ -129,7 +129,18 @@ export function getReadingsForAsset(asset: Asset, startMs: number, endMs: number
   return results;
 }
 
+/** The demo clock the cached days were made for. */
+let cacheMadeAt: number | null = null;
+
 function getReadingsForDay(asset: Asset, tracker: DbRow<'trackers'>, dayMs: number): Reading[] {
+  // A day is generated up to the demo clock's "now", and scenario readings are
+  // placed relative to it. When the clock moves, cached days are stale (a machine
+  // would stop at its last cached reading and go Offline), so start again.
+  const now = clock.now();
+  if (cacheMadeAt !== now) {
+    cache.clear();
+    cacheMadeAt = now;
+  }
   const cacheOwner = `${asset.id}|${tracker.id}`;
   const dayMap = cache.get(cacheOwner);
   if (dayMap?.has(dayMs)) {
@@ -164,7 +175,7 @@ function assetSeed(asset: Asset): number {
 // rules in thresholds.ts give the status the asset table documents.
 
 interface AnchorTail {
-  /** Readings stop this many minutes before the clock. */
+  /** Readings stop this many minutes before the anchor (0: they run up to the clock). */
   ageMin: number;
   /** Ignition on for the last 40 minutes at the yard: an idle tail. */
   ignition?: boolean;
@@ -258,6 +269,8 @@ function fb12Route(asset: Asset, dayMs: number): Segment[] {
   return [
     { mode: 'off', fromMs: dayMs, toMs: dep, from: home.center, to: home.center, jitter: 0.001 },
     { mode: 'drive', fromMs: dep, toMs: arrive, from: home.center, to: dest, jitter: 0.00015, cruiseKmh: kmh, clamp: false },
+    // Arrived: it stays at the hirer's site for the rest of the day, engine off.
+    { mode: 'off', fromMs: arrive, toMs: dayMs + DAY, from: dest, to: dest, jitter: 0.0003 },
   ];
 }
 
@@ -455,7 +468,8 @@ function stayMode(asset: Asset, t: number, prng: () => number): { mode: Mode; sp
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
   const readings = withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
   // Scenario: WT-07 — a planned over-speed event yesterday, at 104 km/h (spec §8, S27).
-  const yesterday = clock.startOfDubaiDay(clock.now()) - DAY;
+  // The day before the anchor, like its alert (al-wt07-speed); not "yesterday" of a moved clock.
+  const yesterday = clock.startOfDubaiDay(ANCHOR_MS) - DAY;
   if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
   return readings;
 }
@@ -488,14 +502,19 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   const isToday = dayMs === clock.startOfDubaiDay(now);
   const dayEnd = dayMs + DAY;
 
-  // Scenario: TP-23 — power cut 2 h ago (external power lost, tracker on battery), then offline 40 min ago.
-  if (asset.code === 'TP-23' && isToday) {
-    const powerCutAt = now - 2 * HOUR;
-    const offlineAt = now - 40 * MIN;
+  // Scenario: TP-23 — power cut 2 h before the anchor (external power lost, tracker on
+  // battery), then offline 40 min before it. Fixed to the anchor like its alerts, so moving
+  // the clock ages it; the days after it stay silent (the tracker is still offline).
+  const anchorDay = clock.startOfDubaiDay(ANCHOR_MS);
+  if (asset.code === 'TP-23' && dayMs > anchorDay) return [];
+  if (asset.code === 'TP-23' && dayMs === anchorDay) {
+    const powerCutAt = ANCHOR_MS - 2 * HOUR;
+    const offlineAt = ANCHOR_MS - 40 * MIN;
     const home = siteById(asset.homeSiteId);
-    const trucks = sampleSegments(asset, tracker.id, planFor(asset, dayMs, undefined, prng), dayMs, powerCutAt, prng);
+    const trucks = sampleSegments(asset, tracker.id, planFor(asset, dayMs, undefined, prng), dayMs, Math.min(powerCutAt, now), prng);
+    if (now <= powerCutAt) return trucks;
     const lastTruck = trucks.at(-1);
-    const battery = generateBatteryReadings(asset, tracker.id, powerCutAt, offlineAt, prng, lastTruck, home?.center);
+    const battery = generateBatteryReadings(asset, tracker.id, powerCutAt, Math.min(offlineAt, now), prng, lastTruck, home?.center);
     return [...trucks, ...battery];
   }
 
@@ -504,7 +523,10 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   let end = Math.min(dayEnd, now);
   let via: AnchorTail['via'];
   if (tail && (!tail.todayOnly || isToday)) {
-    const cutoff = now - tail.ageMin * MIN;
+    // A tracker that stopped reporting stopped at a fixed time before the anchor, so a
+    // later clock ages it (§13: +1 h turns WT-08 Offline). Idle and parked tails (age 0)
+    // keep reporting up to the clock.
+    const cutoff = tail.ageMin > 0 ? Math.min(now, ANCHOR_MS - tail.ageMin * MIN) : now;
     if (dayMs > cutoff) return []; // this day comes after the last reading
     end = Math.min(end, cutoff);
     via = tail.via;
