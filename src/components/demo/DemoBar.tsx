@@ -90,7 +90,8 @@ export function DemoBar() {
   };
 
   // Scenarios for the current user first — starting any of them switches user.
-  const orderedScenarios = [...SCENARIOS].sort((a, b) => {
+  // S20 and S41 only demonstrated the Phase switch, which is gone.
+  const orderedScenarios = SCENARIOS.filter(s => s.id !== 20 && s.id !== 41).sort((a, b) => {
     const rank = (s: Scenario) => (s.user === null || s.user === session?.userId ? 0 : 1);
     return rank(a) - rank(b) || a.id - b.id;
   });
@@ -206,36 +207,8 @@ export function DemoBar() {
         )}
       </div>
 
-      {/* Phase switch */}
-      <div className="flex-shrink-0 flex items-center bg-[#1a1b20] border border-[#2a2c30] rounded-lg overflow-hidden">
-        {(['day_one', 'phase2', 'later'] as const).map(p => (
-          <button
-            key={p}
-            onClick={() => storeActions.setDemoSwitches({ phase: p })}
-            className={clsx(
-              'px-2 py-1 text-[10px] font-mono transition-colors',
-              switches.phase === p
-                ? 'bg-yellow/10 text-yellow border-r border-yellow-dark/40'
-                : 'bg-transparent text-paper/60 hover:text-paper'
-            )}
-          >
-            {p === 'day_one' ? 'Day 1' : p === 'phase2' ? 'Phase 2' : 'Later'}
-          </button>
-        ))}
-      </div>
-
-      {/* Show hidden */}
-      <button
-        onClick={() => storeActions.setDemoSwitches({ showHidden: !switches.showHidden })}
-        className={clsx(
-          'flex-shrink-0 px-2 py-1 text-[10px] font-mono rounded-lg border transition-colors',
-          switches.showHidden
-            ? 'bg-yellow/10 text-yellow border-yellow-dark/40'
-            : 'bg-[#1a1b20] text-paper/60 border-[#2a2c30] hover:text-paper'
-        )}
-      >
-        {switches.showHidden ? 'Show hidden: ON' : 'Show hidden: OFF'}
-      </button>
+      {/* Phase and Show hidden were removed (owner, 12 Oct): the demo always shows every
+          phase, and actions a user can't take are simply absent, as in the product. */}
 
       {/* Sales view */}
       <button

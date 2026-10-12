@@ -104,6 +104,16 @@ export const useStore = create<Store>()(
         // Tour dismissals persist so finished walkthroughs stay finished.
         walkthroughsDone: state.walkthroughsDone,
       }),
+      // The demo always shows every phase and never shows hidden actions: a phase or
+      // Show hidden value saved by an older version is dropped on load.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<StoreState>;
+        return {
+          ...current,
+          ...p,
+          demoSwitches: { ...defaultSwitches, ...(p.demoSwitches ?? {}), phase: 'later', showHidden: false },
+        };
+      },
       // Re-apply the persisted demo clock offset to the simulated clock, so a
       // refresh keeps demo time (spec: reload persistence).
       onRehydrateStorage: () => (state) => {

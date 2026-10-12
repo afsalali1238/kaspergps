@@ -10,24 +10,10 @@
 //  5. Switching to another user on /app shows that user, not the previous one.
 
 import { expect, test } from '@playwright/test';
-import { goTo, setPhase, signIn, USERS, viewAs } from './helpers';
+import { goTo, signIn, USERS, viewAs } from './helpers';
 
 test.describe('F2: screens follow the store', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop nav and demo bar layout');
-
-  test('Day 1 hides the Maintenance nav without a reload', async ({ page }) => {
-    await signIn(page, USERS.khalid);
-    await goTo(page, '/app');
-    const nav = page.getByRole('navigation').getByRole('link', { name: 'Maintenance', exact: true });
-    await expect(nav.first()).toBeVisible();
-
-    // A marker on the window: it survives only if the page was not reloaded.
-    await page.evaluate(() => { (window as unknown as { __noReload: number }).__noReload = 1; });
-    await setPhase(page, 'Day 1');
-    await expect(nav).toHaveCount(0);
-    const marker = await page.evaluate(() => (window as unknown as { __noReload?: number }).__noReload);
-    expect(marker).toBe(1);
-  });
 
   test('an invited user appears in View as with the invited badge at once', async ({ page }) => {
     await signIn(page, USERS.lina);

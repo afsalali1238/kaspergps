@@ -3,7 +3,7 @@
 // phase switches that take both screens away again.
 
 import { expect, test } from '@playwright/test';
-import { demo, expectNoText, goTo, setPhase, USERS } from './helpers';
+import { demo, expectNoText, goTo, USERS } from './helpers';
 
 test.describe('S37 — Khalid’s maintenance board', () => {
   test('overdue, due soon and ok, with a service task per fault code', async ({ page }) => {
@@ -57,20 +57,4 @@ test.describe('S40 — Mark, a Site User, sees maintenance but no money', () => 
   });
 });
 
-test.describe('S41 — the phase ladder', () => {
-  test('Phase 2 hides maintenance and cost, Day one hides more', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, on: '/app' });
-    await setPhase(page, 'Phase 2');
-    for (const label of ['Maintenance', 'Cost & ROI']) {
-      await expect(page.getByRole('link', { name: label })).toHaveCount(0);
-    }
-    await goTo(page, '/app/geofences');
-    await expect(page.getByRole('heading', { name: 'Geofences' })).toBeVisible();
-
-    await setPhase(page, 'Day 1');
-    await goTo(page, '/app/geofences');
-    await expect(page.getByText('Not available')).toBeVisible();
-    await goTo(page, '/app/downloads');
-    await expect(page.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-  });
-});
+// S41 (phase ladder) was removed with the Phase control: the demo always shows every phase.

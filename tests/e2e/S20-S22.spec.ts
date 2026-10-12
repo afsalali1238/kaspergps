@@ -2,32 +2,9 @@
 // view that locks Tier 3 features, and the deactivated account.
 
 import { expect, test } from '@playwright/test';
-import { demo, goTo, setPhase, setSalesView, USERS } from './helpers';
+import { demo, setSalesView, USERS } from './helpers';
 
-test.describe('S20 — Day one hides every Phase 2 surface', () => {
-  test('maintenance and cost are locked, the map loses labels and playback', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, on: '/app' });
-    await setPhase(page, 'Day 1');
-
-    await goTo(page, '/app/maintenance');
-    await expect(page.getByText('Not available')).toBeVisible();
-    await expect(page.getByText(/arrives in the Later phase/)).toBeVisible();
-
-    await goTo(page, '/app/cost');
-    await expect(page.getByText('Not available')).toBeVisible();
-  });
-
-  // Maintenance and Cost & ROI are Later features (spec 11.18, 11.19): Phase 2
-  // still hides them, and only the Later phase brings them back.
-  test('the Later phase brings maintenance and cost back', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, on: '/app' });
-    await setPhase(page, 'Later');
-    await goTo(page, '/app/maintenance');
-    await expect(page.getByRole('heading', { name: 'Maintenance' })).toBeVisible();
-    await goTo(page, '/app/cost');
-    await expect(page.getByRole('heading', { name: 'Cost & ROI' })).toBeVisible();
-  });
-});
+// S20 (phase switch) was removed with the Phase control: the demo always shows every phase.
 
 test.describe('S21 — the sales view locks Tier 3 cards', () => {
   test('locked “Needs ALL-CAN300 (Tier 3)” cards appear on FB-12 and go again', async ({ page }) => {
