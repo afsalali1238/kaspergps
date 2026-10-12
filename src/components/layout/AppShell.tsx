@@ -41,6 +41,15 @@ export function navItemAllowed(session: Session | null, item: NavItem, phase: st
   return true;
 }
 
+/**
+ * Settings (§11.8) holds company admin: users, sites and assets. It shows only
+ * to someone who may manage at least one of them, so Site Users never see it.
+ */
+export function settingsAllowed(session: Session | null): boolean {
+  if (!session) return false;
+  return can(session, 'users.manage') || can(session, 'sites.manage') || can(session, 'asset.create');
+}
+
 /** What a locked screen says, per route (spec 11.3 / phase ladder). */
 const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: string }> = {
   '/app/certificates': {
@@ -194,7 +203,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const routeItem = navItems.find(item =>
     pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href + '/'))
   );
-  const gate = routeGate(session, routeItem, currentPhase);
+  const onSettings = pathname === '/app/settings' || pathname.startsWith('/app/settings/');
+  const gate: ReturnType<typeof routeGate> = onSettings && session && !settingsAllowed(session)
+    ? ({ kind: 'not_found' } as const)
+    : routeGate(session, routeItem, currentPhase);
 
   const isCustomer = session && !session.isKasper;
   const showMobileNav = isCustomer;
@@ -425,7 +437,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Settings */}
-          {session && (
+          {settingsAllowed(session) && (
             <div className="mt-auto border-t border-line p-2">
               <Link
                 href={href('/app/settings')}

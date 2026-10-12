@@ -540,8 +540,8 @@ export default function BillingPage() {
                         <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv, t)}</td>
                         <td className="px-3 py-2 border-b border-line font-mono text-ink">{aed(inv.totalAed)}</td>
                         <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">
-                          {formatDay(inv.dueAt)}
-                          {inv.displayStatus === 'overdue' && <span className="text-red ml-1">{t('billing.status.overdue', 'Overdue')}</span>}
+                          {/* The status column already says Overdue; the date turns red instead. */}
+                          <span className={inv.displayStatus === 'overdue' ? 'text-red' : undefined}>{formatDay(inv.dueAt)}</span>
                         </td>
                         <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus, t)}</td>
                         <td className="px-3 py-2 border-b border-line">

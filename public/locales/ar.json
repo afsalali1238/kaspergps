@@ -910,7 +910,8 @@
       "hw_adapter": "محوّل CAN",
       "hw_none": "لا يوجد",
       "hw_locked": "تواصل مع Kasper لتغيير الأجهزة.",
-      "request_tracker": "طلب جهاز تتبع"
+      "request_tracker": "طلب جهاز تتبع",
+      "tracker_fitted": "مركّب"
     },
     "phase_gate": "الإعدادات متاحة في المرحلة 2.",
     "subtitle": "إدارة مستخدمي شركتك ومواقعها ومعدّاتها.",
