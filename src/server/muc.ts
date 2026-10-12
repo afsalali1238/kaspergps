@@ -94,10 +94,13 @@ export function buildEcuBreakdown(asset: Asset, fromMs: number, toMs: number): E
 
   const dayKey = (ms: number) => clock.formatDubaiDate(ms).replace(/ /g, ' ');
 
+  // Day keys are display strings ("5 Oct"), so order by each day's first reading, not by the string.
+  const dayStartMs = new Map<string, number>();
   let prevMs: number | null = null;
   for (const r of readings) {
     const t = new Date(r.deviceTime).getTime();
     const key = dayKey(t);
+    if (!dayStartMs.has(key) || t < dayStartMs.get(key)!) dayStartMs.set(key, t);
     let bucket = days.get(key);
     if (!bucket) {
       bucket = { date: key, engineHours: 0, workingHours: 0, idlingHours: 0, gapMinutes: 0 };
@@ -128,7 +131,7 @@ export function buildEcuBreakdown(asset: Asset, fromMs: number, toMs: number): E
       workingHours: n1(d.workingHours),
       idlingHours: n1(d.idlingHours),
     }))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    .sort((a, b) => (dayStartMs.get(a.date) ?? 0) - (dayStartMs.get(b.date) ?? 0));
 
   return { days: ordered, gaps, gapHours: n1(gapHours), maxGapHours: Math.round(maxGapHours * 10) / 10 };
 }

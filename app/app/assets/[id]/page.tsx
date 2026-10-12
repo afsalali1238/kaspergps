@@ -485,14 +485,13 @@ export default function AssetDetailPage() {
       </div>
 
       {/* Last updated */}
-      <div className="text-sm text-grey-500">
-        {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}{' '}
-        {reading ? `· ${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })}` : ''}
-        {reading && (
-          <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
-            {t('asset_detail.hover_details', '(hover for details)')}
-          </span>
-        )}
+      {/* Hover shows device time vs received time (§11.3); no visible hint text. */}
+      <div
+        className={reading ? 'text-sm text-grey-500 cursor-help w-fit' : 'text-sm text-grey-500'}
+        title={reading ? `Device time: ${clock.formatDubaiDateTime(new Date(reading.deviceTime).getTime())}\nReceived: ${clock.formatDubaiDateTime(new Date(reading.receivedAt).getTime())}` : undefined}
+      >
+        {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
+        {reading ? ` (${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })})` : ''}
       </div>
 
       {/* Rental strip */}
@@ -523,7 +522,7 @@ export default function AssetDetailPage() {
                 <div className="font-medium text-ink text-sm">{t('asset_detail.rental_strip.recent', 'Recent rentals')}</div>
                 {recentBookings.map(b => (
                   <div key={b.id} className="text-grey-700 text-sm mt-1">
-                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {renterNameOf(b)} ·
+                    {b.status === 'closed' ? t('asset_detail.rental_strip.rented_to_prefix', 'Rented to') : t('asset_detail.rental_strip.cancelled', 'Cancelled')} {renterNameOf(b)} ·{' '}
                     {clock.formatDubaiDate(new Date(b.start).getTime())} – {clock.formatDubaiDate(new Date(b.end).getTime())}
                   </div>
                 ))}

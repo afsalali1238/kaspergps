@@ -5,13 +5,17 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { useDb, hasRole, createUser, updateUserSites, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
+import { useDb, hasRole, computeStatus, createUser, updateUserSites, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
 import { searchPlaces } from '@/domain/places';
 import { renameLabel, deleteLabel, labelUsage, labelsVisibleTo } from '@/server/api';
 import { useT, useHref } from '@/i18n';
 import * as clock from '@/lib/clock';
 import { useSession, useSwitches } from '@/hooks';
 import type { Asset, AssetClass, Role } from '@/domain/types';
+
+const STATUS_WORD: Record<string, string> = {
+  live: 'Live', idle: 'Idle', stale: 'Stale', offline: 'Offline', unknown: 'Unknown', no_tracker: 'No tracker',
+};
 
 const EMPTY_INVITE = { name: '', email: '', role: 'tenant_admin' as Role, siteIds: [] as string[] };
 
@@ -661,8 +665,9 @@ export default function SettingsPage() {
                       <td className="px-3 py-2 border-b border-line text-grey-500">{a.assetClass}</td>
                       <td className="px-3 py-2 border-b border-line text-grey-700">{site?.name ?? '—'}</td>
                       <td className="px-3 py-2 border-b border-line">
+                        {/* Customers never see IMEIs or SIMs (spec §5): only whether one is fitted. */}
                         {tracker ? (
-                          <span className="font-mono text-xs text-grey-700">{tracker.imei}</span>
+                          <span className="text-xs text-grey-700">{t('settings.assets.tracker_fitted', 'Fitted')}</span>
                         ) : (
                           <span className="text-grey-400 text-xs">{t('settings.assets.no_tracker', 'No tracker')}</span>
                         )}
@@ -671,9 +676,15 @@ export default function SettingsPage() {
                         {a.retiredAt ? (
                           <Badge variant="grey">{t('settings.assets.retired', 'Retired')}</Badge>
                         ) : (
-                          <Badge variant={a.status === 'live' ? 'green' : a.status === 'offline' ? 'red' : a.status === 'unknown' ? 'yellow' : 'grey'}>
-                            {t(`common.status.${a.status}`, a.status)}
-                          </Badge>
+                          (() => {
+                            // The same status the map shows (one status function, H3).
+                            const live = computeStatus(a, clock.now());
+                            return (
+                              <Badge variant={live === 'live' ? 'green' : live === 'offline' ? 'red' : live === 'idle' || live === 'stale' ? 'yellow' : 'grey'}>
+                                {t(`common.status.${live}`, STATUS_WORD[live] ?? live)}
+                              </Badge>
+                            );
+                          })()
                         )}
                       </td>
                       <td className="px-3 py-2 text-right border-b border-line">

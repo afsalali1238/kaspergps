@@ -348,7 +348,11 @@ export default function MapPage() {
 
   const classOptions = useMemo(() => [...new Set(visibleAssets.map(a => a.asset.assetClass))], [visibleAssets]);
   const hasTierFilter = useMemo(() => new Set(visibleAssets.map(a => a.tier)).size > 1, [visibleAssets]);
-  const hasRented = useMemo(() => session ? visibleAssets.some(a => a.isRentedIn) : false, [visibleAssets, session]);
+  // §11.2: the Owned / Rented in switch shows only to a user who has both (kept while a choice is active).
+  const hasRented = useMemo(
+    () => session ? rentedFilter !== 'all' || (visibleAssets.some(a => a.isRentedIn) && visibleAssets.some(a => !a.isRentedIn)) : false,
+    [visibleAssets, session, rentedFilter]
+  );
 
   const totalVisible = visibleAssets.length;
 

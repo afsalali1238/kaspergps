@@ -81,3 +81,26 @@ describe('AppShell nav (H4.7)', () => {
     expect(screen.getByText('Page not found')).not.toBeNull();
   });
 });
+
+describe('AppShell Settings (§11.8: company admin only)', () => {
+  afterEach(() => {
+    session.current = null;
+    nav.pathname = '/app';
+  });
+
+  it('a Tenant Admin gets Settings', () => {
+    session.current = sessionFor('u-omar');
+    renderShell();
+    expect(screen.queryAllByRole('link', { name: 'Settings' }).length).toBeGreaterThan(0);
+  });
+
+  it('a Site User gets no Settings link, and the page reads as not found', () => {
+    session.current = { ...sessionFor('u-mark') };
+    const first = renderShell();
+    expect(screen.queryAllByRole('link', { name: 'Settings' })).toHaveLength(0);
+    first.unmount();
+    nav.pathname = '/app/settings';
+    renderShell();
+    expect(screen.queryByText('page body')).toBeNull();
+  });
+});
