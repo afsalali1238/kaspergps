@@ -161,6 +161,7 @@ export default function ReportsPage() {
             <button
               key={report.id}
               onClick={() => setSelectedReport(report.id)}
+              aria-pressed={selectedReport === report.id}
               className={clsx(
                 'text-left px-4 py-3 rounded-lg border transition-colors',
                 selectedReport === report.id

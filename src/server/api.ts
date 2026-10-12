@@ -186,7 +186,7 @@ export type { AssetCostRow, CostPeriod } from './cost';
 export { append, hydrateDb, nextRowNumber, useDb } from './db';
 export type { DbRow, DbState } from './db';
 export { clockPresets, dubaiYesterdayAt, fb12PublicPath, presetAt } from './demo-presets';
-export { createGeofence, deleteGeofence, visibleGeofenceEvents, visibleGeofences } from './geofences';
+export { assetGeofenceStatus, createGeofence, createSiteGeofence, deleteGeofence, updateGeofence, visibleGeofenceEvents, visibleGeofences } from './geofences';
 export { getTrackingLinkState, resolveTrackingLink } from './links';
 export { boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts, openTasks, planSnapshot, plansForAsset, plansVisibleTo, savePlan, serviceHistory } from './maintenance';
 export type { PlanSnapshot } from './maintenance';

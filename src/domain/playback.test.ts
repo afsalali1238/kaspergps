@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Reading } from '@/domain/types';
 import {
   advancePlayhead,
+  buildPins,
   buildSpans,
   gapAt,
   positionAt,
@@ -198,5 +199,84 @@ describe('trailUntil', () => {
     expect(total).toBeLessThanOrEqual(5000);
     const flat = lines.flat();
     expect(flat[flat.length - 1].ms).toBe(end);
+  });
+});
+
+describe('event pins (spec 11.15)', () => {
+  const window = { fromMs: T0 - min(5), toMs: T0 + min(60) };
+  const pin = (over: { readings: Reading[]; tier?: 1 | 2 | 3; geofenceEvents?: { atMs: number; type: 'enter' | 'exit'; geofenceName: string }[] }) =>
+    buildPins({
+      readings: over.readings,
+      tier: over.tier ?? 1,
+      fromMs: window.fromMs,
+      toMs: window.toMs,
+      geofenceEvents: over.geofenceEvents ?? [],
+    });
+
+  it('one over-speed pin per run, at its first reading, labelled with the top speed', () => {
+    const readings = [
+      reading(0, { speedKmh: 60 }),
+      reading(min(1), { speedKmh: 101 }),
+      reading(min(2), { speedKmh: 104 }),
+      reading(min(3), { speedKmh: 90 }),
+      reading(min(4), { speedKmh: 102 }),
+    ];
+    const pins = pin({ readings });
+    expect(pins.map(p => [p.kind, p.label])).toEqual([
+      ['overspeed', 'Over speed 104 km/h'],
+      ['overspeed', 'Over speed 102 km/h'],
+    ]);
+    expect(pins[0].atMs).toBe(T0 + min(1));
+  });
+
+  it('a silence inside an over-speed run starts a new pin', () => {
+    const readings = [reading(0, { speedKmh: 105 }), reading(min(11), { speedKmh: 105 })];
+    expect(pin({ readings }).filter(p => p.kind === 'overspeed')).toHaveLength(2);
+  });
+
+  it('a fuel drop of 10 points or more gives a pin on Tier 2 and 3, never on Tier 1', () => {
+    const readings = [
+      reading(0, { fuelLevelPct: 80 }),
+      reading(min(1), { fuelLevelPct: 65 }),
+    ];
+    expect(pin({ readings, tier: 2 }).map(p => p.kind)).toEqual(['fuel_drop']);
+    expect(pin({ readings, tier: 3 })[0].label).toBe('Fuel fell 15 points');
+    expect(pin({ readings, tier: 1 })).toEqual([]);
+  });
+
+  it('a fuel drop across a data gap is not measured, so it gives no pin', () => {
+    const readings = [
+      reading(0, { fuelLevelPct: 80 }),
+      reading(min(20), { fuelLevelPct: 40 }),
+    ];
+    expect(pin({ readings, tier: 3 })).toEqual([]);
+  });
+
+  it('geofence events inside the window become pins; those outside do not', () => {
+    const pins = pin({
+      readings: [],
+      geofenceEvents: [
+        { atMs: T0 + min(5), type: 'enter', geofenceName: 'Gate' },
+        { atMs: T0 + min(6), type: 'exit', geofenceName: 'Gate' },
+        { atMs: T0 + min(600), type: 'enter', geofenceName: 'Later' },
+      ],
+    });
+    expect(pins.map(p => [p.kind, p.label])).toEqual([
+      ['geofence_enter', 'Entered Gate'],
+      ['geofence_exit', 'Left Gate'],
+    ]);
+  });
+
+  it('readings outside the window are ignored, and pins come back in time order', () => {
+    const readings = [reading(-min(30), { speedKmh: 120 }), reading(min(2), { speedKmh: 110 })];
+    const pins = pin({
+      readings,
+      geofenceEvents: [{ atMs: T0 + min(1), type: 'enter', geofenceName: 'Gate' }],
+    });
+    expect(pins.map(p => p.kind)).toEqual(['geofence_enter', 'overspeed']);
+  });
+
+  it('no readings and no events give no pins', () => {
+    expect(pin({ readings: [] })).toEqual([]);
   });
 });

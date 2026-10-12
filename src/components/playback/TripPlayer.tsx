@@ -20,6 +20,8 @@ import {
   stepPlayhead,
   trailDistanceKm,
   trailUntil,
+  type PinKind,
+  type PlaybackPin,
   type PlaybackSpeed,
   type PlaybackState,
   type Span,
@@ -31,8 +33,17 @@ export interface TripPlayerProps {
   readings: Reading[];
   fromMs: number;
   toMs: number;
+  /** Event pins on the scrubber, built by the screen (see buildPins). */
+  pins?: PlaybackPin[];
   onClose: () => void;
 }
+
+const PIN_COLOUR: Record<PinKind, string> = {
+  overspeed: '#e03131',
+  fuel_drop: '#7048e8',
+  geofence_enter: '#1971c2',
+  geofence_exit: '#1971c2',
+};
 
 const STATE_COLOUR: Record<Exclude<PlaybackState, 'no_data'>, string> = {
   moving: '#2f9e44',
@@ -91,7 +102,7 @@ function SpanTrack({ spans, fromMs, toMs }: { spans: Span[]; fromMs: number; toM
   );
 }
 
-export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, onClose }: TripPlayerProps) {
+export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = [], onClose }: TripPlayerProps) {
   const sorted = useMemo(() => sortReadings(readings), [readings]);
   const spans = useMemo(() => buildSpans(sorted, fromMs, toMs), [sorted, fromMs, toMs]);
 
@@ -241,6 +252,30 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, onClose }
           </div>
         </div>
 
+        {pins.length > 0 && (
+          <div className="relative h-4" data-testid="event-pins" aria-label="Event pins" role="group">
+            {pins.map((p, i) => {
+              const total = Math.max(1, toMs - fromMs);
+              const left = ((p.atMs - fromMs) / total) * 100;
+              return (
+                <button
+                  key={`${p.kind}-${p.atMs}-${i}`}
+                  type="button"
+                  title={`${p.label} · ${fmt(p.atMs)}`}
+                  aria-label={`${p.label} at ${fmt(p.atMs)}`}
+                  onClick={() => {
+                    setPlaying(false);
+                    setJump(null);
+                    moveTo(p.atMs);
+                  }}
+                  className="absolute top-0 -translate-x-1/2 w-3 h-3 rounded-full border border-white shadow"
+                  style={{ left: `${left}%`, background: PIN_COLOUR[p.kind] }}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {banner && (
           <div role="status" className="text-xs px-2 py-1 rounded bg-paper-2 text-ink" data-testid="gap-banner">
             No data {fmt(banner.fromMs)} – {fmt(banner.toMs)}
@@ -304,6 +339,10 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, onClose }
               <div>
                 <dt className="text-grey-500">Engine load</dt>
                 <dd>{pick(reading?.engineLoadPct, '%')}</dd>
+              </div>
+              <div>
+                <dt className="text-grey-500">AdBlue</dt>
+                <dd>{pick(reading?.adBluePct, '%')}</dd>
               </div>
             </>
           )}

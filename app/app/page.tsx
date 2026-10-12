@@ -91,13 +91,13 @@ function lastUpdatedStr(asset: Asset, locale: Locale): string {
   const ms = new Date(reading.deviceTime).getTime();
   const ageMin = clock.minutesSinceDubai(ms);
   const ageH = clock.hoursSinceDubai(ms);
-  if (ageMin < 60) {
-    return translate(locale, 'map.updated_ago', '{time} · {minutes} min ago', {
-      time: clock.formatDubaiTime(ms), minutes: Math.round(ageMin),
-    });
-  }
-  return translate(locale, 'map.updated_ago', '{time} · {hours} h ago', {
-    time: clock.formatDubaiTime(ms), hours: Math.round(ageH),
+  // The age phrase comes from the shell keys, which are translated with their own
+  // plurals; map.updated_ago only joins the time and that phrase.
+  const ago = ageMin < 60
+    ? translate(locale, 'shell.min_ago', '{count} min ago', { count: Math.round(ageMin) })
+    : translate(locale, 'shell.hours_ago', '{count} h ago', { count: Math.round(ageH) });
+  return translate(locale, 'map.updated_ago', '{time} · {ago}', {
+    time: clock.formatDubaiTime(ms), ago,
   });
 }
 
@@ -154,6 +154,11 @@ export default function MapPage() {
   const [urlReady, setUrlReady] = useState(false);
   const [removeLabelId, setRemoveLabelId] = useState('');
   const [showGeofences, setShowGeofences] = useState(false);
+  // Map tiles: after three failed tiles in a row the map steps aside, so the list
+  // takes the screen. A Retry remounts the map.
+  const [tilesFailed, setTilesFailed] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const tileErrors = useRef(0);
 
   useEffect(() => {
     setLoading(false);
@@ -439,8 +444,17 @@ export default function MapPage() {
       ) : (
         <>
           {/* Map */}
-          <div className="rounded-xl border border-line bg-paper overflow-hidden h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px]">
+          {tilesFailed && (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg border border-red/40 bg-red/5 text-xs text-ink">
+              <span>{t('map.tiles_failed', 'The map could not load. Every asset is still in the list below.')}</span>
+              <Button size="sm" variant="secondary" onClick={() => { tileErrors.current = 0; setTilesFailed(false); setMapKey(k => k + 1); }}>
+                {t('common.retry', 'Retry')}
+              </Button>
+            </div>
+          )}
+          <div className={clsx('rounded-xl border border-line bg-paper overflow-hidden h-[400px] sm:h-[480px] md:h-[520px] lg:h-[560px]', tilesFailed && 'hidden')}>
             <MapContainer
+              key={mapKey}
               center={[25.2048, 55.2708]}
               zoom={10}
               scrollWheelZoom={true}
@@ -449,6 +463,13 @@ export default function MapPage() {
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                eventHandlers={{
+                  tileerror: () => {
+                    tileErrors.current += 1;
+                    if (tileErrors.current >= 3) setTilesFailed(true);
+                  },
+                  tileload: () => { tileErrors.current = 0; },
+                }}
               />
               <ClusterLayer markers={clusterMarkers} />
               {showGeofences && <GeofenceOverlayLayer fences={geofenceOverlay} />}

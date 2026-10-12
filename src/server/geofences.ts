@@ -3,7 +3,7 @@
 
 import type { Asset, Geofence, GeofenceEvent, LatLng, Session } from '@/domain/types';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
-import { db, append, removeWhere } from '@/server/db';
+import { db, append, removeWhere, touch } from '@/server/db';
 import { fail, ok, type OpResult } from '@/server/result';
 import { isAssetVisible } from '@/server/access';
 import { recordAuditForSession } from '@/server/audit';
@@ -115,6 +115,8 @@ export interface CreateGeofenceInput {
   alertOnEnter: boolean;
   alertOnExit: boolean;
   assetIds: string[] | 'all';
+  /** Set for a site's own geofence (spec §11.12). */
+  siteId?: string;
 }
 
 export const GEOFENCE_RADIUS_MIN_M = 50;
@@ -122,6 +124,7 @@ export const GEOFENCE_RADIUS_MAX_M = 5000;
 export const GEOFENCE_POINTS_MIN = 3;
 export const GEOFENCE_POINTS_MAX = 30;
 const WEEK_MS = 7 * 86_400_000;
+const DAY_MS = 86_400_000;
 
 /** Metres between two points (haversine). */
 function metresBetween(a: LatLng, b: LatLng): number {
@@ -179,6 +182,19 @@ function validShape(shape: GeofenceShape): string | null {
   return null;
 }
 
+/** Events for the last 7 days, from the readings of the covered assets this viewer can see. */
+function recordGeofenceEvents(session: Session, id: string, shape: GeofenceShape, assetIds: Geofence['assetIds'], now: number): void {
+  const covered: Asset[] = db.getState().assets.filter(a =>
+    (assetIds === 'all' || assetIds.includes(a.id)) && isAssetVisible(session, a.id),
+  );
+  for (const asset of covered) {
+    const readings = getReadingsForAsset(asset, now - WEEK_MS, now);
+    for (const ev of eventsFromReadings(shape, readings)) {
+      append('geofenceEvents', { id: `ge-${id}-${asset.id}-${ev.at}`, geofenceId: id, assetId: asset.id, type: ev.type, at: new Date(ev.at).toISOString() });
+    }
+  }
+}
+
 /** Create a circle or polygon: Kasper or the tenant admin (geofence.manage). */
 export function createGeofence(session: Session, input: CreateGeofenceInput): OpResult<GeofenceView> {
   if (!can(session, 'geofence.manage')) {
@@ -199,7 +215,7 @@ export function createGeofence(session: Session, input: CreateGeofenceInput): Op
     name,
     kind: input.kind,
     shape,
-    siteId: undefined,
+    siteId: input.siteId,
     alertOnEnter: input.alertOnEnter,
     alertOnExit: input.alertOnExit,
     assetIds: input.assetIds,
@@ -207,21 +223,32 @@ export function createGeofence(session: Session, input: CreateGeofenceInput): Op
     createdAt: new Date(now).toISOString(),
   };
   append('geofences', geofence);
-
-  // Events for the last 7 days, from the readings of the covered assets this tenant can see.
-  const covered: Asset[] = db.getState().assets.filter(a =>
-    (input.assetIds === 'all' || input.assetIds.includes(a.id)) && isAssetVisible(session, a.id),
-  );
-  for (const asset of covered) {
-    const readings = getReadingsForAsset(asset, now - WEEK_MS, now);
-    for (const ev of eventsFromReadings(shape, readings)) {
-      append('geofenceEvents', { id: `ge-${id}-${asset.id}-${ev.at}`, geofenceId: id, assetId: asset.id, type: ev.type, at: new Date(ev.at).toISOString() });
-    }
-  }
+  recordGeofenceEvents(session, id, shape, input.assetIds, now);
 
   const shapeText = shape.type === 'circle' ? `${shape.radiusM} m circle` : `${shape.points.length}-point polygon`;
   recordAuditForSession(session, { action: 'geofence.create', tenantId: geofence.tenantId, detail: `Geofence ${name} created (${shapeText})` });
   return ok(geofenceView(geofence, db.getState().geofenceEvents), 'Geofence created');
+}
+
+/**
+ * A site's own geofence: a circle at the site's centre with the site's radius. One
+ * per site. Only the company that owns the site can make it.
+ */
+export function createSiteGeofence(session: Session, siteId: string): OpResult<GeofenceView> {
+  if (!can(session, 'geofence.manage')) return fail('You can’t create geofences.');
+  const site = db.getState().sites.find(x => x.id === siteId);
+  if (!site || site.tenantId !== session.tenantId) return fail('Site not found.');
+  if (db.getState().geofences.some(g => g.siteId === siteId)) return fail(`${site.name} already has a site geofence.`);
+  return createGeofence(session, {
+    name: `${site.name} site`,
+    kind: 'site',
+    center: site.center,
+    radiusM: site.radiusM,
+    alertOnEnter: false,
+    alertOnExit: false,
+    assetIds: 'all',
+    siteId,
+  });
 }
 
 /** Delete: Kasper or the owner tenant admin. */
@@ -239,4 +266,76 @@ export function deleteGeofence(session: Session, id: string): OpResult<null> {
     detail: `Geofence ${removed.name} deleted`,
   });
   return ok(null, 'Geofence deleted');
+}
+
+export interface UpdateGeofenceInput {
+  name?: string;
+  shape?: GeofenceShape;
+  alertOnEnter?: boolean;
+  alertOnExit?: boolean;
+}
+
+/**
+ * Edit a fence's name, shape or alert switches (spec §11.12). A new shape replaces the
+ * old one and its events are worked out again over the last 7 days, so events of the
+ * old shape do not linger. A site's own geofence follows its site, so its shape is
+ * changed by changing the site, not here.
+ */
+export function updateGeofence(session: Session, id: string, input: UpdateGeofenceInput): OpResult<GeofenceView> {
+  if (!can(session, 'geofence.manage')) return fail('You can’t edit geofences.');
+  const geofence = db.getState().geofences.find(g => g.id === id && geofenceVisible(session, g));
+  if (!geofence) return fail('Geofence not found.');
+
+  const name = input.name !== undefined ? input.name.trim() : geofence.name;
+  if (!name) return fail('Give the geofence a name.');
+  if (input.shape && geofence.siteId) return fail('A site geofence follows its site. Change the site instead.');
+  if (input.shape) {
+    const problem = validShape(input.shape);
+    if (problem) return fail(problem);
+  }
+  const nextShape = input.shape ?? geofence.shape;
+  const shapeChanged = JSON.stringify(nextShape) !== JSON.stringify(geofence.shape);
+  const alertsChanged = (input.alertOnEnter ?? geofence.alertOnEnter) !== geofence.alertOnEnter
+    || (input.alertOnExit ?? geofence.alertOnExit) !== geofence.alertOnExit;
+  const nameChanged = name !== geofence.name;
+
+  geofence.name = name;
+  geofence.alertOnEnter = input.alertOnEnter ?? geofence.alertOnEnter;
+  geofence.alertOnExit = input.alertOnExit ?? geofence.alertOnExit;
+  if (shapeChanged) {
+    geofence.shape = nextShape;
+    removeWhere('geofenceEvents', e => e.geofenceId === id);
+    recordGeofenceEvents(session, id, nextShape, geofence.assetIds, clock.now());
+  }
+  touch('geofences');
+
+  const changed = [nameChanged ? 'name' : '', shapeChanged ? 'shape' : '', alertsChanged ? 'alerts' : ''].filter(Boolean);
+  recordAuditForSession(session, {
+    action: 'geofence.edit',
+    tenantId: geofence.tenantId,
+    detail: `Geofence ${name} edited${changed.length ? ` (${changed.join(', ')})` : ''}`,
+  });
+  return ok(geofenceView(geofence, db.getState().geofenceEvents), 'Geofence saved');
+}
+
+/**
+ * Where an asset is against the viewer's geofences (spec §11.12): the fences that
+ * cover it and contain its last known position. Only the owning company sees this;
+ * renters and Kasper staff get null, as does an asset with no reading in the last day.
+ */
+export function assetGeofenceStatus(session: Session, assetId: string): { inside: string[] } | null {
+  if (!can(session, 'asset.view', assetId)) return null;
+  const asset = db.getState().assets.find(a => a.id === assetId);
+  if (!asset || session.isKasper || asset.ownerTenantId !== session.tenantId) return null;
+  const now = clock.now();
+  const readings = getReadingsForAsset(asset, now - DAY_MS, now)
+    .sort((a, b) => new Date(a.deviceTime).getTime() - new Date(b.deviceTime).getTime());
+  const last = readings[readings.length - 1];
+  if (!last) return null;
+  const point = { lat: last.lat, lng: last.lng };
+  const inside = db.getState().geofences
+    .filter(g => g.tenantId === session.tenantId && (g.assetIds === 'all' || g.assetIds.includes(asset.id)))
+    .filter(g => insideShape(g.shape, point))
+    .map(g => g.name);
+  return { inside };
 }

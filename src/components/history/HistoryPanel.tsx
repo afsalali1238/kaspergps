@@ -26,6 +26,8 @@ export interface HistoryPanelProps {
   /** Earliest time this session may view (renters); null for owners and Kasper. */
   floorMs: number | null;
   readingsFor: (fromMs: number, toMs: number) => Reading[];
+  /** Opens the playback player over the period shown (spec 11.3 "Play this period"). */
+  onPlay?: (fromMs: number, toMs: number) => void;
 }
 
 const PAGE = 100;
@@ -45,7 +47,7 @@ const ERRORS: Record<string, string> = {
   missing: 'Choose a start and an end.',
 };
 
-export function HistoryPanel({ supported, nowMs, floorMs, readingsFor }: HistoryPanelProps) {
+export function HistoryPanel({ supported, nowMs, floorMs, readingsFor, onPlay }: HistoryPanelProps) {
   const [period, setPeriod] = useState<HistoryPeriod>('24h');
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalInput(nowMs - HISTORY_DAY_MS));
   const [customTo, setCustomTo] = useState<string>(() => toLocalInput(nowMs));
@@ -116,6 +118,18 @@ export function HistoryPanel({ supported, nowMs, floorMs, readingsFor }: History
           </button>
         ))}
       </div>
+
+      {onPlay && range && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => onPlay(range.fromMs, range.toMs)}
+            className="px-2 py-1 border border-line rounded text-xs text-ink"
+          >
+            Play this period
+          </button>
+        </div>
+      )}
 
       {period === 'custom' && (
         <div className="flex flex-wrap items-end gap-2 text-xs">

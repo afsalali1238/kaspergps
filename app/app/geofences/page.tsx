@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Button, Badge, EmptyState,
 } from '@/components/ui';
-import { useDb, isAssetVisible, visibleGeofences, visibleGeofenceEvents, createGeofence, deleteGeofence, can } from '@/server/api';
+import { useDb, isAssetVisible, visibleGeofences, visibleGeofenceEvents, createGeofence, updateGeofence, deleteGeofence, can } from '@/server/api';
 import { GeofenceEditor, type ShapeValue, type OverlayFence } from '@/components/geofences/GeofenceMap';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
@@ -42,6 +42,8 @@ export default function GeofencesPage() {
   const [alertExit, setAlertExit] = useState(true);
   const [scope, setScope] = useState<'all' | string>('all');
   const [formError, setFormError] = useState<string | null>(null);
+  // The fence being edited, or null when the form creates a new one.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const geofences = useMemo(
     () => (session ? visibleGeofences(session) : []),
@@ -104,6 +106,60 @@ export default function GeofencesPage() {
     }
   };
 
+  const editing = editingId ? geofences.find(g => g.id === editingId) ?? null : null;
+  // A site's own geofence follows its site, so its shape is not drawn here.
+  const shapeLocked = Boolean(editing?.siteName);
+
+  const closeForm = () => {
+    setShowCreateForm(false);
+    setEditingId(null);
+    setFormError(null);
+  };
+
+  const toggleCreate = () => {
+    if (showCreateForm) return closeForm();
+    setEditingId(null);
+    setName('');
+    setFormError(null);
+    setShowCreateForm(true);
+  };
+
+  const startEdit = (g: (typeof geofences)[number]) => {
+    setEditingId(g.id);
+    setName(g.name);
+    setKind(g.kind);
+    setShape(g.shape === 'circle'
+      ? { type: 'circle', center: g.center ?? { lat: 0, lng: 0 }, radiusM: g.radiusM ?? 0 }
+      : { type: 'polygon', points: g.points ?? [] });
+    setRadiusText(String(g.radiusM ?? ''));
+    setAlertEnter(g.alertOnEnter);
+    setAlertExit(g.alertOnExit);
+    setFormError(null);
+    setShowCreateForm(true);
+  };
+
+  const handleSave = () => {
+    setFormError(null);
+    if (!editingId) return;
+    if (!shapeLocked && !shape) {
+      setFormError(t('geofences.draw_first', 'Draw a circle or a polygon on the map.'));
+      return;
+    }
+    const result = updateGeofence(session, editingId, {
+      name,
+      alertOnEnter: alertEnter,
+      alertOnExit: alertExit,
+      ...(shapeLocked || !shape ? {} : { shape }),
+    });
+    if (!result.ok) {
+      setFormError(result.error ?? 'Could not save the geofence.');
+      return;
+    }
+    closeForm();
+    setVersion(v => v + 1);
+    showToast(result.message ?? t('geofences.saved', 'Geofence saved'));
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -122,7 +178,7 @@ export default function GeofencesPage() {
         <>
           {canManage && (
             <div className="flex gap-2">
-              <Button onClick={() => setShowCreateForm(!showCreateForm)}>{t('geofences.create', 'Create geofence')}</Button>
+              <Button onClick={toggleCreate}>{t('geofences.create', 'Create geofence')}</Button>
             </div>
           )}
 
@@ -134,7 +190,9 @@ export default function GeofencesPage() {
 
           {showCreateForm && (
             <div className="bg-surface border border-line rounded-lg p-4">
-              <h2 className="text-sm font-medium text-ink mb-3">{t('geofences.create', 'Create geofence')}</h2>
+              <h2 className="text-sm font-medium text-ink mb-3">
+                {editing ? t('geofences.edit_title', 'Edit {name}', { name: editing.name }) : t('geofences.create', 'Create geofence')}
+              </h2>
               <div className="space-y-3">
                 <div>
                   <label htmlFor="gf-name" className="text-xs text-grey-500 font-medium">{t('geofences.name', 'Name')}</label>
@@ -151,8 +209,9 @@ export default function GeofencesPage() {
                   <label className="text-xs text-grey-500 font-medium">{t('geofences.kind', 'Kind')}</label>
                   <select
                     value={kind}
+                    disabled={Boolean(editing)}
                     onChange={e => setKind(e.target.value as 'site' | 'job' | 'yard' | 'restricted')}
-                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink disabled:opacity-60"
                   >
                     <option value="job">{t('geofences.kinds.job', 'Job')}</option>
                     <option value="yard">{t('geofences.kinds.yard', 'Yard')}</option>
@@ -165,8 +224,14 @@ export default function GeofencesPage() {
                   <p className="text-xs text-grey-500">
                     {t('geofences.draw_hint', 'Use the toolbar on the map to draw a circle or polygon (3–30 points). Drag or edit the points, or remove the shape.')}
                   </p>
-                  <GeofenceEditor shape={shape} onChange={next => { setShape(next); if (next?.type === 'circle') setRadiusText(String(next.radiusM)); }} overlay={overlay} />
-                  {shape?.type === 'circle' && (
+                  {shapeLocked ? (
+                    <p className="text-xs text-grey-500">
+                      {t('geofences.site_locked', 'This is a site geofence. It follows the site’s centre and radius, so change the site to move it.')}
+                    </p>
+                  ) : (
+                    <GeofenceEditor shape={shape} onChange={next => { setShape(next); if (next?.type === 'circle') setRadiusText(String(next.radiusM)); }} overlay={overlay} />
+                  )}
+                  {shape?.type === 'circle' && !shapeLocked && (
                     <div>
                       <label htmlFor="gf-radius" className="text-xs text-grey-500 font-medium">{t('geofences.radius', 'Radius (m)')}</label>
                       <input
@@ -201,8 +266,9 @@ export default function GeofencesPage() {
                   <label className="text-xs text-grey-500 font-medium">{t('geofences.assets', 'Assets')}</label>
                   <select
                     value={scope}
+                    disabled={Boolean(editing)}
                     onChange={e => setScope(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
+                    className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink disabled:opacity-60"
                   >
                     <option value="all">{t('geofences.all_assets', 'All assets')}</option>
                     {seed.assets.filter(a => isAssetVisible(session, a.id)).map(a => (
@@ -212,8 +278,10 @@ export default function GeofencesPage() {
                 </div>
                 {formError && <div className="text-xs text-red">{formError}</div>}
                 <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setShowCreateForm(false)}>{t('common.cancel', 'Cancel')}</Button>
-                  <Button onClick={handleCreate}>{t('geofences.create_button', 'Create')}</Button>
+                  <Button variant="secondary" onClick={closeForm}>{t('common.cancel', 'Cancel')}</Button>
+                  <Button onClick={editing ? handleSave : handleCreate}>
+                    {editing ? t('geofences.save', 'Save changes') : t('geofences.create_button', 'Create')}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -255,6 +323,14 @@ export default function GeofencesPage() {
                       </div>
                     )}
                   </div>
+                  {canManage && (
+                    <button
+                      onClick={() => startEdit(geofence)}
+                      className="mr-2 text-xs px-2 py-1 rounded bg-paper border border-line text-ink hover:bg-paper-2"
+                    >
+                      {t('common.edit', 'Edit')}
+                    </button>
+                  )}
                   {canManage && (
                     <button
                       onClick={() => handleDelete(geofence.id)}

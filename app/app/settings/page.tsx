@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
 } from '@/components/ui';
-import { useDb, hasRole, createUser, updateUserSites, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite } from '@/server/api';
+import { useDb, hasRole, createUser, updateUserSites, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
 import { searchPlaces } from '@/domain/places';
 import { renameLabel, deleteLabel, labelUsage, labelsVisibleTo } from '@/server/api';
 import { useT, useHref } from '@/i18n';
@@ -62,6 +62,7 @@ export default function SettingsPage() {
   const [assetDraft, setAssetDraft] = useState(EMPTY_ASSET);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [assetNotice, setAssetNotice] = useState<string | null>(null);
+  const [newAssetId, setNewAssetId] = useState<string | null>(null);
   const [siteDraft, setSiteDraft] = useState(EMPTY_SITE);
   const [siteError, setSiteError] = useState<string | null>(null);
   const [siteNotice, setSiteNotice] = useState<string | null>(null);
@@ -124,6 +125,7 @@ export default function SettingsPage() {
     setAssetDraft(EMPTY_ASSET);
     setAssetError(null);
     setAssetNotice(result.message ?? null);
+    setNewAssetId(result.data?.id ?? null);
     setShowAddAsset(false);
     setRowError(null);
   };
@@ -154,6 +156,16 @@ export default function SettingsPage() {
     setSiteDraft({ name: site.name, radius: String(site.radiusM), center: site.center, placeName: '' });
     setSiteError(null);
     setShowAddSite(true);
+  };
+
+  const makeSiteGeofence = (id: string) => {
+    const result = createSiteGeofence(session, id);
+    if (!result.ok) {
+      setRowError(result.error ?? 'The site geofence could not be created.');
+      return;
+    }
+    setRowError(null);
+    setSiteNotice(t('settings.sites.geofence_made', 'Site geofence created.'));
   };
 
   const removeSite = (id: string) => {
@@ -512,6 +524,7 @@ export default function SettingsPage() {
                     <td className="px-3 py-2 text-right border-b border-line">
                       <div className="flex gap-1 justify-end">
                         <Button variant="secondary" size="sm" onClick={() => startEditSite(s.id)}>{t('common.edit', 'Edit')}</Button>
+                        <Button variant="secondary" size="sm" onClick={() => makeSiteGeofence(s.id)}>{t('settings.sites.make_geofence', 'Create site geofence')}</Button>
                         <Button variant="danger" size="sm" onClick={() => removeSite(s.id)}>{t('common.delete', 'Delete')}</Button>
                       </div>
                     </td>
@@ -541,7 +554,19 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {assetNotice && <p role="status" className="text-xs text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2 mb-3">{assetNotice}</p>}
+          {assetNotice && (
+            <p role="status" className="text-xs text-ink bg-yellow/10 border border-yellow-dark/40 rounded-lg px-3 py-2 mb-3">
+              {assetNotice}
+              {newAssetId && (
+                <>
+                  {' '}
+                  <Link href={href(`/app/assets/${newAssetId}`)} className="underline">
+                    {t('settings.assets.request_tracker', 'Request a tracker')}
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
           {rowError && <p role="alert" className="text-xs text-red mb-3">{rowError}</p>}
 
           {showAddAsset && (
@@ -595,8 +620,11 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-              <div className="text-xs text-grey-500 italic">
-                {t('settings.assets.starts_as', 'The asset starts as No tracker, Tier 1. Contact Kasper to fit hardware.')}
+              {/* Hardware is read-only here: the asset starts as No tracker, Tier 1. */}
+              <div className="rounded-lg border border-line bg-paper-2 px-3 py-2 text-xs text-grey-700 space-y-0.5">
+                <div><span className="text-grey-500">{t('settings.assets.hw_tracker', 'Tracker')}:</span> {t('settings.assets.hw_none', 'None')}</div>
+                <div><span className="text-grey-500">{t('settings.assets.hw_adapter', 'CAN adapter')}:</span> {t('settings.assets.hw_none', 'None')}</div>
+                <div className="italic text-grey-500">{t('settings.assets.hw_locked', 'Contact Kasper to change hardware.')}</div>
               </div>
               {assetError && <p role="alert" className="text-xs text-red">{assetError}</p>}
               <div className="flex gap-2">

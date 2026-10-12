@@ -229,7 +229,30 @@ function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
 }
 
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
-  return withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
+  const readings = withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
+  // Scenario: WT-07 — a planned over-speed event yesterday, at 104 km/h (spec §8, S27).
+  const yesterday = Math.floor(clock.now() / 86400000) * 86400000 - 86400000;
+  if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
+  return readings;
+}
+
+/**
+ * Sets `count` consecutive moving readings, nearest the middle of the day, to `kmh`.
+ * The run must be contiguous in time order: a stationary reading inside it would
+ * end the run and split the event into two.
+ */
+function plannedOverspeed(readings: Reading[], kmh: number, count: number): Reading[] {
+  const ok = (r: Reading) => r.moving && r.speedKmh >= 10;
+  const mid = Math.floor(readings.length / 2);
+  for (let d = 0; d < readings.length; d++) {
+    for (const i of [mid + d, mid - d]) {
+      if (i < 0 || i + count > readings.length) continue;
+      if (readings.slice(i, i + count).every(ok)) {
+        return readings.map((r, j) => (j >= i && j < i + count ? { ...r, speedKmh: kmh } : r));
+      }
+    }
+  }
+  return readings;
 }
 
 function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {

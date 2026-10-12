@@ -28,8 +28,33 @@ export const NAMES = {
   fatima: 'Fatima Noor',
 } as const;
 
+// Map tiles come from OpenStreetMap. Tests answer them locally with a blank tile,
+// so the suite never depends on the network; setTilesDown makes them fail on purpose.
+const TILE_HOST = /tile\.openstreetmap\.org/;
+const BLANK_TILE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+const stubbedPages = new WeakSet<Page>();
+const tilesDownFor = new WeakMap<Page, boolean>();
+
+/** Answer map tile requests locally (once per page). */
+export async function stubTiles(page: Page): Promise<void> {
+  if (stubbedPages.has(page)) return;
+  stubbedPages.add(page);
+  await page.route(TILE_HOST, route =>
+    tilesDownFor.get(page) ? route.abort() : route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
+  );
+}
+
+/** Make map tiles fail (true) or load again (false). */
+export function setTilesDown(page: Page, down: boolean): void {
+  tilesDownFor.set(page, down);
+}
+
 /** Sign in and wait for the user's home screen. */
 export async function signIn(page: Page, email: string): Promise<void> {
+  await stubTiles(page);
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('demo');
@@ -39,6 +64,7 @@ export async function signIn(page: Page, email: string): Promise<void> {
 
 /** The demo bar survives in-app navigation, so tests can hop between screens. */
 export async function goTo(page: Page, path: string): Promise<void> {
+  await stubTiles(page);
   await page.goto(path);
   await expect(page.locator('.demo-bar')).toBeVisible();
 }

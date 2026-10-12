@@ -4,7 +4,7 @@
 // Desktop only: the bulk bar and the row checkboxes are laid out for wide screens.
 
 import { expect, test } from '@playwright/test';
-import { demo, goTo, USERS } from './helpers';
+import { demo, goTo, setTilesDown, USERS } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 0) < 900, 'the bulk bar is laid out for desktop');
@@ -34,6 +34,23 @@ test.describe('H4.6 — map clustering and URL filters', () => {
     await page.goBack();
     await expect(page).toHaveURL(/status=live/);
     await expect(page.locator('input[type="checkbox"][aria-label^="Select "]')).toHaveCount(liveRows);
+  });
+});
+
+test.describe('H4.6 — map error state', () => {
+  test('failed tiles show a notice with Retry and keep the list; Retry brings the map back', async ({ page }) => {
+    await demo(page, { email: USERS.omar, on: '/app' });
+    setTilesDown(page, true);
+    await page.reload();
+    const notice = page.getByRole('alert').filter({ hasText: 'The map could not load' });
+    await expect(notice).toBeVisible();
+    // The list still works while the map is down.
+    await expect(page.locator('input[type="checkbox"][aria-label^="Select "]').first()).toBeVisible();
+
+    setTilesDown(page, false);
+    await notice.getByRole('button', { name: 'Retry' }).click();
+    await expect(notice).toHaveCount(0);
+    await expect(page.locator('.leaflet-container').first()).toBeVisible();
   });
 });
 

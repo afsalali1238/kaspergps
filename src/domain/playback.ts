@@ -255,3 +255,86 @@ export function trailUntil(
     return kept;
   });
 }
+
+// ── Event pins (spec 11.15) ───────────────────────────────────────────────────
+
+/** A reading at or above this speed is an over-speed. The planned WT-07 event runs at 104 km/h. */
+export const OVERSPEED_KMH = 100;
+/** A drop of at least this many points between two fuel readings is a fuel-drop pin (Tier 2/3). */
+export const FUEL_DROP_POINTS = 10;
+
+export type PinKind = 'overspeed' | 'fuel_drop' | 'geofence_enter' | 'geofence_exit';
+
+export interface PlaybackPin {
+  atMs: number;
+  kind: PinKind;
+  label: string;
+}
+
+export interface PinGeofenceEvent {
+  atMs: number;
+  type: 'enter' | 'exit';
+  geofenceName: string;
+}
+
+/**
+ * Pins for one trip window. Over-speed gets one pin per run, at its first reading,
+ * labelled with the run's top speed. Fuel-drop pins need two readings that are
+ * close enough in time that the drop is not measured across a data gap, and only
+ * Tier 2/3 have fuel. Geofence pins come from the caller, who has already limited
+ * them to the viewer's own fences. Pins are sorted by time.
+ */
+export function buildPins(args: {
+  readings: Reading[];
+  tier: 1 | 2 | 3;
+  fromMs: number;
+  toMs: number;
+  geofenceEvents: PinGeofenceEvent[];
+}): PlaybackPin[] {
+  const { tier, fromMs, toMs, geofenceEvents } = args;
+  const sorted = sortReadings(args.readings).filter(r => {
+    const t = readingMs(r);
+    return t >= fromMs && t <= toMs;
+  });
+  const pins: PlaybackPin[] = [];
+
+  let run: Reading[] = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    const top = Math.max(...run.map(r => r.speedKmh));
+    pins.push({ atMs: readingMs(run[0]), kind: 'overspeed', label: `Over speed ${Math.round(top)} km/h` });
+    run = [];
+  };
+  for (const r of sorted) {
+    const broken = run.length > 0 && readingMs(r) - readingMs(run[run.length - 1]) > PLAYBACK_GAP_MS;
+    if (broken) flush();
+    if (r.speedKmh >= OVERSPEED_KMH) run.push(r);
+    else flush();
+  }
+  flush();
+
+  if (tier >= 2) {
+    let prev: Reading | null = null;
+    for (const r of sorted) {
+      if (r.fuelLevelPct === undefined) continue;
+      if (prev && prev.fuelLevelPct !== undefined && readingMs(r) - readingMs(prev) <= PLAYBACK_GAP_MS) {
+        const drop = prev.fuelLevelPct - r.fuelLevelPct;
+        if (drop >= FUEL_DROP_POINTS) {
+          pins.push({ atMs: readingMs(r), kind: 'fuel_drop', label: `Fuel fell ${Math.round(drop)} points` });
+        }
+      }
+      prev = r;
+    }
+  }
+
+  for (const e of geofenceEvents) {
+    if (e.atMs < fromMs || e.atMs > toMs) continue;
+    pins.push({
+      atMs: e.atMs,
+      kind: e.type === 'enter' ? 'geofence_enter' : 'geofence_exit',
+      label: `${e.type === 'enter' ? 'Entered' : 'Left'} ${e.geofenceName}`,
+    });
+  }
+
+  return pins.sort((a, b) => a.atMs - b.atMs);
+}

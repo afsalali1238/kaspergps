@@ -9,11 +9,12 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents } from '@/server/api';
 import * as clock from '@/lib/clock';
-import type { Asset, TrackingLink } from '@/domain/types';
+import type { Asset, Reading, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
 import { TripPlayer } from '@/components/playback/TripPlayer';
+import { buildPins } from '@/domain/playback';
 import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
@@ -257,6 +258,8 @@ export default function AssetDetailPage() {
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   // Trip currently open in the playback player (spec 11.15).
   const [playWindow, setPlayWindow] = useState<{ startMs: number; endMs: number } | null>(null);
+  // Period opened from the History tab with "Play this period" (spec 11.3, 11.15).
+  const [historyPlay, setHistoryPlay] = useState<{ startMs: number; endMs: number } | null>(null);
 
   const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [seed.assets, assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
@@ -280,6 +283,22 @@ export default function AssetDetailPage() {
     if (!asset || !playWindow) return [];
     return getReadingsForAsset(asset, playWindow.startMs - 60_000, playWindow.endMs + 60_000);
   }, [asset, playWindow]);
+
+  // Pins for a playback window: over-speed, fuel drop, and this viewer's own geofence events.
+  const pinsFor = (readings: Reading[], window: { startMs: number; endMs: number } | null) => {
+    if (!asset || !session || !window) return [];
+    const geofenceEvents = visibleGeofenceEvents(session)
+      .filter(e => e.assetCode === asset.code)
+      .map(e => ({ atMs: e.at, type: e.type, geofenceName: e.geofenceName }));
+    return buildPins({ readings, tier: tierForAsset(asset), fromMs: window.startMs, toMs: window.endMs, geofenceEvents });
+  };
+  const playPins = pinsFor(playReadings, playWindow);
+
+  const historyPlayReadings = useMemo(() => {
+    if (!asset || !historyPlay) return [];
+    return getReadingsForAsset(asset, historyPlay.startMs - 60_000, historyPlay.endMs + 60_000);
+  }, [asset, historyPlay]);
+  const historyPlayPins = pinsFor(historyPlayReadings, historyPlay);
 
   const assetAlerts = useMemo(
     () => (session && asset ? visibleAlerts(session, phase).filter(a => a.assetId === asset.id) : []),
@@ -432,6 +451,17 @@ export default function AssetDetailPage() {
           <div className="text-sm text-grey-500">
             {site?.name} · {ownerTenant?.name}
           </div>
+          {session && (() => {
+            const fences = assetGeofenceStatus(session, asset.id);
+            if (!fences) return null;
+            return (
+              <div className="text-sm text-grey-700 mt-1">
+                {fences.inside.length > 0
+                  ? t('asset_detail.geofence.inside', 'Inside: {names}', { names: fences.inside.join(', ') })
+                  : t('asset_detail.geofence.outside', 'Outside all geofences')}
+              </div>
+            );
+          })()}
           {session && (
             <AssetLabels
               labels={labelsOnAsset(session, asset.id).map(l => ({ id: l.id, name: l.name }))}
@@ -457,7 +487,7 @@ export default function AssetDetailPage() {
       {/* Last updated */}
       <div className="text-sm text-grey-500">
         {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}{' '}
-        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} ${t('common.minutes_short', 'min ago')}` : ''}
+        {reading ? `· ${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })}` : ''}
         {reading && (
           <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
             {t('asset_detail.hover_details', '(hover for details)')}
@@ -565,7 +595,7 @@ export default function AssetDetailPage() {
                 {t('asset_detail.end_access.title', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
               </h2>
               <p className="text-xs text-grey-500 mb-2">
-                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.')}
+                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer', code: asset.code })}
               </p>
               <input
                 type="text"
@@ -869,12 +899,28 @@ export default function AssetDetailPage() {
       )}
 
       {shownTab === 'history' && asset && (
-        <HistoryPanel
-          supported={asset.canProfile.supported}
-          nowMs={clock.now()}
-          floorMs={historyFloorMs}
-          readingsFor={(from, to) => getReadingsForAsset(asset, from, to)}
-        />
+        <>
+          {historyPlay && (
+            <div className="bg-surface border border-line rounded-lg p-3">
+              <TripPlayer
+                assetLabel={asset.code}
+                tier={tierForAsset(asset)}
+                readings={historyPlayReadings}
+                fromMs={historyPlay.startMs}
+                toMs={historyPlay.endMs}
+                pins={historyPlayPins}
+                onClose={() => setHistoryPlay(null)}
+              />
+            </div>
+          )}
+          <HistoryPanel
+            supported={asset.canProfile.supported}
+            nowMs={clock.now()}
+            floorMs={historyFloorMs}
+            readingsFor={(from, to) => getReadingsForAsset(asset, from, to)}
+            onPlay={(startMs, endMs) => setHistoryPlay({ startMs, endMs })}
+          />
+        </>
       )}
 
       {shownTab === 'trips' && (
@@ -888,6 +934,7 @@ export default function AssetDetailPage() {
                 readings={playReadings}
                 fromMs={playWindow.startMs}
                 toMs={playWindow.endMs}
+                pins={playPins}
                 onClose={() => setPlayWindow(null)}
               />
             </div>

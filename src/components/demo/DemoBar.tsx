@@ -123,17 +123,32 @@ export function DemoBar() {
     afterClockMove();
   };
 
+  // The walkthrough card is shared by the full bar and the public-page pill, so a
+  // scenario that ends on a public page (a tracking link, the verify page) can finish.
+  const walkthroughCard = walkthrough ? (
+    <WalkthroughCard
+      scenario={SCENARIOS.find(x => x.id === walkthrough.scenarioId) ?? { id: walkthrough.scenarioId, label: '', user: null, path: '/app' }}
+      walkthrough={walkthrough}
+      onSetStep={(stepIndex) => storeActions.setWalkthrough({ scenarioId: walkthrough.scenarioId, stepIndex })}
+      onFinish={(id) => storeActions.markWalkthroughDone(id)}
+      onDismiss={() => storeActions.setWalkthrough(null)}
+    />
+  ) : null;
+
   if (publicPage && !pillExpanded) {
     return (
-      <button
-        type="button"
-        onClick={() => setPillExpanded(true)}
-        aria-label="Show the demo bar"
-        className="demo-bar fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
-      >
-        <span className="demo-tag text-[9px]">DEMO</span>
-        <span className="text-[11px]">Prototype</span>
-      </button>
+      <>
+        {walkthroughCard}
+        <button
+          type="button"
+          onClick={() => setPillExpanded(true)}
+          aria-label="Show the demo bar"
+          className="demo-bar fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
+        >
+          <span className="demo-tag text-[9px]">DEMO</span>
+          <span className="text-[11px]">Prototype</span>
+        </button>
+      </>
     );
   }
 
@@ -248,17 +263,6 @@ export function DemoBar() {
 
       {/* Features panel */}
       {featuresOpen && <FeaturesPanel />}
-
-      {/* Guided walkthrough card */}
-      {walkthrough && (
-        <WalkthroughCard
-          scenario={SCENARIOS.find(x => x.id === walkthrough.scenarioId) ?? { id: walkthrough.scenarioId, label: '', user: null, path: '/app' }}
-          walkthrough={walkthrough}
-          onSetStep={(stepIndex) => storeActions.setWalkthrough({ scenarioId: walkthrough.scenarioId, stepIndex })}
-          onFinish={(id) => storeActions.markWalkthroughDone(id)}
-          onDismiss={() => storeActions.setWalkthrough(null)}
-        />
-      )}
 
       {/* Scenarios dropdown */}
       <div className="flex-shrink-0 relative">
@@ -423,6 +427,7 @@ export function DemoBar() {
       <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ms-auto hidden lg:inline">
         Prototype · dummy data
       </span>
+      {walkthroughCard}
     </div>
   );
 }

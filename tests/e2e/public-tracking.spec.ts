@@ -3,6 +3,7 @@
 // noindex/no-referrer, a readable status line and the dead-link message.
 
 import { expect, test } from '@playwright/test';
+import { demo, stubTiles, USERS } from './helpers';
 
 const LIVE_FB12 = 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5';        // FB-12 on BK-1011, ETA on
 const LIVE_TP22 = 'dB8rXp2kN9wQ4mY7hT6vZ1AaCs';        // TP-22, ETA off
@@ -54,5 +55,29 @@ test.describe('public tracking page', () => {
     await expect(page.getByText('Flatbed trailer truck')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+});
+
+test.describe('H5 proof: a revoke reaches the hirer’s open tab', () => {
+  test('Omar revokes FB-12 and the hirer’s open tab shows the inactive message within 30 seconds', async ({ browser }) => {
+    // One browser context is one set of site data, so both tabs share the demo state.
+    const context = await browser.newContext();
+    const omar = await context.newPage();
+    const hirer = await context.newPage();
+    await stubTiles(hirer);
+    try {
+      await demo(omar, { email: USERS.omar, on: '/app/assets/a-fb12' });
+      await hirer.goto(`/t/${LIVE_FB12}`);
+      await expect(hirer.getByText(/Arriving about|Arrived|ETA unavailable/)).toBeVisible();
+
+      await omar.getByRole('button', { name: 'Share tracking link' }).click();
+      await omar.getByRole('button', { name: 'Revoke' }).first().click();
+      await expect(omar.getByText(/^FB-12 link revoked\.$/)).toBeVisible();
+
+      await expect(hirer.getByText('This tracking link is no longer active.')).toBeVisible({ timeout: 30_000 });
+      await expect(hirer.getByText(/Arriving|Arrived/)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
   });
 });
