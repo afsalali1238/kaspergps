@@ -471,6 +471,8 @@ function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
   // The day before the anchor, like its alert (al-wt07-speed); not "yesterday" of a moved clock.
   const yesterday = clock.startOfDubaiDay(ANCHOR_MS) - DAY;
   if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
+  // FB-12: 96 km/h on the Al Noor road two days before the anchor, like its alert (al-fb12-speed).
+  if (asset.code === 'FB-12' && dayMs === yesterday - DAY) return plannedOverspeed(readings, 96, 6);
   return readings;
 }
 

@@ -513,10 +513,10 @@ export const alerts: Alert[] = [
   { id: 'al-fb14-maint', assetId: 'a-fb14', tenantId: 't-alnoor', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: FB-14 10,000 km service (300 km left)' },
   { id: 'al-cr02-maint', assetId: 'a-cr02', tenantId: 't-gulflift', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: CR-02 annual crane inspection (12 days left)' },
   { id: 'al-inv0415', assetId: undefined, tenantId: 't-emirates', type: 'invoice_overdue', openedAt: new Date(daysAgo(6)).toISOString(), detail: 'Invoice INV-EE-0415 is overdue (6 days)' },
-  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: daysAgo(2) + 14*3600000, closedAt: daysAgo(2) + 14.5*3600000, detail: 'Over speed: 96 km/h on Al Noor road' },
+  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: dubaiAt(2, 7, 40), closedAt: dubaiAt(2, 7, 43), detail: 'Over speed: 96 km/h on Al Noor road' },
   { id: 'al-pu51-idle', assetId: 'a-pu51', tenantId: 't-marina', type: 'idle', openedAt: daysAgo(1) + 11*3600000, closedAt: daysAgo(1) + 13.5*3600000, detail: 'PU-51 idle for 2.5 hours at Dubai Hills site' },
   { id: 'al-gn01-lowfuel', assetId: 'a-gn01', tenantId: 't-emirates', type: 'low_fuel', openedAt: dubaiAt(0, 4, 37), closedAt: dubaiAt(0, 7, 0), detail: 'GN-01 fuel level at 20% — refuel soon' },
-  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: daysAgo(1) + 17.5*3600000, closedAt: daysAgo(1) + 18.25*3600000, detail: 'Power cut at Al Quoz Yard — EX-11 on battery' },
+  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: daysAgo(1) + 17.5*3600000, closedAt: daysAgo(1) + 18.25*3600000, detail: 'Power cut at Ras Al Khor Yard — EX-11 on battery' },
 ];
 
 // ── Tracker request ────────────────────────────────────────────────────────────

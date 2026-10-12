@@ -79,6 +79,13 @@ describe('seeded alert times (§8.7)', () => {
     expect(window.some(r => r.speedKmh >= 90 && Math.abs(ts(r) - openedMs('al-wt07-speed')) <= 2 * MIN)).toBe(true);
   });
 
+  it('FB-12 over-speed: the peak reading in the window is the 96 km/h in the detail', () => {
+    const window = readings('FB-12', openedMs('al-fb12-speed'), closedMs('al-fb12-speed'));
+    expect(Math.round(Math.max(...window.map(r => r.speedKmh)))).toBe(96);
+    expect(alertOf('al-fb12-speed').detail).toContain('96 km/h');
+    expect(window.some(r => r.speedKmh >= 90 && Math.abs(ts(r) - openedMs('al-fb12-speed')) <= 2 * MIN)).toBe(true);
+  });
+
   it('BD-02 fault: the fault code first appears at the opened time', () => {
     const at = openedMs('al-bd02-fault');
     const first = readings('BD-02', at - 30 * MIN, at + 30 * MIN).find(r => (r.activeDtcs?.length ?? 0) > 0)!;
@@ -158,5 +165,4 @@ describe.todo('seeded alerts the readings do not show yet');
 it.todo('LB-05 after-hours exit from Al Quoz Yard, 5 Oct 23:40 (spec §8.7, §9) — LB-05 is homed at DIP, not at the Al Quoz Yard fence, so the crossing needs the spec resolved first');
 it.todo('EX-11 power cut at Ras Al Khor Yard (seed alert) — external voltage stays on in readings');
 it.todo('PU-51 idle at Dubai Hills (seed alert) — readings show ignition off, not idling');
-it.todo('FB-12 over-speed 96 km/h (seed alert) — highest FB-12 speed in the past week is 84 km/h');
 it.todo('TP-21 harsh driving, 3 events (spec §8.7) — readings carry no accelerometer events');
