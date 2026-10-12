@@ -9,6 +9,12 @@ import { ecuHoursAt } from '@/server/telemetry/ecu';
 import * as clock from '@/lib/clock';
 import { OFFLINE_AFTER_SEC, STALE_AFTER_SEC } from '@/config/thresholds';
 
+/** Start of the Dubai calendar day containing `ms` (UTC+4, no daylight saving). Shifts are local times. */
+const DUBAI_OFFSET_MS = 4 * 3600000;
+function dubaiDayStart(ms: number): number {
+  return Math.floor((ms + DUBAI_OFFSET_MS) / 86400000) * 86400000 - DUBAI_OFFSET_MS;
+}
+
 // ── Cache ─────────────────────────────────────────────────────────────────────
 
 // (asset, tracker) → dayMs → readings[]. Keyed by asset too, so a tracker moved
@@ -53,7 +59,7 @@ function newestReadingsDay(asset: Asset): Reading[] | null {
   const tracker = currentTrackerFor(asset);
   if (!tracker) return null;
   const now = clock.now();
-  const anchorDayStart = Math.floor(now / 86400000) * 86400000;
+  const anchorDayStart = dubaiDayStart(now);
   for (let d = 0; d <= LOOKBACK_DAYS; d++) {
     const dayMs = anchorDayStart - d * 86400000;
     const readings = getReadingsForDay(asset, tracker, dayMs)
@@ -90,7 +96,7 @@ export function getReadingsForAsset(asset: Asset, startMs: number, endMs: number
   if (!tracker) return [];
 
   const results: Reading[] = [];
-  const dayStart = Math.floor(startMs / 86400000) * 86400000;
+  const dayStart = dubaiDayStart(startMs);
 
   for (let dayMs = dayStart; dayMs <= endMs; dayMs += 86400000) {
     const dayReadings = getReadingsForDay(asset, tracker, dayMs);
@@ -163,6 +169,23 @@ const ANCHOR_TAILS: Record<string, AnchorTail> = {
   'MW-01': 'none',
 };
 
+/**
+ * Assets the spec lists as Live (moving) at the anchor (§8.2) whose shift could
+ * leave them momentarily stopped "now". Their last two minutes are made moving,
+ * so the status matches the asset table whatever the random draw.
+ */
+const MOVING_AT_ANCHOR = new Set(['TP-21', 'BH-05', 'TH-04', 'PU-51']);
+
+function keepMovingNow(asset: Asset, readings: Reading[], now: number, prng: () => number): Reading[] {
+  if (!MOVING_AT_ANCHOR.has(asset.code)) return readings;
+  const from = now - 2 * 60000;
+  return readings.map(r => {
+    const t = new Date(r.deviceTime).getTime();
+    if (t < from || !r.ignition || r.speedKmh >= 3) return r;
+    return { ...r, speedKmh: rand(prng, 12, 25), moving: true };
+  });
+}
+
 function generateForBehaviour(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const behaviour = asset.behaviour;
   if (behaviour === 'parked') return generateParkedReadings(asset, dayMs, endMs, prng);
@@ -231,7 +254,7 @@ function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
   const readings = withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
   // Scenario: WT-07 — a planned over-speed event yesterday, at 104 km/h (spec §8, S27).
-  const yesterday = Math.floor(clock.now() / 86400000) * 86400000 - 86400000;
+  const yesterday = dubaiDayStart(clock.now()) - 86400000;
   if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
   return readings;
 }
@@ -262,7 +285,7 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   const isOutsideAnchor = dayMs > now;
 
   // Scenario: TP-23 — power cut 2 h ago, then offline 40 min ago
-  if (asset.code === 'TP-23' && Math.floor(now / 86400000) === Math.floor(dayMs / 86400000)) {
+  if (asset.code === 'TP-23' && dubaiDayStart(now) === dubaiDayStart(dayMs)) {
     const powerCutAt = now - 2 * 3600000;
     const offlineAt = now - 40 * 60000;
     return [
@@ -285,7 +308,8 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
 
   // Future days — no readings yet
   if (isOutsideAnchor) return [];
-  return generateForBehaviour(asset, dayMs, Math.min(dayEndDubai, now), prng);
+  const day = generateForBehaviour(asset, dayMs, Math.min(dayEndDubai, now), prng);
+  return dubaiDayStart(now) === dayMs ? keepMovingNow(asset, day, now, prng) : day;
 }
 
 // ── Generators ─────────────────────────────────────────────────────────────────
