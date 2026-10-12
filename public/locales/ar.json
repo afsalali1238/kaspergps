@@ -1152,5 +1152,18 @@
     "roi_profile_operator": "تكلفة المشغل في الساعة (درهم إماراتي)",
     "roi_profile_save": "حفظ ملف التكلفة",
     "roi_profile_saved": "تم حفظ ملف التكلفة."
+  },
+  "ui": {
+    "actions": "الإجراءات",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "copied": "تم النسخ",
+    "copy": "نسخ",
+    "copy_failed": "تعذّر النسخ",
+    "more_actions": "المزيد من الإجراءات",
+    "no_items": "لا توجد عناصر بعد",
+    "select": "تحديد",
+    "source": "المصدر: {source}"
   }
 }

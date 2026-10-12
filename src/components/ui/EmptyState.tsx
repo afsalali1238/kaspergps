@@ -1,5 +1,10 @@
 'use client';
 
+// EmptyState — what a list or panel shows when it has nothing to show. Say why
+// it is empty and, if there is one, the next step.
+//
+//   <EmptyState icon="list" title="No alerts today" description="New alerts appear here as they happen." />
+
 import React from 'react';
 import clsx from 'clsx';
 
@@ -52,8 +57,8 @@ export function EmptyState({ title, description, action, icon = 'empty', classNa
   return (
     <div className={clsx('flex flex-col items-center justify-center text-center py-12 px-4 gap-3', className)}>
       <div className="text-line">{iconMap[icon]}</div>
-      <h3 className="text-base font-semibold text-ink">{title}</h3>
-      {description && <p className="text-sm text-grey-500 max-w-xs">{description}</p>}
+      <h3 className="text-section text-ink">{title}</h3>
+      {description && <p className="text-sm text-text-secondary max-w-xs">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

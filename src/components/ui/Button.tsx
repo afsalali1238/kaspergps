@@ -12,14 +12,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   fullWidth?: boolean;
   children: React.ReactNode;
+  /** React 19 passes ref as a prop; ConfirmDialog uses it to focus Cancel. */
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 export const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-ink text-white hover:bg-[#1a1b20] active:scale-[0.98]',
+  primary: 'bg-ink text-white hover:bg-ink/90 active:scale-[0.98]',
   secondary: 'bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 active:scale-[0.98]',
   ghost: 'bg-transparent text-grey-700 hover:bg-paper-2 hover:text-ink',
-  danger: 'bg-red text-white hover:bg-[#b83a3a] active:scale-[0.98]',
-  yellow: 'bg-yellow text-ink hover:bg-[#e6b800] active:scale-[0.98]',
+  danger: 'bg-bad-ink text-white hover:bg-bad-ink/90 active:scale-[0.98]',
+  yellow: 'bg-yellow text-ink hover:bg-yellow-dark active:scale-[0.98]',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
