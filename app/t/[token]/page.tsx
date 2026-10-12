@@ -116,7 +116,8 @@ export default function TrackingPage() {
       </header>
 
       <div className="flex flex-col md:flex-row">
-        <div className="flex-1 h-[60vh] md:h-[70vh] relative bg-paper-2">
+        {/* flex-1 only side by side: in the phone column a 0 flex-basis would collapse the map to 0 px. */}
+        <div className="w-full md:w-auto md:flex-1 h-[60vh] md:h-[70vh] relative bg-paper-2">
           <TrackingMap lat={resolved.lat} lng={resolved.lng} />
           <div className="absolute top-3 left-3 z-[500] flex items-center gap-2 bg-white/90 px-2 py-1 rounded-md shadow-sm">
             <div className="w-2 h-2 rounded-full bg-green animate-pulse" />

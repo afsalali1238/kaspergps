@@ -87,3 +87,17 @@ test('the Scenarios menu opens inside a 390 px screen and shows at least 10 scen
   }
   expect(shown, 'scenarios visible without scrolling').toBeGreaterThanOrEqual(10);
 });
+
+// The hirer's tracking page shows its map on a phone (it once collapsed to 0 px tall there).
+test('the tracking page map has real height at 390 px, with the marker on it', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) > 500, 'phone layout only');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubTiles(page);
+  await page.goto('/t/k7Qm2Xc9TpLw4ZaN8rVb3Ye5');
+  const map = page.locator('.leaflet-container').first();
+  await expect(map).toBeVisible();
+  const box = (await map.boundingBox())!;
+  expect(box.height, 'map height').toBeGreaterThan(300);
+  const title = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+  expect(title.y, 'the asset name sits below the map, not under the Live pill').toBeGreaterThanOrEqual(box.y + box.height);
+});
