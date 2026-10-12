@@ -7,7 +7,7 @@
 
 import type { Asset, Reading } from '@/domain/types';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
-import { IDLE_SPEED_KMH, STALE_AFTER_SEC } from '@/config/thresholds';
+import { TRIP_GAP_MS, groupTrips, readingTime, sortByTime } from '@/domain/trips';
 
 export interface Trip {
   id: string;
@@ -28,12 +28,7 @@ export interface DataGap {
   to: number;
 }
 
-const TRIP_GAP_MS = STALE_AFTER_SEC * 1000;
-const STOP_END_MS = 5 * 60_000;
-
-function readingMs(r: Reading): number {
-  return new Date(r.deviceTime).getTime();
-}
+const readingMs = readingTime;
 
 function haversineKm(a: Reading, b: Reading): number {
   const R = 6371;
@@ -60,76 +55,41 @@ export function findGaps(readings: Reading[], fromMs: number, toMs: number): Dat
 }
 
 /**
- * Detect trips in [fromMs, toMs]. Gaps longer than the stale window split
- * trips; distance is summed only between consecutive in-trip readings less
- * than the gap window apart.
+ * Detect trips in [fromMs, toMs]. The trip rule itself lives in src/domain/trips.ts
+ * (the playback pins need the same rule); this function adds what the Trips tab
+ * shows: id, start and end places, distance and top speed.
  */
 export function detectTrips(asset: Asset, fromMs: number, toMs: number): Trip[] {
-  const readings = getReadingsForAsset(asset, fromMs, toMs)
-    .slice()
-    .sort((a, b) => readingMs(a) - readingMs(b));
+  const readings = sortByTime(getReadingsForAsset(asset, fromMs, toMs));
   const trips: Trip[] = [];
-  let current: {
-    readings: Reading[];
-    startMs: number;
-    lastMs: number;
-    distanceKm: number;
-    maxSpeedKmh: number;
-  } | null = null;
-  let seq = 0;
 
-  const close = () => {
-    if (!current) return;
-    const rs = current.readings;
+  groupTrips(readings).forEach((window, index) => {
+    const rs = window.readings;
     const first = rs[0];
     const last = rs[rs.length - 1];
+    let distance = 0;
+    let maxSpeedKmh = 0;
+    for (let i = 0; i < rs.length; i++) {
+      maxSpeedKmh = Math.max(maxSpeedKmh, rs[i].speedKmh);
+      if (i > 0 && readingMs(rs[i]) - readingMs(rs[i - 1]) <= TRIP_GAP_MS) {
+        distance += haversineKm(rs[i - 1], rs[i]);
+      }
+    }
     trips.push({
-      id: `trip-${asset.id}-${++seq}`,
+      id: `trip-${asset.id}-${index + 1}`,
       assetId: asset.id,
-      startMs: current.startMs,
-      endMs: current.lastMs,
+      startMs: window.startMs,
+      endMs: window.endMs,
       startLat: first.lat,
       startLng: first.lng,
       endLat: last.lat,
       endLng: last.lng,
-      distanceKm: Math.round(current.distanceKm * 100) / 100,
-      maxSpeedKmh: Math.round(current.maxSpeedKmh),
-      durationMin: Math.max(1, Math.round((current.lastMs - current.startMs) / 60_000)),
+      distanceKm: Math.round(distance * 100) / 100,
+      maxSpeedKmh: Math.round(maxSpeedKmh),
+      durationMin: Math.max(1, Math.round((window.endMs - window.startMs) / 60_000)),
     });
-    current = null;
-  };
+  });
 
-  for (const r of readings) {
-    const t = readingMs(r);
-    const moving = r.ignition && r.speedKmh > IDLE_SPEED_KMH;
-
-    if (current) {
-      const sinceLast = t - current.lastMs;
-      const stoppedLong = !moving && t - current.lastMs >= STOP_END_MS;
-      if (sinceLast > TRIP_GAP_MS || stoppedLong || !r.ignition) {
-        close();
-      } else {
-        if (sinceLast <= TRIP_GAP_MS) {
-          current.distanceKm += haversineKm(current.readings[current.readings.length - 1], r);
-        }
-        current.maxSpeedKmh = Math.max(current.maxSpeedKmh, r.speedKmh);
-        current.lastMs = t;
-        current.readings.push(r);
-        continue;
-      }
-    }
-
-    if (moving) {
-      current = {
-        readings: [r],
-        startMs: t,
-        lastMs: t,
-        distanceKm: 0,
-        maxSpeedKmh: r.speedKmh,
-      };
-    }
-  }
-  close();
   return trips;
 }
 

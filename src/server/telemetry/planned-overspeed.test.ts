@@ -39,7 +39,19 @@ describe('WT-07 planned over-speed (S27)', () => {
       toMs: start + DAY - 1,
       geofenceEvents: [],
     });
-    expect(pins.map(p => p.label)).toEqual(['Over speed 104 km/h']);
+    const overspeed = pins.filter(p => p.kind === 'overspeed');
+    expect(overspeed.map(p => p.label)).toEqual(['Over speed 104 km/h']);
+    expect(overspeed[0].atMs).toBeGreaterThanOrEqual(start);
+    expect(overspeed[0].atMs).toBeLessThanOrEqual(start + DAY - 1);
+    expect(overspeed[0].lat).toBeDefined();
+    // The fast run is inside a trip: the day also carries its start and stop pins (S27).
+    const tripStart = pins.filter(p => p.kind === 'trip_start');
+    const tripStop = pins.filter(p => p.kind === 'trip_stop');
+    expect(tripStart.length).toBeGreaterThan(0);
+    expect(tripStart.some(p => p.atMs <= overspeed[0].atMs)).toBe(true);
+    expect(tripStop.some(p => p.atMs >= overspeed[0].atMs)).toBe(true);
+    // A Tier 1 fleet has no fuel gauge, so the day gives no fuel pins.
+    expect(pins.filter(p => p.kind === 'refuel' || p.kind === 'fuel_drop')).toEqual([]);
   });
 
   it('today has no planned over-speed', () => {

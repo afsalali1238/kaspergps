@@ -1,9 +1,9 @@
 # Kasper GPS — Project Handoff
 
 Status as of 2026-10-12, branch `arena/0968f813-kaspergps` (PR: J5 items 1–4, the four unbacked
-alerts, J6.6 Arabic). This file replaces the 2026-10-12 16:00 handoff on `h4-spec-features`.
-`BUILD_PROMPT.md` is the spec and wins over this file; the owner's decisions in section 9 win over the
-spec.
+alerts, J6.6 Arabic; then J6 — every §11.15 playback pin). This file replaces the 2026-10-12 16:00
+handoff on `h4-spec-features`. `BUILD_PROMPT.md` is the spec and wins over this file; the owner's
+decisions in section 9 win over the spec.
 
 ## 1. Where things stand
 
@@ -14,18 +14,21 @@ its own and its exit code was checked.
 | --- | --- |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `TZ=UTC npx vitest run` | exit 0, **857 / 857 tests, 61 files, 0 todo** |
-| `TZ=Asia/Dubai npx vitest run` | exit 0, 857 / 857 tests |
-| `npm run test:coverage` | exit 0, 85.3 % statements, **88.24 % lines** (floor 85 %) |
+| `TZ=UTC npx vitest run` | exit 0, **884 / 884 tests, 63 files, 0 todo** |
+| `TZ=Asia/Dubai npx vitest run` | exit 0, 884 / 884 tests |
+| `npm run test:coverage` | exit 0, 85.5 % statements, **88.44 % lines** (floor 85 %) |
 | `npm run build` | exit 0 (production server on :3000 serves it) |
-| `npx playwright test` (desktop + phone, Chromium, one worker) | exit 0, **361 passed, 0 failed, 195 skipped by design**, 556 entries, 8.0 min |
+| `npx playwright test` (desktop + phone, Chromium, one worker) | exit 0, **369 passed, 0 failed, 203 skipped by design**, 572 entries, 8.3 min |
 | Screenshots, §15 review set (`tests/e2e/screenshots.spec.ts`) | 46 PNGs in `reviews/screenshots/P14/` (23 screens at 1440 and 390 px) |
 | Screenshots, J5 proof (`tests/e2e/j5-proof.spec.ts`) | 19 PNGs in `reviews/screenshots/J5/` (Features panel × 3 users, Engine & fuel × 4 assets, map × 2 widths + List tab, hirer tracking) |
+| Screenshots, J6 proof (`tests/e2e/j6-proof.spec.ts`) | 6 PNGs in `reviews/screenshots/J6/` (LB-05 towing + trip pins, WT-07 single trip, EX-04 7-day fuel, each at 1440 and 390 px) |
 
 - **There is no `it.todo` left in `src/`.** The four seeded alerts that had no readings behind them
   are real tests now (section 3).
-- The 195 skips are intentional: desktop-only specs skip on phone, the phone-layout specs skip on
-  desktop, the two screenshot specs run once (desktop) and S18 "Onboard a company" skips below 900 px.
+- The 203 skips are intentional: desktop-only specs skip on phone, the phone-layout specs skip on
+  desktop, the three capture specs run once (desktop) and S18 "Onboard a company" skips below 900 px.
+- Every number in this table was re-run on `main` (`2493e4d`) plus this branch's playback work, so it
+  describes the tree that would be pushed, not the older branch snapshot.
 - Repository baseline: 818 passed + 4 todo before this branch; the earlier note that quoted 729/729
   was stale.
 
@@ -48,7 +51,7 @@ a known limit, not a hidden one.
 | P9 Rentals, tracking links, public page | Done | `public-tracking.spec.ts` (7): `noindex`, `no-referrer`, inactive copy, two-tab revoke within 30 s; J5.1 map marker | QR code on the certificate is not decoded by any test. |
 | P10 Admin: users, sites, assets, console | Done | `asset-admin-rules.test.ts` (29), `h4-geofences-settings.spec.ts` (5), S17–S22 and S42–S50 runs | Hardware fields are read-only by design ("Contact Kasper to change hardware"). |
 | P11 Multiple sites, labels, geofences | Gaps | `h4-map-labels.spec.ts`, `geofence-admin.test.ts` (13), `geofences.test.ts` | Rename from the row's Edit button is covered by e2e. A new shape, the delete, and the site-fence lock are unit-tested only. Drag-to-draw (`@geoman-io/leaflet-geoman-free`, `GeofenceMap.tsx`) is wired but has no e2e test. |
-| P12 Trip playback, ETA, downloads, schedules | Gaps | `playback.test.ts`, `playback-motion.spec.ts` (4), S27–S30 runs | Pins built: over-speed, fuel drop (Tier 2/3), own geofence enter and exit, click to jump. Not built: harsh, towing, power-cut and refuel pins, and pins on the map. The readings for all four of those now exist (section 3), so only the pins are missing. The gap banner is rendered and unit-tested. |
+| P12 Trip playback, ETA, downloads, schedules | Gaps | `playback.test.ts` (37), `trips.test.ts` (9), `playback-pins.test.ts` (7), `playback-motion.spec.ts` (5), S27–S30 runs | Every pin in §11.15 is built: trip start/stop, harsh, over-speed, geofence enter/exit, refuel and fuel drop (Tier 2/3), power cut, towing — on the scrubber and on the map, click to jump (see section 3a). Trip boundaries are pinned only when the window holds ≤ 3 trips (a working machine makes 60+ micro-trips a week); the Trips tab list is never filtered. The gap banner is rendered and unit-tested. |
 | P13 MUC, billing, payments, console billing | Gaps | `muc.test.ts`, `S31-S36.spec.ts` (tamper case included), `certificate.spec.ts` | QR not decoded by a test. `muc.test.ts` takes about 9 s. |
 | P14 Maintenance, cost & ROI, Arabic, final pass | Gaps | `maintenance-cost.spec.ts` (10), S37–S41 runs, `i18n.test.tsx` (21) | Arabic is a first draft and needs a native reviewer (section 8). Export filenames and PDF/Excel headers stay in English. Long ROI copy is English. |
 
@@ -90,6 +93,25 @@ then the J5 nav-width track (PR #23).
   `%` (a `unit` collides with the tick labels) and `isAnimationActive={false}` so a screenshot is not
   taken mid-animation.
 
+## 3a. What changed in this round (J6: the missing playback event pins)
+
+- **Every §11.15 pin kind is built** (`src/domain/playback.ts` `buildPins`): trip start/stop,
+  harsh (in words), over-speed, refuel, fuel drop, power cut, towing and the viewer's own
+  geofence enter/exit. Each pin carries the position the readings put the machine at, so the
+  player draws them **on the map** as well as on the scrubber, and clicking either jumps the
+  playhead there.
+- **The player** (`src/components/playback/TripPlayer.tsx`) colours the pins per kind, explains
+  them in a legend, and stacks pins that are close in time into rows so one pin can never cover
+  another (a 7-day window can hold a trip's end and an over-speed two minutes apart).
+- **The trip rule now lives in one place** (`src/domain/trips.ts`), read by both the Trips tab
+  and the playback pins. Fixing a real bug on the way: the old rule measured time since the
+  previous reading, so a machine reporting every 30 s while idling **never ended its trip**; it
+  now measures five minutes from the first reading that shows the machine standing, and a
+  stopped machine adds no distance or top speed to the trip it ends.
+- **Decisions taken** (see `reviews/J6-self-check.md`): trip-boundary pins appear only in windows
+  of ≤ 3 trips, and a trip's end is its last driving reading. New thresholds:
+  `FUEL_REFUEL_RISE_PCT`, `POWER_CUT_V`, `POWER_OK_V` in `src/config/thresholds.ts`.
+
 ## 4. How to run it
 
 ```bash
@@ -100,7 +122,17 @@ npx playwright install chromium   # once
 npx playwright test               # desktop + phone e2e (CI uses next build && next start)
 npx playwright test tests/e2e/screenshots.spec.ts tests/e2e/j5-proof.spec.ts --project=desktop
 # → reviews/screenshots/P14 (46 files) and reviews/screenshots/J5 (19 files)
+npx playwright test tests/e2e/j6-proof.spec.ts --project=desktop
+# → reviews/screenshots/J6 (6 files)
 ```
+
+**Sandbox without the Playwright CDN** (`npx playwright install chromium` fails with a TLS reset):
+`npm pack @sparticuz/chromium`, then brotli-decompress `package/bin/chromium.br` to `chromium` (chmod
+755) and `package/bin/al2023.tar.br` to `al2023.tar`, untar the latter into `libs/`. Run with
+`LD_LIBRARY_PATH=<dir>/libs/lib PW_CHROMIUM_PATH=<dir>/chromium
+PW_CHROMIUM_ARGS='["--no-sandbox","--disable-gpu","--disable-dev-shm-usage"]'` — the config reads both
+variables. Keep `npm run start` (not `dev`) listening on :3000 first, or Playwright falls back to
+`npm run dev` and the first-hit compile makes the certificate and S42 specs time out.
 
 Sign in with any seeded email (for example `sara@kasper.ae`, `omar@alnoor.ae`,
 `khalid@emiratesearth.ae`, `mark@gulflift.ae`) and any non-empty password. Sign-in is role-first: pick
@@ -144,8 +176,10 @@ The earlier handoff had four errors. They are fixed here.
 
 - **Hosting is undecided.** Either a deployment or a run guide for the team has to be chosen.
 - **Arabic is a first draft.** A native reviewer must check every string (section 8).
-- **Event pins are partial** (see the P12 row): harsh, towing, power-cut and refuel pins, and pins on
-  the map, are not built. The readings they would pin now exist.
+- **Event pins are complete** for §11.15, with one deliberate limit: trip boundaries are pinned only
+  in windows of ≤ 3 trips, because plant working at a site makes 60+ minute-long trips a week.
+  Those micro-trips are a simulator property, not a pin problem — fixing them means changing seeded
+  telemetry and is a separate change.
 - **The S1–S50 walkthrough run proves each scenario runs start to finish from the Scenarios menu**,
   and that each card shows its "What you should see" text. It does not assert every expectation
   written in `src/components/demo/walkthroughs.ts`. Those assertions live in the per-scenario specs.
@@ -218,8 +252,9 @@ keys listed here.
 - `reviews/P<n>-self-check.md`, `reviews/H<n>-self-check.md`, `reviews/J<n>-self-check.md`: acceptance
   evidence per phase.
 - `reviews/screenshots/P14/`: the §15 review set, `<user>-<screen>-<width>.png` (46 files).
-- `reviews/screenshots/J5/`: the J5 proof set (19 files); `reviews/screenshots/J2/`: the J2 proof,
-  refreshed by its own spec.
+- `reviews/screenshots/J5/`: the J5 proof set (19 files); `reviews/screenshots/J6/`: the J6 proof set
+  (6 files, reproduced byte-for-byte by `j6-proof.spec.ts`); `reviews/screenshots/J2/`: the J2 proof,
+  refreshed by its own spec. `reviews/J6-self-check.md`: the playback pins.
 - `src/server/capability-catalog.ts`: the Features panel's one source of words (capability labels and
   groups, scope sentences, role words and purposes, feature availability and reasons, tier sentences,
   "Right now" counts). Re-exported from `src/server/api.ts`, so screens never reach past the gate.
@@ -227,5 +262,9 @@ keys listed here.
   (`fuelWeekFor`, `last7DaysIgnition`, `todayFor`) is the maths behind it.
 - `src/server/telemetry/simulator.ts`: day plans, excursion legs (LB-05, WL-06, PU-51, GR-01) and the
   scripted events (TP-21 harsh, EX-11 power cut, WT-07/FB-12 over-speed, GN-01 fuel drop).
-- `tests/e2e/j5-proof.spec.ts`, `tests/e2e/screenshots.spec.ts`: the two capture specs.
+- `src/domain/trips.ts`: the §11.5 trip rule, shared by the Trips tab (`src/server/trips.ts`) and
+  the playback pins (`src/domain/playback.ts`); `src/components/playback/TripPlayer.tsx` plays a
+  window and draws its pins on the scrubber and the map.
+- `tests/e2e/j5-proof.spec.ts`, `tests/e2e/j6-proof.spec.ts`, `tests/e2e/screenshots.spec.ts`: the three
+  capture specs.
 - `docs/demo-script.md` and `docs/test-matrix.md`: the walkthrough and the scenario-to-test map.

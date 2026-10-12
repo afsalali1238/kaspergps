@@ -15,6 +15,8 @@ import {
   advancePlayhead,
   buildSpans,
   gapAt,
+  pinRows,
+  pinMarkerHtml,
   positionAt,
   sortReadings,
   stepPlayhead,
@@ -39,11 +41,29 @@ export interface TripPlayerProps {
 }
 
 const PIN_COLOUR: Record<PinKind, string> = {
+  trip_start: '#0ca678',
+  trip_stop: '#495057',
+  harsh: '#e8590c',
   overspeed: '#e03131',
   fuel_drop: '#7048e8',
+  refuel: '#2b8a3e',
+  power_cut: '#c2255c',
+  towing: '#a61e4d',
   geofence_enter: '#1971c2',
   geofence_exit: '#1971c2',
 };
+
+/** The pins' words, in the order they are explained under the scrubber. */
+const PIN_WORDS: { kind: PinKind; word: string }[] = [
+  { kind: 'trip_start', word: 'Trip start/stop' },
+  { kind: 'harsh', word: 'Harsh event' },
+  { kind: 'overspeed', word: 'Over speed' },
+  { kind: 'fuel_drop', word: 'Fuel drop' },
+  { kind: 'refuel', word: 'Refuel' },
+  { kind: 'power_cut', word: 'Power cut' },
+  { kind: 'towing', word: 'Towing' },
+  { kind: 'geofence_enter', word: 'Geofence' },
+];
 
 const STATE_COLOUR: Record<Exclude<PlaybackState, 'no_data'>, string> = {
   moving: '#2f9e44',
@@ -67,6 +87,15 @@ function arrowIcon(heading: number): L.DivIcon {
   });
 }
 
+function pinIcon(kind: PinKind, title: string): L.DivIcon {
+  return L.divIcon({
+    className: `trip-pin trip-pin-${kind}`,
+    html: pinMarkerHtml(PIN_COLOUR[kind], title),
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+}
+
 function FollowMarker({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   useEffect(() => {
@@ -78,7 +107,7 @@ function FollowMarker({ lat, lng }: { lat: number; lng: number }) {
 function SpanTrack({ spans, fromMs, toMs }: { spans: Span[]; fromMs: number; toMs: number }) {
   const total = Math.max(1, toMs - fromMs);
   return (
-    <div className="relative h-3 rounded bg-paper-2 overflow-hidden" aria-hidden="true">
+    <div className="relative rounded bg-paper-2 overflow-hidden" style={{ height: 12 }} aria-hidden="true">
       {spans.map(s => {
         const left = ((s.fromMs - fromMs) / total) * 100;
         const width = ((s.toMs - s.fromMs) / total) * 100;
@@ -171,6 +200,9 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
   const trail = useMemo(() => trailUntil(sorted, fromMs, timeMs), [sorted, fromMs, timeMs]);
   const faintTrack = useMemo(() => trailUntil(sorted, fromMs, toMs), [sorted, fromMs, toMs]);
   const icon = useMemo(() => arrowIcon(fix?.heading ?? 0), [fix?.heading]);
+  // Pins stacked into rows so two events close in time cannot cover each other.
+  const pinRowList = useMemo(() => pinRows(pins, fromMs, toMs), [pins, fromMs, toMs]);
+  const pinRowHeight = pinRowList.reduce((max, r) => Math.max(max, r.row), 0) * 12 + 14;
 
   const reading = fix?.reading;
   const fmt = (ms: number) => clock.formatDubaiTime(ms);
@@ -241,7 +273,8 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
                 setJump(null);
                 moveTo(Number(e.target.value));
               }}
-              className="absolute inset-0 w-full h-3 opacity-0 cursor-pointer"
+              className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              style={{ height: 12 }}
             />
           </div>
           <div className="flex gap-3 text-[11px] text-grey-500">
@@ -253,8 +286,14 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
         </div>
 
         {pins.length > 0 && (
-          <div className="relative h-4" data-testid="event-pins" aria-label="Event pins" role="group">
-            {pins.map((p, i) => {
+          <div
+            className="relative"
+            style={{ height: `${pinRowHeight}px` }}
+            data-testid="event-pins"
+            aria-label="Event pins"
+            role="group"
+          >
+            {pinRowList.map(({ pin: p, row }, i) => {
               const total = Math.max(1, toMs - fromMs);
               const left = ((p.atMs - fromMs) / total) * 100;
               return (
@@ -268,11 +307,25 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
                     setJump(null);
                     moveTo(p.atMs);
                   }}
-                  className="absolute top-0 -translate-x-1/2 w-3 h-3 rounded-full border border-white shadow"
-                  style={{ left: `${left}%`, background: PIN_COLOUR[p.kind] }}
+                  className="absolute -translate-x-1/2 w-3 h-3 rounded-full border border-white shadow"
+                  style={{ left: `${left}%`, top: `${row * 12}px`, background: PIN_COLOUR[p.kind] }}
                 />
               );
             })}
+          </div>
+        )}
+
+        {pins.length > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-grey-500" data-testid="pin-legend">
+            {PIN_WORDS.filter(w => pins.some(p => p.kind === w.kind || (w.kind === 'trip_start' && p.kind === 'trip_stop'))).map(w => (
+              <span key={w.kind}>
+                <span
+                  className="inline-block w-2 h-2 mr-1 align-middle rounded-full"
+                  style={{ background: PIN_COLOUR[w.kind] }}
+                />
+                {w.word}
+              </span>
+            ))}
           </div>
         )}
 
@@ -296,6 +349,22 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
             {trail.map((line, i) => (
               <Polyline key={`t-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: '#1d4ed8', weight: 4 }} />
             ))}
+            {pins
+              .filter(p => p.lat !== undefined && p.lng !== undefined)
+              .map((p, i) => (
+                <Marker
+                  key={`pin-${p.kind}-${p.atMs}-${i}`}
+                  position={[p.lat as number, p.lng as number]}
+                  icon={pinIcon(p.kind, `${p.label} · ${fmt(p.atMs)}`)}
+                  eventHandlers={{
+                    click: () => {
+                      setPlaying(false);
+                      setJump(null);
+                      moveTo(p.atMs);
+                    },
+                  }}
+                />
+              ))}
             {fix && (
               <>
                 <Marker position={[fix.lat, fix.lng]} icon={icon} />
