@@ -95,7 +95,28 @@ The pre-existing assertion inside the last-admin test was left in place.
 | `TZ=UTC npm test` | **0** | 64 files passed, 901 tests |
 | `TZ=Asia/Dubai npm test` | **0** | 64 files passed, 901 tests |
 | `npm run test:coverage` | **0** | **85.53 %** lines (floor 85 %) |
-| `npx playwright test` | **not run** | no browser in this sandbox — see §3 |
+| `npx playwright test` | **not run here** | no browser in this sandbox — see §3 |
+| CI: `Typecheck, lint and unit tests` | **success** | 1 m 40 s |
+| CI: `Playwright — shard 1/3` | **success** | 5 m 29 s — includes 11 of my 22 e2e tests |
+| CI: `Playwright — shard 2/3` | **success** | 4 m 6 s — includes the other 11 |
+| CI: `Playwright — shard 3/3` | **success** | 2 m 26 s — 0 of my tests |
+
+**The e2e spec is verified.** `npx playwright test --list --shard=N/3` puts 11 of
+`agent-a-fixes.spec.ts`'s 22 tests in shard 1 and 11 in shard 2 (shard 3 gets
+none), and both those shards are green — so all 22 ran in a real Chromium at
+1440 and 390 px, as did the existing `billing.spec.ts`, `S31-S36.spec.ts`,
+`certificate.spec.ts` and `phone-layout.spec.ts`, which is the check that my
+markup changes didn't break them. The workflow runs
+`npx playwright test --shard=N/3` with no spec filter, so nothing was silently
+skipped. I could not read the shard logs to quote the per-test lines — GitHub
+redirects job logs to `*.blob.core.windows.net`, which is outside this sandbox's
+allowlist — so the evidence is the shard conclusions plus the local `--list`
+distribution, not the log text.
+
+That run also settles the 390 px question I could not answer locally:
+`phone-layout.spec.ts` asserts no sideways scroll on exactly the four screens I
+touched — `/app/reports` and `/app/settings` as Omar, `/app/billing` and
+`/app/certificates` as Khalid — and it is green.
 
 Baseline before my changes, for comparison: 63 files / 886 tests, coverage
 **85.5 %**. So the PR adds 1 file and 15 tests, and coverage is 85.53 % — the
@@ -110,7 +131,7 @@ The test count is derived, not read off one line: the baseline run printed
 
 ## 3. Two things I could not do here, and why
 
-### 3a. The e2e suite cannot run in this sandbox
+### 3a. The e2e suite cannot run in *this sandbox* (it did run on CI — see §2)
 
 There is no Chromium anywhere in it, and the browser CDN is firewalled:
 
@@ -172,6 +193,12 @@ this PR merges so the captures show the fixes:
 npx playwright test tests/e2e/screenshots.spec.ts
 git add reviews/screenshots/P14 && git commit
 ```
+
+Worth knowing: `screenshots.spec.ts` lives in `tests/e2e/`, so it **did** run in
+the CI shards and passed — but it writes into the runner's working copy, and the
+workflow only uploads `playwright-report/` and `test-results/`, so the fresh PNGs
+were discarded with the runner. Regenerating them is therefore not a debugging
+job, purely a "run it where a browser exists and commit" job.
 
 Note that two of those captures (`khalid-billing-*`, `khalid-certificates-*`) are
 the ones my fixes change, plus `omar-reports-*`.
