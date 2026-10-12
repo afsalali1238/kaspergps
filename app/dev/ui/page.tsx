@@ -11,6 +11,7 @@ import {
   InlineConfirm,
 } from '@/components/ui';
 import type { AssetStatus } from '@/domain/types';
+import { KitGallery } from './KitGallery';
 
 export default function DevUiPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -34,6 +35,8 @@ export default function DevUiPage() {
             </div>
           </div>
         </div>
+
+        <KitGallery />
 
         {/* Button */}
         <section className="mb-8">
