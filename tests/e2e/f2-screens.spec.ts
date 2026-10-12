@@ -36,7 +36,7 @@ test.describe('F2: screens follow the store', () => {
     await page.getByLabel('Full name', { exact: true }).fill('Nadia Test');
     await page.getByLabel('Email', { exact: true }).fill('nadia.test@marina.ae');
     await page.getByLabel('Role', { exact: true }).selectOption('site_user');
-    await page.getByLabel('Sites', { exact: true }).selectOption({ index: 1 });
+    await page.getByRole('group', { name: 'Sites' }).getByRole('checkbox').first().check();
     await page.getByRole('button', { name: 'Send invite' }).click();
     await expect(page.getByText('Nadia Test invited')).toBeVisible();
 
@@ -53,7 +53,7 @@ test.describe('F2: screens follow the store', () => {
     await page.getByRole('button', { name: 'Invite user' }).click();
     await page.getByLabel('Full name', { exact: true }).fill('Yusuf Test');
     await page.getByLabel('Email', { exact: true }).fill('yusuf.test@marina.ae');
-    await page.getByLabel('Sites', { exact: true }).selectOption({ index: 1 });
+    await page.getByRole('group', { name: 'Sites' }).getByRole('checkbox').first().check();
     await page.getByRole('button', { name: 'Send invite' }).click();
     await expect(page.getByText('Yusuf Test invited')).toBeVisible();
 

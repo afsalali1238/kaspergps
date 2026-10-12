@@ -24,7 +24,8 @@ export type ReportTypeId =
   | 'operating_hours'
   | 'fuel'
   | 'utilisation'
-  | 'driving_events';
+  | 'driving_events'
+  | 'geofence';
 
 export interface ReportTypeOption {
   id: ReportTypeId;
@@ -42,6 +43,8 @@ export const REPORT_TYPES: ReportTypeOption[] = [
   { id: 'fuel', label: 'Fuel', fileTag: 'Fuel', description: 'Fuel used, refuels, drops, L/h', phase: 'phase2', needs: 'fuel.used' },
   { id: 'utilisation', label: 'Utilisation', fileTag: 'Utilisation', description: 'Working, idling and off hours per day', phase: 'phase2', needs: 'utilisation' },
   { id: 'driving_events', label: 'Driving events', fileTag: 'DrivingEvents', description: 'Harsh events and over-speed incidents', phase: 'phase2', needs: 'driving.events' },
+  // Listed only when the viewer has a geofence (see availableReportTypes).
+  { id: 'geofence', label: 'Geofence', fileTag: 'Geofence', description: 'Entries and exits of your geofences', phase: 'phase2', needs: 'report.geofence' },
 ];
 
 export interface ReportResult {
@@ -371,6 +374,30 @@ function buildDrivingEvents(asset: Asset, fromMs: number, toMs: number): ExportT
   ];
 }
 
+/** Geofences this viewer can see that cover the asset (Kasper sees all; a company sees its own). */
+function geofencesCovering(session: Session, asset: Asset) {
+  return db.getState().geofences.filter(g =>
+    (session.isKasper || g.tenantId === session.tenantId) && (g.assetIds === 'all' || g.assetIds.includes(asset.id)),
+  );
+}
+
+/** Entries and exits of the viewer's geofences for one asset in the period (spec §11.12). */
+function buildGeofenceEvents(session: Session, asset: Asset, fromMs: number, toMs: number): ExportTable[] {
+  const fences = new Map(geofencesCovering(session, asset).map(g => [g.id, g]));
+  const rows = db.getState().geofenceEvents
+    .filter(e => e.assetId === asset.id && fences.has(e.geofenceId))
+    .map(e => ({ at: new Date(e.at).getTime(), e }))
+    .filter(x => x.at >= fromMs && x.at <= toMs)
+    .sort((a, b) => a.at - b.at)
+    .map(({ at, e }) => [clock.formatDubaiDateTime(at), asset.code, fences.get(e.geofenceId)!.name, e.type === 'enter' ? 'Entered' : 'Left']);
+  return [{ title: `${asset.code} geofence events`, columns: ['Time (Dubai)', 'Asset', 'Geofence', 'Event'], rows }];
+}
+
+/** The geofence report is listed only when the viewer has at least one geofence. */
+function viewerHasGeofence(session: Session): boolean {
+  return db.getState().geofences.some(g => session.isKasper || g.tenantId === session.tenantId);
+}
+
 function buildSummary(reportType: ReportTypeId, entries: { asset: Asset; tables: ExportTable[]; totalKm: number }[]): ExportTable {
   const columns = ['Asset', 'Name', 'Period rows'];
   const rows = entries.map(e => [e.asset.code, e.asset.name, String(e.tables[0]?.rows.length ?? 0)]);
@@ -388,6 +415,7 @@ export function availableReportTypes(session: Session, assetIds: string[], phase
     .map(id => db.getState().assets.find(a => a.id === id))
     .filter((a): a is Asset => Boolean(a));
   return REPORT_TYPES.filter(rt => {
+    if (rt.id === 'geofence' && !viewerHasGeofence(session)) return false;
     if (rt.phase === 'phase2' && phase === 'day_one') return false;
     if (rt.phase === 'later' && phase !== 'later') return false;
     // Spec §11.5: a type is listed only if at least one selected asset supports it.
@@ -453,6 +481,12 @@ function buildTables(
           break;
         case 'driving_events': {
           const t = buildDrivingEvents(asset, seg.from, seg.to);
+          anyRows = anyRows || (t[0]?.rows.length ?? 0) > 0;
+          tables.push(...t);
+          break;
+        }
+        case 'geofence': {
+          const t = buildGeofenceEvents(session, asset, seg.from, seg.to);
           anyRows = anyRows || (t[0]?.rows.length ?? 0) > 0;
           tables.push(...t);
           break;

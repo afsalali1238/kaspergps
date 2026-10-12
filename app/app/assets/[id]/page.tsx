@@ -9,10 +9,14 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents } from '@/server/api';
 import * as clock from '@/lib/clock';
-import type { Asset, TrackingLink } from '@/domain/types';
-import { hasFeature, lockedFeatures } from '@/domain/features';
+import type { Asset, Reading, TrackingLink } from '@/domain/types';
+import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
+import { TripPlayer } from '@/components/playback/TripPlayer';
+import { buildPins } from '@/domain/playback';
+import { AssetLabels } from '@/components/labels/AssetLabels';
+import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
@@ -252,6 +256,10 @@ export default function AssetDetailPage() {
   const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  // Trip currently open in the playback player (spec 11.15).
+  const [playWindow, setPlayWindow] = useState<{ startMs: number; endMs: number } | null>(null);
+  // Period opened from the History tab with "Play this period" (spec 11.3, 11.15).
+  const [historyPlay, setHistoryPlay] = useState<{ startMs: number; endMs: number } | null>(null);
 
   const asset = useMemo(() => seed.assets.find(a => a.id === assetId), [seed.assets, assetId]);
   const visible = useMemo(() => asset && session ? isAssetVisible(session, asset.id) : false, [asset, session]);
@@ -259,12 +267,8 @@ export default function AssetDetailPage() {
   const status = useMemo(() => asset ? computeStatus(asset) : 'no_tracker', [asset]);
   const reading = useMemo(() => asset ? getReadingForAsset(asset) : null, [asset]);
 
-  // Real telemetry-backed tab data (never fabricated).
-  const historyRows = useMemo(() => {
-    if (!asset) return [];
-    const end = clock.now();
-    return getReadingsForAsset(asset, end - 24 * 3600_000, end).slice(-24);
-  }, [asset]);
+  // Earliest history a renter may see (spec 11.3); null for owners.
+  const historyFloorMs = useMemo(() => (asset && session ? historyFloor(session, asset.id) : null), [asset, session]);
 
   // Today's distance and ignition-on time (spec 11.3 Overview).
   const today = useMemo(() => (asset ? todayFor(asset) : null), [asset]);
@@ -273,6 +277,28 @@ export default function AssetDetailPage() {
     if (!asset) return [];
     return detectTrips(asset, clock.now() - 7 * 86_400_000, clock.now()).slice(-5);
   }, [asset]);
+
+  // Readings for the open trip, with a minute of padding either side (spec 11.15).
+  const playReadings = useMemo(() => {
+    if (!asset || !playWindow) return [];
+    return getReadingsForAsset(asset, playWindow.startMs - 60_000, playWindow.endMs + 60_000);
+  }, [asset, playWindow]);
+
+  // Pins for a playback window: over-speed, fuel drop, and this viewer's own geofence events.
+  const pinsFor = (readings: Reading[], window: { startMs: number; endMs: number } | null) => {
+    if (!asset || !session || !window) return [];
+    const geofenceEvents = visibleGeofenceEvents(session)
+      .filter(e => e.assetCode === asset.code)
+      .map(e => ({ atMs: e.at, type: e.type, geofenceName: e.geofenceName }));
+    return buildPins({ readings, tier: tierForAsset(asset), fromMs: window.startMs, toMs: window.endMs, geofenceEvents });
+  };
+  const playPins = pinsFor(playReadings, playWindow);
+
+  const historyPlayReadings = useMemo(() => {
+    if (!asset || !historyPlay) return [];
+    return getReadingsForAsset(asset, historyPlay.startMs - 60_000, historyPlay.endMs + 60_000);
+  }, [asset, historyPlay]);
+  const historyPlayPins = pinsFor(historyPlayReadings, historyPlay);
 
   const assetAlerts = useMemo(
     () => (session && asset ? visibleAlerts(session, phase).filter(a => a.assetId === asset.id) : []),
@@ -425,6 +451,32 @@ export default function AssetDetailPage() {
           <div className="text-sm text-grey-500">
             {site?.name} · {ownerTenant?.name}
           </div>
+          {session && (() => {
+            const fences = assetGeofenceStatus(session, asset.id);
+            if (!fences) return null;
+            return (
+              <div className="text-sm text-grey-700 mt-1">
+                {fences.inside.length > 0
+                  ? t('asset_detail.geofence.inside', 'Inside: {names}', { names: fences.inside.join(', ') })
+                  : t('asset_detail.geofence.outside', 'Outside all geofences')}
+              </div>
+            );
+          })()}
+          {session && (
+            <AssetLabels
+              labels={labelsOnAsset(session, asset.id).map(l => ({ id: l.id, name: l.name }))}
+              options={labelsVisibleTo(session).map(l => ({ id: l.id, name: l.name }))}
+              canEdit={can(session, 'label.manage', asset.id)}
+              onAdd={choice => {
+                const r = addLabelToAssets(session, choice, [asset.id]);
+                return r.ok ? null : (r.error ?? 'The label could not be added.');
+              }}
+              onRemove={id => {
+                const r = removeLabelFromAssets(session, id, [asset.id]);
+                return r.ok ? null : (r.error ?? 'The label could not be removed.');
+              }}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
@@ -435,7 +487,7 @@ export default function AssetDetailPage() {
       {/* Last updated */}
       <div className="text-sm text-grey-500">
         {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}{' '}
-        {reading ? `· ${clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())} ${t('common.minutes_short', 'min ago')}` : ''}
+        {reading ? `· ${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })}` : ''}
         {reading && (
           <span className="hover:text-ink cursor-help" title={`Device time: ${reading.deviceTime}\nReceived: ${reading.receivedAt}`}>
             {t('asset_detail.hover_details', '(hover for details)')}
@@ -533,7 +585,8 @@ export default function AssetDetailPage() {
           </div>
 
           {panel === 'share' && (
-            <SharePanel asset={asset} onClose={() => setPanel(null)} onDone={message => { showAssetToast('ok', message); setPanel(null); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
+            <SharePanel asset={asset} onClose={() => setPanel(null)} // Stay open: the new link and its suggested message are what the owner needs next.
+            onDone={message => { showAssetToast('ok', message); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
           )}
 
           {panel === 'end' && currentBooking && (
@@ -542,7 +595,7 @@ export default function AssetDetailPage() {
                 {t('asset_detail.end_access.title', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
               </h2>
               <p className="text-xs text-grey-500 mb-2">
-                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.')}
+                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer', code: asset.code })}
               </p>
               <input
                 type="text"
@@ -845,55 +898,47 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      {shownTab === 'history' && (
-        <div className="space-y-4">
-          <div className="bg-surface border border-line rounded-lg p-4">
-            <div className="text-sm font-medium text-ink mb-3">{t('asset_detail.history.positions', 'Positions')}</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-line">
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.time', 'Time')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.speed', 'Speed')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.ignition', 'Ignition')}</th>
-                    <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.heading', 'Heading')}</th>
-                    {asset.canProfile.supported.includes('fuelLevel') && (
-                      <th className="text-left text-xs text-grey-500 font-medium px-3 py-2">{t('asset_detail.history.fuel_pct', 'Fuel %')}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyRows.length > 0 ? (
-                    historyRows.map(r => (
-                      <tr key={r.deviceTime} className="border-b border-line">
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {clock.formatDubaiDateTime(new Date(r.deviceTime).getTime())}
-                        </td>
-                        <td className="px-3 py-2 font-mono">{r.speedKmh.toFixed(0)} km/h</td>
-                        <td className="px-3 py-2">{r.ignition ? t('common.on', 'On') : t('common.off', 'Off')}</td>
-                        <td className="px-3 py-2 font-mono">{Math.round(r.heading)}°</td>
-                        {asset.canProfile.supported.includes('fuelLevel') && (
-                          <td className="px-3 py-2 font-mono">
-                            {r.fuelLevelPct !== undefined ? `${r.fuelLevelPct.toFixed(0)}%` : '—'}
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-grey-500">{t('common.no_data', 'No data')}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+      {shownTab === 'history' && asset && (
+        <>
+          {historyPlay && (
+            <div className="bg-surface border border-line rounded-lg p-3">
+              <TripPlayer
+                assetLabel={asset.code}
+                tier={tierForAsset(asset)}
+                readings={historyPlayReadings}
+                fromMs={historyPlay.startMs}
+                toMs={historyPlay.endMs}
+                pins={historyPlayPins}
+                onClose={() => setHistoryPlay(null)}
+              />
             </div>
-          </div>
-        </div>
+          )}
+          <HistoryPanel
+            supported={asset.canProfile.supported}
+            nowMs={clock.now()}
+            floorMs={historyFloorMs}
+            readingsFor={(from, to) => getReadingsForAsset(asset, from, to)}
+            onPlay={(startMs, endMs) => setHistoryPlay({ startMs, endMs })}
+          />
+        </>
       )}
 
       {shownTab === 'trips' && (
         <div className="bg-surface border border-line rounded-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-line text-sm font-medium text-ink">{t('asset_detail.tabs.trips', 'Trips')}</div>
+          {asset && playWindow && (
+            <div className="p-3 border-b border-line">
+              <TripPlayer
+                assetLabel={asset.code}
+                tier={tierForAsset(asset)}
+                readings={playReadings}
+                fromMs={playWindow.startMs}
+                toMs={playWindow.endMs}
+                pins={playPins}
+                onClose={() => setPlayWindow(null)}
+              />
+            </div>
+          )}
           {recentTrips.length === 0 ? (
             <div className="p-4 text-sm text-grey-500">
               {t('asset_detail.trips_empty', 'No trips recorded yet. Trips start when ignition is on and speed exceeds 3 km/h.')}
@@ -906,6 +951,7 @@ export default function AssetDetailPage() {
                   <th className="px-3 py-2 text-left font-medium">{t('asset_detail.trips.end', 'End')}</th>
                   <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.distance', 'Distance')}</th>
                   <th className="px-3 py-2 text-right font-medium">{t('asset_detail.trips.top_speed', 'Top speed')}</th>
+                  <th className="px-3 py-2 text-right font-medium"><span className="sr-only">{t('asset_detail.trips.play_col', 'Playback')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -915,6 +961,15 @@ export default function AssetDetailPage() {
                     <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{clock.formatDubaiDateTime(tr.endMs)}</td>
                     <td className="px-3 py-2 border-b border-line text-right font-mono text-ink">{tr.distanceKm.toFixed(1)} km</td>
                     <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{tr.maxSpeedKmh.toFixed(0)} km/h</td>
+                    <td className="px-3 py-2 border-b border-line text-right">
+                      <button
+                        type="button"
+                        onClick={() => setPlayWindow({ startMs: tr.startMs, endMs: tr.endMs })}
+                        className="px-2 py-1 border border-line rounded text-xs text-ink hover:bg-paper-2"
+                      >
+                        {t('asset_detail.trips.play', 'Play')}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

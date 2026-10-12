@@ -22,12 +22,13 @@ test.describe('S18 — Sara onboards a tenant with a Tier 3 asset', () => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await demo(page, { email: USERS.sara, on: '/console/onboarding' });
     await expect(page.getByRole('heading', { name: 'Onboard a company' })).toBeVisible();
-    await expect(page.getByText('Company')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Company', exact: true })).toBeVisible();
     await expect(page.getByText('Sites')).toBeVisible();
     await expect(page.getByText('People')).toBeVisible();
   });
 
   test('the scenario menu lands S18 on the wizard', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await demo(page, { email: USERS.sara });
     await startScenario(page, 18);
     await expect(page.getByRole('heading', { name: 'Onboard a company' })).toBeVisible();
@@ -51,9 +52,9 @@ test.describe('S19 — Lina invites a user', () => {
     await page.getByRole('button', { name: 'Invite user' }).click();
     // The field's accessible name is its <label> ("Name"); "Full name" is only
     // the placeholder, which getByLabel does not match.
-    await page.getByLabel('Name').fill('Huda Test');
-    await page.getByLabel('Email').fill('huda@marina.ae');
-    await page.getByLabel('Sites').selectOption({ index: 1 });
+    await page.getByLabel('Full name', { exact: true }).fill('Huda Test');
+    await page.getByLabel('Email', { exact: true }).fill('huda@marina.ae');
+    await page.getByRole('group', { name: 'Sites' }).getByRole('checkbox').first().check();
     await page.getByRole('button', { name: 'Send invite' }).click();
     await page.getByRole('button', { name: 'View as' }).click();
     // The row is a menu button; the name also appears in the table and the notice.

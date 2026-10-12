@@ -36,7 +36,7 @@ test.describe('S5 — Lina: a rented asset’s history starts at the rental', ()
     await expect(page.getByText('Your rental')).toBeVisible();
     await expect(page.getByText(/^Rented from Emirates Earthmovers until /)).toBeVisible();
     await expect(page.getByText(/^History starts /)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Run report' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Run report' })).toBeVisible();
     // A renter can't edit or share the owner's asset.
     await expect(page.getByRole('button', { name: 'Edit asset' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Share tracking link' })).toHaveCount(0);
@@ -75,6 +75,8 @@ test.describe('S8 — Anil: reports include past rentals', () => {
     await demo(page, { email: USERS.omar, scenario: 8 });
     await expect(page).toHaveURL(/\/app\/reports$/);
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    // The asset checklist appears once a report type is picked (§11.5).
+    await page.getByRole('button', { name: /^Trip & Mileage/ }).click();
     await expect(page.getByText('VN-01').first()).toBeVisible();
     await expect(page.getByText(/Past rental/).first()).toBeVisible();
   });

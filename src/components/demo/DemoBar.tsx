@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useDb, tamperWithMuc, runDueSchedules, clockPresets } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { exportDemoState, importDemoState, resetDemoState } from '@/lib/demo-state';
 import { useSession, useSwitches, useNow, useClockOffsetMs, useWalkthrough, useWalkthroughsDone, storeActions } from '@/hooks';
+import { stripLocale } from '@/i18n';
 import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
 import { SCENARIOS, startScenario, type Scenario } from '@/components/demo/scenarios';
 import { ViewAsMenu } from '@/components/demo/ViewAsMenu';
@@ -39,6 +40,30 @@ export function DemoBar() {
   // Presets depend on bookings, links, readings and invoices: recompute when any of them change.
   const dbSnapshot = useDb(s => s);
 
+  // Public pages (tracking link, verify) show the bar as a small floating pill (spec 10.9).
+  const pathname = stripLocale(usePathname() ?? '');
+  const publicPage = pathname.startsWith('/t/') || pathname.startsWith('/verify/');
+  const [pillExpanded, setPillExpanded] = useState(false);
+  useEffect(() => {
+    const collapsed = publicPage && !pillExpanded;
+    if (collapsed) document.body.dataset.demoCollapsed = 'true';
+    else delete document.body.dataset.demoCollapsed;
+    return () => { delete document.body.dataset.demoCollapsed; };
+  }, [publicPage, pillExpanded]);
+
+  // The bar wraps onto more rows on a phone, so its real height (not a fixed 36 px)
+  // sets the offset the page and the sticky header sit below.
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const sync = () => document.documentElement.style.setProperty('--demo-bar-h', `${el.offsetHeight}px`);
+    sync();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [publicPage, pillExpanded]);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(false);
@@ -98,8 +123,37 @@ export function DemoBar() {
     afterClockMove();
   };
 
+  // The walkthrough card is shared by the full bar and the public-page pill, so a
+  // scenario that ends on a public page (a tracking link, the verify page) can finish.
+  const walkthroughCard = walkthrough ? (
+    <WalkthroughCard
+      scenario={SCENARIOS.find(x => x.id === walkthrough.scenarioId) ?? { id: walkthrough.scenarioId, label: '', user: null, path: '/app' }}
+      walkthrough={walkthrough}
+      onSetStep={(stepIndex) => storeActions.setWalkthrough({ scenarioId: walkthrough.scenarioId, stepIndex })}
+      onFinish={(id) => storeActions.markWalkthroughDone(id)}
+      onDismiss={() => storeActions.setWalkthrough(null)}
+    />
+  ) : null;
+
+  if (publicPage && !pillExpanded) {
+    return (
+      <>
+        {walkthroughCard}
+        <button
+          type="button"
+          onClick={() => setPillExpanded(true)}
+          aria-label="Show the demo bar"
+          className="demo-bar fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
+        >
+          <span className="demo-tag text-[9px]">DEMO</span>
+          <span className="text-[11px]">Prototype</span>
+        </button>
+      </>
+    );
+  }
+
   return (
-    <div className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-2 flex items-center gap-2 overflow-x-auto" style={{ height: 'var(--demo-bar-h)' }}>
+    <div ref={barRef} className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
       {/* DEMO tag */}
       <span className="demo-tag flex-shrink-0 text-[9px]">DEMO</span>
 
@@ -199,9 +253,9 @@ export function DemoBar() {
       {/* Features button */}
       <button
         onClick={() => setFeaturesOpen(!featuresOpen)}
-        className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+        className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
           <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 8l3-3 3 3M2 5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         Features
@@ -210,24 +264,13 @@ export function DemoBar() {
       {/* Features panel */}
       {featuresOpen && <FeaturesPanel />}
 
-      {/* Guided walkthrough card */}
-      {walkthrough && (
-        <WalkthroughCard
-          scenario={SCENARIOS.find(x => x.id === walkthrough.scenarioId) ?? { id: walkthrough.scenarioId, label: '', user: null, path: '/app' }}
-          walkthrough={walkthrough}
-          onSetStep={(stepIndex) => storeActions.setWalkthrough({ scenarioId: walkthrough.scenarioId, stepIndex })}
-          onFinish={(id) => storeActions.markWalkthroughDone(id)}
-          onDismiss={() => storeActions.setWalkthrough(null)}
-        />
-      )}
-
       {/* Scenarios dropdown */}
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setScenariosOpen(!scenariosOpen)}
-          className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
             <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 7l3-3 3 3M2 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Scenarios
@@ -278,9 +321,9 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setToolsOpen(!toolsOpen)}
-          className="flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="mr-1 text-paper/60">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
             <path d="M3 2l5 5-5 5M3 6l4 4M2 3a1 1 0 100 2 1 1 0 000-2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Tools
@@ -384,6 +427,7 @@ export function DemoBar() {
       <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ms-auto hidden lg:inline">
         Prototype · dummy data
       </span>
+      {walkthroughCard}
     </div>
   );
 }

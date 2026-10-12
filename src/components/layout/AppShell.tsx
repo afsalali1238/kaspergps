@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { anyAssetHasFeature, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
+import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
@@ -38,6 +39,44 @@ export function navItemAllowed(session: Session | null, item: NavItem, phase: st
     return anyAssetHasFeature(session, item.featureKey);
   }
   return true;
+}
+
+/** What a locked screen says, per route (spec 11.3 / phase ladder). */
+const LOCK_COPY: Record<string, { phase?: string; feature?: string; role?: string }> = {
+  '/app/certificates': {
+    phase: 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.',
+    feature: 'Certificates need Tier 3 assets with ECU engine hours only.',
+  },
+  '/app/geofences': { phase: 'Geofences are available in Phase 2.' },
+  '/app/billing': {
+    phase: 'Billing is available in Phase 2.',
+    feature: 'Billing needs Tier 3 assets with ECU engine hours only.',
+    role: 'Your access doesn’t include billing.',
+  },
+  '/app/maintenance': { phase: 'Maintenance arrives in the Later phase.' },
+  '/app/cost': { phase: 'Cost & ROI arrives in the Later phase.' },
+};
+
+/**
+ * How a route renders for this session (spec 11.3, phase ladder):
+ *  - role denied (no capability)  → "Page not found" (unchanged; the role never sees it);
+ *  - phase or Tier denied          → a locked "Not available" screen with the reason;
+ *  - otherwise                     → the page.
+ */
+export function routeGate(
+  session: Session | null,
+  item: NavItem | undefined,
+  phase: string,
+): { kind: 'ok' } | { kind: 'not_found'; role?: string } | { kind: 'locked'; reason: string } {
+  if (!session || !item) return { kind: 'ok' };
+  const copy = LOCK_COPY[item.href] ?? {};
+  if (!can(session, item.capability)) return copy.role ? { kind: 'not_found', role: copy.role } : { kind: 'not_found' };
+  if (item.phase === 'phase2' && phase === 'day_one') return { kind: 'locked', reason: copy.phase ?? 'Not available in this phase.' };
+  if (item.phase === 'later' && phase !== 'later') return { kind: 'locked', reason: copy.phase ?? 'Arrives in the Later phase.' };
+  if (item.featureKey && (visibleAssetIds(session).length === 0 || !anyAssetHasFeature(session, item.featureKey))) {
+    return { kind: 'locked', reason: copy.feature ?? 'Not available for your assets.' };
+  }
+  return { kind: 'ok' };
 }
 
 const navItems: NavItem[] = [
@@ -87,6 +126,7 @@ const navItems: NavItem[] = [
     label: 'Certificates',
     capability: 'muc.view',
     phase: 'phase2',
+    featureKey: 'muc',
     icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6h2M4 8h6M4 10h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   },
   {
@@ -154,7 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const routeItem = navItems.find(item =>
     pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href + '/'))
   );
-  const pageAllowed = !routeItem || navItemAllowed(session, routeItem, currentPhase);
+  const gate = routeGate(session, routeItem, currentPhase);
 
   const isCustomer = session && !session.isKasper;
   const showMobileNav = isCustomer;
@@ -349,7 +389,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {showMobileNav && (
           <button
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            className="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
+            aria-expanded={mobileNavOpen}
+            aria-label={t('shell.open_menu', 'Open menu')}
+            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -404,31 +446,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* Mobile bottom nav */}
-        {showMobileNav && (
-          <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-line z-40 flex lg:hidden overflow-x-auto">
-            <div className="flex w-full">
-              {visibleNavItems.slice(0, 5).map(item => {
-                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href.replace('/app/', '/app/')));
+        {/* Phones: every allowed item lives in a bottom sheet (spec 11), opened from the header. */}
+        {showMobileNav && mobileNavOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t('shell.open_menu', 'Open menu')}>
+            <button
+              type="button"
+              aria-label={t('common.close', 'Close')}
+              onClick={() => setMobileNavOpen(false)}
+              className="absolute inset-0 bg-ink/40"
+            />
+            <div className="absolute bottom-0 inset-x-0 bg-surface rounded-t-xl border-t border-line p-2 max-h-[80vh] overflow-y-auto">
+              {visibleNavItems.map(item => {
+                const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
                 return (
                   <Link
                     key={item.href}
                     href={href(item.href)}
+                    onClick={() => setMobileNavOpen(false)}
                     className={clsx(
-                      'flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors min-w-[60px]',
-                      isActive
-                        ? 'text-ink'
-                        : 'text-grey-500 hover:text-ink'
+                      'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors',
+                      isActive ? 'text-ink bg-paper-2' : 'text-grey-700 hover:bg-paper-2'
                     )}
                   >
                     {item.icon}
                     {t(item.labelKey, item.label)}
-                    {isActive && <span className="h-0.5 w-5 bg-yellow rounded-full" />}
                   </Link>
                 );
               })}
             </div>
-          </nav>
+          </div>
         )}
 
         {/* Main content */}
@@ -436,11 +482,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Keyed by user: a switch of user remounts the page, so no state
               from the previous user's screen survives it. */}
           <div key={session?.userId ?? 'signed-out'}>
-            {pageAllowed ? children : (
+            {gate.kind === 'ok' && children}
+            {gate.kind === 'not_found' && (
               <div className="flex items-center justify-center py-24">
                 <div className="text-center">
                   <div className="text-sm font-semibold text-ink">{t('common.page_not_found', 'Page not found')}</div>
-                  <div className="text-sm text-grey-500 mt-1">{t('shell.not_in_your_role', "This page isn't available for your role.")}</div>
+                  <div className="text-sm text-grey-500 mt-1">
+                    {gate.role ?? t('shell.not_in_your_role', "This page isn't available for your role.")}
+                  </div>
+                </div>
+              </div>
+            )}
+            {gate.kind === 'locked' && (
+              <div className="p-4" data-testid="locked-screen">
+                <div className="bg-surface border border-line rounded-lg">
+                  <EmptyState title={t('common.not_available', 'Not available')} description={gate.reason} />
                 </div>
               </div>
             )}

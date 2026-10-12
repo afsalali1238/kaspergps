@@ -33,7 +33,7 @@ test.describe('S25–S26 — geofences', () => {
   test('Palm Crescent is on Fatima’s screen and off Khalid’s', async ({ page }) => {
     await demo(page, { email: USERS.fatima, scenario: 25 });
     await expect(page).toHaveURL(/\/app\/geofences$/);
-    await expect(page.getByText('Palm Crescent')).toBeVisible();
+    await expect(page.getByText('Palm Crescent').first()).toBeVisible();
     await expect(page.getByText(/Events \(7d\): \d+/).first()).toBeVisible();
 
     await startScenario(page, 26);

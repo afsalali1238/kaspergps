@@ -258,7 +258,7 @@ export default function AssetsPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-ink">{asset.code}</span>
+                    <Link href={`/console/assets/${asset.id}`} className="font-medium text-ink hover:text-yellow-dark">{asset.code}</Link>
                     <span className="text-grey-500">— {asset.name}</span>
                     <TierChip tier={tier} />
                     {status === 'No tracker' && <Badge variant="grey">No tracker</Badge>}
@@ -281,18 +281,15 @@ export default function AssetsPage() {
                   <Link href={`/app/assets/${asset.id}`} className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
                     View
                   </Link>
-                  <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
-                    Edit
-                  </button>
                   {!asset.retiredAt && (
-                    <button className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
+                    <Link href={`/console/assets/${asset.id}?tab=transfer`} className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink">
                       Transfer
-                    </button>
+                    </Link>
                   )}
                   {!asset.retiredAt && (
-                    <button className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20">
+                    <Link href={`/console/assets/${asset.id}?tab=overview`} className="text-xs px-2 py-1 rounded bg-red/10 border border-red/30 text-red hover:bg-red/20">
                       Retire
-                    </button>
+                    </Link>
                   )}
                 </div>
               </div>

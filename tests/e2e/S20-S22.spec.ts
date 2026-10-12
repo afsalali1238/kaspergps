@@ -17,9 +17,11 @@ test.describe('S20 — Day one hides every Phase 2 surface', () => {
     await expect(page.getByText('Not available')).toBeVisible();
   });
 
-  test('Phase 2 brings maintenance and cost back', async ({ page }) => {
+  // Maintenance and Cost & ROI are Later features (spec 11.18, 11.19): Phase 2
+  // still hides them, and only the Later phase brings them back.
+  test('the Later phase brings maintenance and cost back', async ({ page }) => {
     await demo(page, { email: USERS.khalid, on: '/app' });
-    await setPhase(page, 'Phase 2');
+    await setPhase(page, 'Later');
     await goTo(page, '/app/maintenance');
     await expect(page.getByRole('heading', { name: 'Maintenance' })).toBeVisible();
     await goTo(page, '/app/cost');

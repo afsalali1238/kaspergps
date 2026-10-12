@@ -140,3 +140,17 @@ export function anyAssetHasFeature(session: Session, featureKey: string): boolea
     return asset && hasFeature(asset, featureKey);
   });
 }
+
+/**
+ * The earliest time a session may view history for this asset (spec 11.3).
+ * Renters: the start of their current rental, or of their most recent past
+ * rental. Owners and Kasper staff: null (no floor).
+ */
+export function historyFloor(session: Session, assetId: string): number | null {
+  // Owners and Kasper staff hold no renter booking, so both lookups return null.
+  const active = rentalWindow(session, assetId);
+  if (active) return active.start;
+  const past = pastRentalFor(session, assetId);
+  if (past) return new Date(past.start).getTime();
+  return null;
+}

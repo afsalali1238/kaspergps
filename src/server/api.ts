@@ -170,7 +170,7 @@ export type { Session };
 // Screens (app/** and src/components/**) import server code only from this file
 // (architecture test, rule 6). Every function below enforces its own access check
 // through can(); this file is a list of re-exports, not a second permission layer.
-export { anyAssetHasFeature, getRelationship, isAssetVisible, visibleAssetIds } from './access';
+export { anyAssetHasFeature, getRelationship, historyFloor, isAssetVisible, visibleAssetIds } from './access';
 export { ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fitAdapter, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, stockAdapters } from './adapters';
 export { acknowledgeAlert, alertTypesIn, bellAlerts, visibleAlerts } from './alerts';
 export type { AlertView } from './alerts';
@@ -186,7 +186,7 @@ export type { AssetCostRow, CostPeriod } from './cost';
 export { append, hydrateDb, nextRowNumber, useDb } from './db';
 export type { DbRow, DbState } from './db';
 export { clockPresets, dubaiYesterdayAt, fb12PublicPath, presetAt } from './demo-presets';
-export { createGeofence, deleteGeofence, visibleGeofenceEvents, visibleGeofences } from './geofences';
+export { assetGeofenceStatus, createGeofence, createSiteGeofence, deleteGeofence, updateGeofence, visibleGeofenceEvents, visibleGeofences } from './geofences';
 export { getTrackingLinkState, resolveTrackingLink } from './links';
 export { boardFor, canManageMaintenance, createTaskFromFault, currentMeter, logService, maintenanceAlerts, openTasks, planSnapshot, plansForAsset, plansVisibleTo, savePlan, serviceHistory } from './maintenance';
 export type { PlanSnapshot } from './maintenance';
@@ -204,6 +204,8 @@ export { searchAssets } from './search';
 export { createUser, deactivateUser, reactivateUser, updateUserName, updateUserRole, updateUserSites } from './team';
 export { computeStatus, getReadingForAsset, getReadingsForAsset } from './telemetry/simulator';
 export { createTenant, suspendTenant, unsuspendTenant, updateTenant } from './tenants';
+export { createAsset, createSite, deleteSite, reinstateAsset, retireAsset, transferAsset, updateSite } from './asset-admin';
+export { addLabelToAssets, deleteLabel, labelIdsByAsset, labelUsage, labelsOnAsset, labelsVisibleTo, removeLabelFromAssets, renameLabel } from './labels';
 export { assetsWithoutTracker, currentPairingForTracker, currentTrackerForAsset, markTrackerFaulty, pairTracker, pairingHistory, pairingTargetsFor, registerTracker, retireTracker, stockTrackers, unpairTracker, updateTrackerSettings } from './trackers';
 export { activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink } from './tracking-links';
 export { detectTrips } from './trips';

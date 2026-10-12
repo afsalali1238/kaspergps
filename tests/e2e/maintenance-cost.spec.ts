@@ -18,12 +18,18 @@ test.describe('maintenance board', () => {
     // BD-02's plan is past its interval, EX-04's is inside the due-soon band.
     await expect(page.getByText(/Overdue — due at 14,950 h · ECU \(.+ over\)/)).toBeVisible();
     await expect(page.getByText(/Due at 8,500 h · ECU — \d+ h left/)).toBeVisible();
-    // Tier 1/2 assets say how their hours were worked out.
-    await expect(page.getByText(/Estimated \(ignition hours\)/).first()).toBeVisible();
+    // Khalid's fleet is all Tier 3 (ECU hours), so the Tier 1/2 wording is checked
+    // on Omar's board below, where TP-22's plan is estimated.
     await expect(page.getByText('Maintenance overdue: BD-02 — 250 h service')).toBeVisible();
     // A Tier 3 fault code offers a one-off task.
     await expect(page.getByText('Fault codes needing a service task')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create service task' })).toBeVisible();
+  });
+
+  test('Tier 1/2 assets say how their hours were worked out', async ({ page }) => {
+    await signIn(page, USERS.omar);
+    await page.goto('/app/maintenance');
+    await expect(page.getByText(/Estimated \(ignition hours\)/).first()).toBeVisible();
   });
 
   test('logs a service and resets the plan', async ({ page }) => {
@@ -57,7 +63,7 @@ test.describe('maintenance board', () => {
     await page.goto('/app/assets/a-bd02');
     await page.getByRole('button', { name: 'Maintenance' }).click();
     await expect(page.getByText('Service plans')).toBeVisible();
-    await expect(page.getByText('250 h service')).toBeVisible();
+    await expect(page.getByText('250 h service').first()).toBeVisible();
     await expect(page.getByText('Service history')).toBeVisible();
     await expect(page.getByText('250 h service — oil, filters, coolant top-up')).toBeVisible();
   });

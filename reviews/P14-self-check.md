@@ -82,3 +82,28 @@ None.
 - **No browser in some build environments**, so `npm run test:e2e` and the P14 screenshots may be missing.
 - **Arabic is a first draft** — `public/locales/ar.json` is marked *Draft — needs native review*.
 - **Deep maintenance/cost copy** (log-service form, ROI drawer) is still mostly English.
+
+---
+
+## Update 2026-10-12 (H4–H7)
+
+The sections above were written before a browser was available. This update records what has changed.
+
+| Earlier gap | Now |
+| --- | --- |
+| The Playwright suite had never run ("no Chromium") | Full run, desktop + phone: exit 0, 347 passed, 0 failed, 167 skipped, 514 entries (`reviews/H6-self-check.md`). |
+| Check 8: no sideways scroll at 390 px "needs Playwright" | `phone-layout.spec.ts`: 21 tests (customer and public pages at 390 × 844, plus the demo bar). All pass. |
+| Check 1: S37–S41 "pass (code), unverified at runtime" | `maintenance-cost.spec.ts` (10) and `S37-S41.spec.ts` pass in the final run. Every scenario S1–S50 runs from the Scenarios menu (`scenario-walkthroughs.spec.ts`, 50 tests). |
+| Check 3: "every cost and maintenance figure has a basis label" | Asserted by `maintenance-cost.spec.ts`. |
+| Screenshots "empty unless a browser is available" | 46 PNGs in `reviews/screenshots/P14/` (23 screens × 2 widths), including `omar-ar-map` (Arabic RTL) and `anon-sign-in`. |
+| Reduced motion had no automated check | `playback-motion.spec.ts`: the player starts stepped and never runs by itself. |
+| Scenario specs had never been run ("needs one run with a browser") | The final run is that run. Selector drift was fixed in the specs, never by deleting an assertion. |
+
+Still open from this phase:
+
+- Arabic is a first draft and needs a native reviewer. One Arabic string was corrected to show a
+  placeholder properly (`map.updated_ago`, "last updated" line); nine placeholder-only alert words were
+  removed. See `HANDOFF.md` section 8.
+- Export filenames and PDF/Excel column headers stay in English, as the original question 1 left open.
+- The Deep maintenance/cost copy (log-service form, ROI drawer) is still mostly English.
+- The GitHub CI run has not happened.

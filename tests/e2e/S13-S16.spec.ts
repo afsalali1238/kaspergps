@@ -10,13 +10,14 @@ test.describe('S13 — Omar: share FB-12, then revoke', () => {
     await demo(page, { email: USERS.omar, on: '/app/assets/a-fb12' });
 
     await page.getByRole('button', { name: 'Share tracking link' }).click();
-    await expect(page.getByText('Share tracking link')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Share tracking link' })).toBeVisible();
     await page.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(page.getByText('Link created.')).toBeVisible();
+    // The toast spells out the effect and the expiry (spec 11.x: "toasts spell out their effect").
+    await expect(page.getByText(/^FB-12 link created — expires /)).toBeVisible();
     await expect(page.getByText(/^Track FB-12 live: /)).toBeVisible();
 
     await page.getByRole('button', { name: 'Revoke' }).first().click();
-    await expect(page.getByText('Link revoked.')).toBeVisible();
+    await expect(page.getByText(/^FB-12 link revoked\.$/)).toBeVisible();
   });
 });
 
@@ -34,7 +35,7 @@ test.describe('S15 — Khalid: End access now', () => {
   test('the panel explains the cut-off and audits the reason', async ({ page }) => {
     await demo(page, { email: USERS.khalid, on: '/app/assets/a-ex04' });
     await page.getByRole('button', { name: 'End access now' }).click();
-    await expect(page.getByText(/^End Marina Builders access now$/)).toBeVisible();
+    await expect(page.getByText(/^End Marina Builders access now$/).first()).toBeVisible();
     await expect(page.getByText(/not undone by the nightly check/)).toBeVisible();
     await expect(page.getByPlaceholder('Reason (at least 10 characters)')).toBeVisible();
   });

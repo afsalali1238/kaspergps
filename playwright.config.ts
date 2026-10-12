@@ -14,6 +14,14 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Sandboxes without a Playwright CDN can point at a Chromium binary with
+    // PW_CHROMIUM_PATH (and optional PW_CHROMIUM_ARGS as a JSON array).
+    launchOptions: process.env.PW_CHROMIUM_PATH
+      ? {
+          executablePath: process.env.PW_CHROMIUM_PATH,
+          args: process.env.PW_CHROMIUM_ARGS ? JSON.parse(process.env.PW_CHROMIUM_ARGS) : [],
+        }
+      : undefined,
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },

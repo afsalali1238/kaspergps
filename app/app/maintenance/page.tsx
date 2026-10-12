@@ -39,7 +39,7 @@ export default function MaintenancePage() {
 
   const [view, setView] = useState<View>('board');
   const [toast, setToast] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [, setVersion] = useState(0);
+  const [version, setVersion] = useState(0);
   const [logFor, setLogFor] = useState<PlanSnapshot | null>(null);
   const [planForm, setPlanForm] = useState<{ snapshot?: PlanSnapshot } | null>(null);
 
@@ -48,11 +48,12 @@ export default function MaintenancePage() {
     setVersion(v => v + 1);
   };
 
-  const board = useMemo(() => (session ? boardFor(session) : { overdue: [], dueSoon: [], ok: [] }), [session, setVersion]);
-  const alerts = useMemo(() => (session ? maintenanceAlerts(session) : []), [session]);
-  const history = useMemo(() => (session ? serviceHistory(session) : []), [session]);
-  const tasks = useMemo(() => (session ? openTasks(session) : []), [session]);
-  const plans = useMemo(() => (session ? plansVisibleTo(session) : []), [session]);
+  // `version` moves after every write, so each list re-reads the store.
+  const board = useMemo(() => (session ? boardFor(session) : { overdue: [], dueSoon: [], ok: [] }), [session, version]);
+  const alerts = useMemo(() => (session ? maintenanceAlerts(session) : []), [session, version]);
+  const history = useMemo(() => (session ? serviceHistory(session) : []), [session, version]);
+  const tasks = useMemo(() => (session ? openTasks(session) : []), [session, version]);
+  const plans = useMemo(() => (session ? plansVisibleTo(session) : []), [session, version]);
 
   const canManage = Boolean(session && canManageMaintenance(session));
 
@@ -436,7 +437,9 @@ function LogServiceSheet({ snapshot, session, onClose, onResult }: {
             onClick={() => {
               const result = logService(session, {
                 planId: plan.id,
-                doneAt: new Date(`${doneAt}T12:00:00+04:00`).getTime(),
+                // Noon of the chosen day, but never later than now: a service logged
+                // today before noon must not be refused as "in the future".
+                doneAt: Math.min(new Date(`${doneAt}T12:00:00+04:00`).getTime(), clock.now()),
                 value: Number(value),
                 notes,
                 costAed: Number(cost || 0),

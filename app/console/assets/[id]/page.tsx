@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Button, Badge, EmptyState, Tabs,
   TierChip,
 } from '@/components/ui';
-import { useDb } from '@/server/api';
+import { useDb, retireAsset, reinstateAsset, transferAsset } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useSession } from '@/hooks';
 
@@ -45,6 +45,14 @@ export default function ConsoleAssetDetailPage() {
   const [canChecked, setCanChecked] = useState(false);
   const [canCheckResult, setCanCheckResult] = useState<string | null>(null);
   const [transferring, setTransferring] = useState(false);
+  const [transferTo, setTransferTo] = useState('');
+  const [adminMsg, setAdminMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  // The asset list links here with ?tab=transfer or ?tab=overview.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab) setActiveTab(tab);
+  }, []);
 
   const assetId = params.id as string;
   const asset = seed.assets.find(a => a.id === assetId);
@@ -97,8 +105,17 @@ export default function ConsoleAssetDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm">Edit asset</Button>
-          <Button variant="danger" size="sm">Retire</Button>
+          {session && asset.retiredAt ? (
+            <Button variant="secondary" size="sm" onClick={() => {
+              const r = reinstateAsset(session, asset.id);
+              setAdminMsg({ tone: r.ok ? 'ok' : 'error', text: (r.ok ? r.message : r.error) ?? '' });
+            }}>Reinstate</Button>
+          ) : (
+            <Button variant="danger" size="sm" onClick={() => {
+              const r = retireAsset(session, asset.id);
+              setAdminMsg({ tone: r.ok ? 'ok' : 'error', text: (r.ok ? r.message : r.error) ?? '' });
+            }}>Retire</Button>
+          )}
         </div>
       </div>
 
@@ -147,6 +164,12 @@ export default function ConsoleAssetDetailPage() {
           <div className="text-ink font-medium mt-1 text-sm font-mono">{formatTs(asset.createdAt)}</div>
         </div>
       </div>
+
+      {adminMsg && (
+        <p role={adminMsg.tone === 'error' ? 'alert' : 'status'} className={`text-xs px-3 py-2 rounded-lg border ${adminMsg.tone === 'error' ? 'text-red border-red/40 bg-red/5' : 'text-ink border-yellow-dark/40 bg-yellow/10'}`}>
+          {adminMsg.text}
+        </p>
+      )}
 
       {/* Tabs */}
       <Tabs tabs={[
@@ -263,10 +286,12 @@ export default function ConsoleAssetDetailPage() {
               </p>
               {transferring ? (
                 <div className="space-y-3">
-                  <label className="text-xs text-grey-500 font-medium">Target tenant</label>
+                  <label htmlFor="transfer-target" className="text-xs text-grey-500 font-medium">Target tenant</label>
                   <select
+                    id="transfer-target"
+                    value={transferTo}
+                    onChange={e => setTransferTo(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                    defaultValue=""
                   >
                     <option value="">Select a tenant…</option>
                     {otherTenants.map(t => (
@@ -274,6 +299,11 @@ export default function ConsoleAssetDetailPage() {
                     ))}
                   </select>
                   <div className="flex gap-2">
+                    <Button size="sm" onClick={() => {
+                      const r = transferAsset(session, asset.id, transferTo);
+                      setAdminMsg({ tone: r.ok ? 'ok' : 'error', text: (r.ok ? r.message : r.error) ?? '' });
+                      if (r.ok) { setTransferring(false); setTransferTo(''); }
+                    }}>Confirm transfer</Button>
                     <Button size="sm" variant="secondary" onClick={() => setTransferring(false)}>Cancel</Button>
                   </div>
                 </div>

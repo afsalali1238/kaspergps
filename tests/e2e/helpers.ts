@@ -28,8 +28,33 @@ export const NAMES = {
   fatima: 'Fatima Noor',
 } as const;
 
+// Map tiles come from OpenStreetMap. Tests answer them locally with a blank tile,
+// so the suite never depends on the network; setTilesDown makes them fail on purpose.
+const TILE_HOST = /tile\.openstreetmap\.org/;
+const BLANK_TILE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+const stubbedPages = new WeakSet<Page>();
+const tilesDownFor = new WeakMap<Page, boolean>();
+
+/** Answer map tile requests locally (once per page). */
+export async function stubTiles(page: Page): Promise<void> {
+  if (stubbedPages.has(page)) return;
+  stubbedPages.add(page);
+  await page.route(TILE_HOST, route =>
+    tilesDownFor.get(page) ? route.abort() : route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
+  );
+}
+
+/** Make map tiles fail (true) or load again (false). */
+export function setTilesDown(page: Page, down: boolean): void {
+  tilesDownFor.set(page, down);
+}
+
 /** Sign in and wait for the user's home screen. */
 export async function signIn(page: Page, email: string): Promise<void> {
+  await stubTiles(page);
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('demo');
@@ -39,6 +64,7 @@ export async function signIn(page: Page, email: string): Promise<void> {
 
 /** The demo bar survives in-app navigation, so tests can hop between screens. */
 export async function goTo(page: Page, path: string): Promise<void> {
+  await stubTiles(page);
   await page.goto(path);
   await expect(page.locator('.demo-bar')).toBeVisible();
 }
@@ -65,9 +91,12 @@ export async function setPhase(page: Page, phase: 'Day 1' | 'Phase 2' | 'Later')
 
 /** Sales view toggle (separate from Show hidden). */
 export async function setSalesView(page: Page, on: boolean): Promise<void> {
-  const label = `Sales view: ${on ? 'ON' : 'OFF'}`;
-  await page.locator('.demo-bar').getByRole('button', { name: label, exact: true }).click();
-  await expect(page.locator('.demo-bar').getByRole('button', { name: `Sales view: ${on ? 'ON' : 'OFF'}`, exact: true })).toBeVisible();
+  // The button shows the CURRENT state, so to reach `on` we click the button
+  // labelled with the opposite state.
+  const bar = page.locator('.demo-bar');
+  const current = on ? 'OFF' : 'ON';
+  await bar.getByRole('button', { name: `Sales view: ${current}`, exact: true }).click();
+  await expect(bar.getByRole('button', { name: `Sales view: ${on ? 'ON' : 'OFF'}`, exact: true })).toBeVisible();
 }
 
 /** Start one of the S1–S50 guided walkthroughs from the Scenarios menu. */
