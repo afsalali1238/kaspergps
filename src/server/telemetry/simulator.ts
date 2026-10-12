@@ -1,6 +1,7 @@
 // Telemetry simulator — generates readings on demand per tracker per day and caches them.
 // Never pre-generates everything. Caches per tracker per day.
 // Architecture rule 9: all time from clock.ts (here Date.now() is allowed as it IS the clock module).
+// Day starts are Dubai midnight (clock.startOfDubaiDay), so a 07:00 shift starts at 07:00 Dubai.
 
 import type { Reading, Asset } from '@/domain/types';
 import { db, type DbRow } from '@/server/db';
@@ -53,7 +54,7 @@ function newestReadingsDay(asset: Asset): Reading[] | null {
   const tracker = currentTrackerFor(asset);
   if (!tracker) return null;
   const now = clock.now();
-  const anchorDayStart = Math.floor(now / 86400000) * 86400000;
+  const anchorDayStart = clock.startOfDubaiDay(now);
   for (let d = 0; d <= LOOKBACK_DAYS; d++) {
     const dayMs = anchorDayStart - d * 86400000;
     const readings = getReadingsForDay(asset, tracker, dayMs)
@@ -90,7 +91,7 @@ export function getReadingsForAsset(asset: Asset, startMs: number, endMs: number
   if (!tracker) return [];
 
   const results: Reading[] = [];
-  const dayStart = Math.floor(startMs / 86400000) * 86400000;
+  const dayStart = clock.startOfDubaiDay(startMs);
 
   for (let dayMs = dayStart; dayMs <= endMs; dayMs += 86400000) {
     const dayReadings = getReadingsForDay(asset, tracker, dayMs);
@@ -168,9 +169,8 @@ function generateForBehaviour(asset: Asset, dayMs: number, endMs: number, prng: 
   if (behaviour === 'parked') return generateParkedReadings(asset, dayMs, endMs, prng);
   if (behaviour === 'stationary_24h') return generateGeneratorReadings(asset, dayMs, endMs, prng, false);
   if (behaviour === 'light_vehicle_day') return generateLightVehicleReadings(asset, dayMs, endMs, prng);
-  if (behaviour === 'works_at_site' || behaviour === 'drives_between_sites') {
-    return generateMovingReadings(asset, dayMs, endMs, prng);
-  }
+  if (behaviour === 'drives_between_sites') return generateTripReadings(asset, dayMs, endMs, prng);
+  if (behaviour === 'works_at_site') return generateMovingReadings(asset, dayMs, endMs, prng);
   return generateParkedReadings(asset, dayMs, endMs, prng);
 }
 
@@ -203,10 +203,40 @@ const CAN_PARAMS = ['rpm', 'engineLoad', 'fuelLevel', 'fuelUsed', 'fuelRate', 'c
  * parameters the asset's adapter supports (spec §6.2), and only after the
  * adapter was fitted. Everything else stays undefined.
  */
-function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
+/**
+ * Fuel level for one asset on one day (spec §9). The tank starts the day at a level
+ * of its own, falls with use (more while moving), gets one refuel of 40–70 points
+ * in the working day, and GN-01 drops 18 points at 02:10. Each asset has its own
+ * numbers, so two assets never read the same level at the same moment.
+ */
+function fuelModelForDay(asset: Asset, dayMs: number) {
+  const salt = assetSeed(asset);
+  const prng = mulberry32(salt + Math.floor(dayMs / 86400000) * 7919);
+  let level = 45 + prng() * 45;
+  const refuelAt = dayMs + (rand(prng, 8, 12) * 3600000);
+  const refuelBy = 40 + prng() * 30;
+  const gnDropAt = dayMs + 2 * 3600000 + 10 * 60000;
+  let lastT = dayMs;
+  let refuelled = false;
+  let dropped = false;
+  return {
+    at(t: number, moving: boolean): number {
+      const elapsed = Math.max(0, (t - lastT) / 60000);
+      lastT = t;
+      level -= elapsed * (moving ? 0.03 : 0.004);
+      if (!refuelled && t >= refuelAt) { level += refuelBy; refuelled = true; }
+      if (asset.code === 'GN-01' && !dropped && t >= gnDropAt) { level -= 18; dropped = true; }
+      level = Math.min(100, Math.max(5, level));
+      return Math.round(level * 10) / 10;
+    },
+  };
+}
+
+function withCanValues(asset: Asset, readings: Reading[], dayMs: number): Reading[] {
   const supported = new Set<string>(asset.canProfile.supported);
   if (!CAN_PARAMS.some(p => supported.has(p))) return readings;
   const salt = assetSeed(asset);
+  const fuel = fuelModelForDay(asset, dayMs);
   return readings.map(r => {
     const t = new Date(r.deviceTime).getTime();
     if (!isCanReadingAvailable(asset, t)) return r;
@@ -216,7 +246,7 @@ function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
     const out: Reading = { ...r };
     if (supported.has('rpm')) out.rpm = on ? (moving ? 1400 + 700 * u : 700 + 100 * u) : 0;
     if (supported.has('engineLoad')) out.engineLoadPct = on ? (moving ? 40 + 40 * u : 15 + 10 * u) : 0;
-    if (supported.has('fuelLevel')) out.fuelLevelPct = Math.round((40 + 40 * (0.5 + 0.5 * Math.sin(t / (6 * 3600000)))) * 10) / 10;
+    if (supported.has('fuelLevel')) out.fuelLevelPct = fuel.at(t, moving);
     if (supported.has('fuelUsed')) out.fuelUsedL = Math.round(r.gnssOdometerKm * 0.35 * 10) / 10;
     if (supported.has('fuelRate')) out.fuelRateLph = on ? (moving ? 18 + 12 * u : 3 + 2 * u) : 0;
     if (supported.has('canOdometer')) out.canOdometerKm = r.gnssOdometerKm;
@@ -228,10 +258,37 @@ function withCanValues(asset: Asset, readings: Reading[]): Reading[] {
   });
 }
 
+/** Behaviours that are working in the shift; they move at the anchor (spec §8.2, §9). */
+const WORKING_BEHAVIOURS = new Set(['works_at_site', 'drives_between_sites', 'light_vehicle_day']);
+/** The last stretch before the clock on which a working asset is moving. */
+const WORKING_WINDOW_MS = 30 * 60000;
+
+/**
+ * An asset expected to be working at the anchor must read as moving (speed ≥ 3 km/h
+ * with the engine on), or the status rules call it idle. The generators choose
+ * "moving" at random per reading, so the last stretch is forced here. Idle, stale
+ * and offline assets keep their scripted tails; they never reach this.
+ */
+function applyWorkingAtAnchor(asset: Asset, readings: Reading[], dayMs: number): Reading[] {
+  // Between-site trucks already drive at the anchor (buildTripLegs), so they keep their own speeds.
+  if (!WORKING_BEHAVIOURS.has(asset.behaviour) || asset.behaviour === 'drives_between_sites') return readings;
+  if (ANCHOR_TAILS[asset.code] !== undefined) return readings;
+  const now = clock.now();
+  if (dayMs !== clock.startOfDubaiDay(now)) return readings;
+  const from = now - WORKING_WINDOW_MS;
+  const salt = assetSeed(asset);
+  return readings.map(r => {
+    const t = new Date(r.deviceTime).getTime();
+    if (t < from || t > now) return r;
+    const u = mulberry32(t + salt)();
+    return { ...r, moving: true, ignition: true, speedKmh: Math.round((12 + 20 * u) * 10) / 10 };
+  });
+}
+
 function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
-  const readings = withCanValues(asset, makeDayReadingsRaw(asset, dayMs));
+  const readings = withCanValues(asset, applyWorkingAtAnchor(asset, makeDayReadingsRaw(asset, dayMs), dayMs), dayMs);
   // Scenario: WT-07 — a planned over-speed event yesterday, at 104 km/h (spec §8, S27).
-  const yesterday = Math.floor(clock.now() / 86400000) * 86400000 - 86400000;
+  const yesterday = clock.startOfDubaiDay(clock.now()) - 86400000;
   if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
   return readings;
 }
@@ -262,7 +319,7 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   const isOutsideAnchor = dayMs > now;
 
   // Scenario: TP-23 — power cut 2 h ago, then offline 40 min ago
-  if (asset.code === 'TP-23' && Math.floor(now / 86400000) === Math.floor(dayMs / 86400000)) {
+  if (asset.code === 'TP-23' && clock.startOfDubaiDay(now) === dayMs) {
     const powerCutAt = now - 2 * 3600000;
     const offlineAt = now - 40 * 60000;
     return [
@@ -327,9 +384,11 @@ function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prn
   const odometer = rand(prng, 0, 1000) + asset.code.charCodeAt(0);
   const tracker = currentTrackerFor(asset);
   const trackerId = tracker?.id ?? 'unknown';
+  // A parked asset keeps one heading all day; it does not spin between readings.
+  const parkedHeading = rand(prng, 0, 360);
 
   for (let t = dayMs; t < dayEnd && t < nowMs(); t += interval) {
-    const r = baseReading(t, trackerId, site.center.lat + rand(prng, -0.001, 0.001), site.center.lng + rand(prng, -0.001, 0.001), 0, rand(prng, 0, 360), false, false, rand(prng, 12.4, 13.2), rand(prng, 3.9, 4.1), randInt(prng, 2, 4), randInt(prng, 6, 12), odometer, prng);
+    const r = baseReading(t, trackerId, site.center.lat + rand(prng, -0.001, 0.001), site.center.lng + rand(prng, -0.001, 0.001), 0, parkedHeading, false, false, rand(prng, 12.4, 13.2), rand(prng, 3.9, 4.1), randInt(prng, 2, 4), randInt(prng, 6, 12), odometer, prng);
     readings.push(r);
   }
   return readings;
@@ -465,6 +524,121 @@ function generateLightVehicleReadings(asset: Asset, dayMs: number, endMs: number
     const r = baseReading(t, trackerId, lat, lng, speed, heading, ignition, moving,
       extV, rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), dist, prng);
 
+    readings.push(r);
+  }
+  return readings;
+}
+
+// ── Between-site trips (spec §9) ──────────────────────────────────────────────
+
+type LatLngPt = { lat: number; lng: number };
+type TripLeg =
+  | { kind: 'dwell'; at: LatLngPt; start: number; end: number }
+  | { kind: 'drive'; from: LatLngPt; to: LatLngPt; start: number; end: number; cruiseKmh: number };
+
+const TRIP_DWELL_MS = 20 * 60000;
+const TRIP_SHIFT_START_H = 7;
+const TRIP_SHIFT_END_H = 18;
+/** The window before the clock that is always a drive on the anchor day. */
+const TRIP_ANCHOR_LEG_MS = 40 * 60000;
+
+function haversineKm(a: LatLngPt, b: LatLngPt): number {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function bearingDeg(a: LatLngPt, b: LatLngPt): number {
+  const y = Math.sin((b.lng - a.lng) * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180);
+  const x = Math.cos(a.lat * Math.PI / 180) * Math.sin(b.lat * Math.PI / 180) - Math.sin(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.cos((b.lng - a.lng) * Math.PI / 180);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/**
+ * Legs for one shift: a stop at the yard, then a drive to another site of the same
+ * owner at 45–80 km/h, a stop, and the drive back, and so on. On the anchor day the
+ * last leg is a drive that covers the minutes before the clock.
+ */
+function buildTripLegs(asset: Asset, home: LatLngPt, dayMs: number, prng: () => number): TripLeg[] {
+  const others = db.getState().sites.filter(s => s.tenantId === asset.ownerTenantId && s.id !== asset.homeSiteId);
+  const dests: LatLngPt[] = others.length
+    ? others.map(s => s.center)
+    : [{ lat: home.lat + 0.03, lng: home.lng + 0.03 }];
+  const shiftStart = dayMs + TRIP_SHIFT_START_H * 3600000;
+  const shiftEnd = dayMs + TRIP_SHIFT_END_H * 3600000;
+  const now = clock.now();
+  const onAnchorDay = clock.startOfDubaiDay(now) === dayMs;
+  const anchorDriveStart = now - TRIP_ANCHOR_LEG_MS;
+  const legs: TripLeg[] = [];
+  let cursor = shiftStart;
+  let at = home;
+  let k = 0;
+  while (cursor < shiftEnd) {
+    const dwellEnd = cursor + TRIP_DWELL_MS;
+    if (onAnchorDay && dwellEnd > anchorDriveStart && cursor <= anchorDriveStart) break;
+    legs.push({ kind: 'dwell', at, start: cursor, end: dwellEnd });
+    cursor = dwellEnd;
+    const to = dests[k % dests.length];
+    k++;
+    const dist = Math.max(1, haversineKm(at, to));
+    const cruiseKmh = rand(prng, 45, 80);
+    const end = cursor + (dist / cruiseKmh) * 3600000;
+    if (end > shiftEnd) break;
+    legs.push({ kind: 'drive', from: at, to, start: cursor, end, cruiseKmh });
+    cursor = end;
+    at = to;
+  }
+  if (onAnchorDay) {
+    // The anchor drive: leaves from where the last leg ended, runs past the clock.
+    const to = dests[k % dests.length];
+    const cruiseKmh = rand(prng, 45, 80);
+    legs.push({ kind: 'drive', from: at, to, start: Math.max(anchorDriveStart, cursor), end: now + 2 * 3600000, cruiseKmh });
+  }
+  return legs;
+}
+
+function generateTripReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
+  const readings: Reading[] = [];
+  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  if (!site) return readings;
+  const tracker = currentTrackerAndAsset(asset);
+  if (!tracker) return readings;
+  const trackerId = tracker.id;
+  const interval = 30 * 1000;
+  const legs = buildTripLegs(asset, site.center, dayMs, prng);
+  let odometer = rand(prng, 5000, 50000) + asset.code.charCodeAt(0);
+  let pos: LatLngPt = site.center;
+  let heading = 0;
+
+  for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
+    const leg = legs.find(l => t >= l.start && t < l.end);
+    let speed = 0;
+    let moving = false;
+    let ignition = false;
+    if (leg?.kind === 'dwell') {
+      ignition = true;
+      pos = leg.at;
+    } else if (leg?.kind === 'drive') {
+      ignition = true;
+      moving = true;
+      const frac = Math.min(1, (t - leg.start) / (leg.end - leg.start));
+      speed = Math.min(90, Math.max(20, leg.cruiseKmh * (0.85 + 0.3 * prng())));
+      const next = {
+        lat: leg.from.lat + (leg.to.lat - leg.from.lat) * frac + rand(prng, -0.00015, 0.00015),
+        lng: leg.from.lng + (leg.to.lng - leg.from.lng) * frac + rand(prng, -0.00015, 0.00015),
+      };
+      heading = bearingDeg(pos, next);
+      pos = next;
+    } else {
+      // Off shift: the asset is at its yard, engine off.
+      pos = site.center;
+    }
+    const dist = (speed * interval / 3600000);
+    odometer += dist;
+    const r = baseReading(t, trackerId, pos.lat, pos.lng, speed, heading, ignition, moving,
+      rand(prng, 24.8, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng);
     readings.push(r);
   }
   return readings;
