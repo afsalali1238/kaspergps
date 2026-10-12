@@ -408,12 +408,37 @@ function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prn
   return readings;
 }
 
+// Plant on site stays within PLANT_RADIUS_M of its working site; lifting makes short
+// moves within LIFT_RADIUS_M (spec §9). Positions are kept as metres east (x) and north (y).
+const PLANT_RADIUS_M = 250;
+const LIFT_RADIUS_M = 120;
+type SitePos = { x: number; y: number };
+
+/** One short step on a bearing, kept inside radiusM of the site centre. */
+function stepWithin(pos: SitePos, stepM: number, radiusM: number, headingDeg: number) {
+  const rad = headingDeg * Math.PI / 180;
+  let x = pos.x + Math.sin(rad) * stepM;
+  let y = pos.y + Math.cos(rad) * stepM;
+  const r = Math.hypot(x, y);
+  if (r > radiusM) { x *= radiusM / r; y *= radiusM / r; }
+  pos.x = x;
+  pos.y = y;
+}
+
+function metresToLatLng(center: LatLngPt, pos: SitePos): LatLngPt {
+  return {
+    lat: center.lat + pos.y / 111320,
+    lng: center.lng + pos.x / (111320 * Math.cos(center.lat * Math.PI / 180)),
+  };
+}
+
 function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, isMoving: boolean): Reading[] {
   const readings: Reading[] = [];
   const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const interval = isMoving ? 30 * 1000 : 10 * 60 * 1000;
   let azimuth = 0;
+  const pos: SitePos = { x: rand(prng, -PLANT_RADIUS_M / 2, PLANT_RADIUS_M / 2), y: rand(prng, -PLANT_RADIUS_M / 2, PLANT_RADIUS_M / 2) };
   let odometer = rand(prng, 100, 5000) + asset.code.charCodeAt(0);
   const tracker = currentTrackerFor(asset);
   const trackerId = tracker?.id ?? 'unknown';
@@ -423,18 +448,18 @@ function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng:
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
     const ignition = inShift;
-    const moving = isMoving && inShift && prng() > 0.3;
-    const speed = moving ? rand(prng, 5, 30) : 0;
-    const heading = azimuth;
-    const lat = site.center.lat + rand(prng, -0.002, 0.002) + (moving ? rand(prng, -0.0005, 0.0005) : 0);
-    const lng = site.center.lng + rand(prng, -0.002, 0.002) + (moving ? rand(prng, -0.0005, 0.0005) : 0);
+    const moving = isMoving && inShift && prng() > 0.75;
+    const speed = moving ? rand(prng, 3, 12) : 0;
     azimuth = (azimuth + rand(prng, -20, 20)) % 360;
+    const stepM = moving ? (speed / 3.6) * (interval / 1000) : 0;
+    if (moving) stepWithin(pos, stepM, PLANT_RADIUS_M, azimuth);
+    odometer += stepM / 1000;
+    const p = metresToLatLng(site.center, pos);
 
-    const r = baseReading(t, trackerId, lat, lng, speed, heading, ignition, moving,
-      rand(prng, 24.0, 28.4), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer + (moving ? rand(prng, 0.01, 0.05) : 0), prng);
+    const r = baseReading(t, trackerId, p.lat, p.lng, speed, azimuth, ignition, moving,
+      rand(prng, 24.0, 28.4), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng);
 
     readings.push(r);
-    odometer = r.gnssOdometerKm;
   }
   return readings;
 }
@@ -550,9 +575,7 @@ type TripLeg =
   | { kind: 'dwell'; at: LatLngPt; start: number; end: number }
   | { kind: 'drive'; from: LatLngPt; to: LatLngPt; start: number; end: number; cruiseKmh: number };
 
-const TRIP_DWELL_MS = 20 * 60000;
 const TRIP_SHIFT_START_H = 7;
-const TRIP_SHIFT_END_H = 18;
 /** The window before the clock that is always a drive on the anchor day. */
 const TRIP_ANCHOR_LEG_MS = 40 * 60000;
 
@@ -581,7 +604,8 @@ function buildTripLegs(asset: Asset, home: LatLngPt, dayMs: number, prng: () => 
     ? others.map(s => s.center)
     : [{ lat: home.lat + 0.03, lng: home.lng + 0.03 }];
   const shiftStart = dayMs + TRIP_SHIFT_START_H * 3600000;
-  const shiftEnd = dayMs + TRIP_SHIFT_END_H * 3600000;
+  // Each truck works a different day: the shift ends between 14:00 and 18:00 Dubai.
+  const shiftEnd = dayMs + rand(prng, 14, 18) * 3600000;
   const now = clock.now();
   const onAnchorDay = clock.startOfDubaiDay(now) === dayMs;
   const anchorDriveStart = now - TRIP_ANCHOR_LEG_MS;
@@ -590,11 +614,12 @@ function buildTripLegs(asset: Asset, home: LatLngPt, dayMs: number, prng: () => 
   let at = home;
   let k = 0;
   while (cursor < shiftEnd) {
-    const dwellEnd = cursor + TRIP_DWELL_MS;
+    // Stops at a yard or site last 10–45 minutes (loading, paperwork, waiting).
+    const dwellEnd = cursor + rand(prng, 10, 45) * 60000;
     if (onAnchorDay && dwellEnd > anchorDriveStart && cursor <= anchorDriveStart) break;
     legs.push({ kind: 'dwell', at, start: cursor, end: dwellEnd });
     cursor = dwellEnd;
-    const to = dests[k % dests.length];
+    const to = dests[Math.floor(prng() * dests.length)];
     k++;
     const dist = Math.max(1, haversineKm(at, to));
     const cruiseKmh = rand(prng, 45, 80);
@@ -668,24 +693,26 @@ function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng
   const interval = 30 * 1000;
   const shiftStart = dayMs + 7 * 3600000;
   const shiftEnd = dayMs + 18 * 3600000;
-  let lat = site.center.lat;
-  let lng = site.center.lng;
+  const lifting = asset.assetClass === 'lifting';
+  const radiusM = lifting ? LIFT_RADIUS_M : PLANT_RADIUS_M;
+  const pos: SitePos = { x: rand(prng, -radiusM / 2, radiusM / 2), y: rand(prng, -radiusM / 2, radiusM / 2) };
+  let heading = rand(prng, 0, 360);
+  let odometer = rand(prng, 100, 5000);
 
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
     const working = inShift;
     const ignition = working;
-    const moving = working && prng() > 0.3;
-    const speed = moving ? rand(prng, 5, 25) : 0;
-    const heading = (t * 0.005) % 360;
-    const dt = interval / 3600000;
-    const dist = (speed * dt * 1000) / 3600 * (moving ? 1 : 0);
+    const moving = working && prng() > 0.75;
+    const speed = moving ? (lifting ? rand(prng, 2, 6) : rand(prng, 3, 12)) : 0;
+    heading = (heading + rand(prng, -45, 45) + 360) % 360;
+    const stepM = moving ? (speed / 3.6) * (interval / 1000) : 0;
+    if (moving) stepWithin(pos, stepM, radiusM, heading);
+    odometer += stepM / 1000;
+    const p = metresToLatLng(site.center, pos);
 
-    lat += rand(prng, -0.0001, 0.0001) + (moving ? Math.cos(heading * Math.PI / 180) * dist / 111000 : 0);
-    lng += rand(prng, -0.0001, 0.0001) + (moving ? Math.sin(heading * Math.PI / 180) * dist / (111000 * Math.cos(lat * Math.PI / 180)) : 0);
-
-    const r = baseReading(t, trackerId, lat, lng, speed, heading, ignition, moving,
-      rand(prng, 24.0, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), dist, prng);
+    const r = baseReading(t, trackerId, p.lat, p.lng, speed, heading, ignition, moving,
+      rand(prng, 24.0, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng);
 
     readings.push(r);
   }
@@ -702,20 +729,23 @@ function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prn
   const interval = 30 * 1000;
   const shiftStart = dayMs + 7 * 3600000;
   const shiftEnd = dayMs + 17 * 3600000;
-  let lat = site.center.lat;
-  let lng = site.center.lng;
+  const pos: SitePos = { x: rand(prng, -LIFT_RADIUS_M / 2, LIFT_RADIUS_M / 2), y: rand(prng, -LIFT_RADIUS_M / 2, LIFT_RADIUS_M / 2) };
+  let heading = rand(prng, 0, 360);
+  let odometer = 0;
 
   for (let t = dayMs; t < endMs && t < nowMs(); t += interval) {
     const inShift = t >= shiftStart && t <= shiftEnd;
     const ignition = inShift;
-    const moving = isMoving && inShift && prng() > 0.5;
-    const speed = moving ? rand(prng, 5, 15) : 0;
+    const moving = isMoving && inShift && prng() > 0.75;
+    const speed = moving ? rand(prng, 2, 6) : 0;
+    heading = (heading + rand(prng, -45, 45) + 360) % 360;
+    const stepM = moving ? (speed / 3.6) * (interval / 1000) : 0;
+    if (moving) stepWithin(pos, stepM, LIFT_RADIUS_M, heading);
+    odometer += stepM / 1000;
+    const p = metresToLatLng(site.center, pos);
 
-    lat += rand(prng, -0.0002, 0.0002) + (moving ? rand(prng, -0.0003, 0.0003) : 0);
-    lng += rand(prng, -0.0002, 0.0002) + (moving ? rand(prng, -0.0003, 0.0003) : 0);
-
-    const r = baseReading(t, trackerId, lat, lng, speed, rand(prng, 0, 360), ignition, moving,
-      rand(prng, 12.4, 13.2), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 12), 0, prng);
+    const r = baseReading(t, trackerId, p.lat, p.lng, speed, heading, ignition, moving,
+      rand(prng, 12.4, 13.2), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 12), odometer, prng);
 
     readings.push(r);
   }

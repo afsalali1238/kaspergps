@@ -106,9 +106,13 @@ describe('J2 — movement by class (§9)', () => {
     expect(Math.min(...moving)).toBeGreaterThanOrEqual(20);
   });
 
-  it('trucks do not all cover the same distance in a day', () => {
-    const km = ['FB-12', 'TP-21', 'WT-07', 'FB-14'].map(c => Math.round(distanceKm(yesterdayReadings(c))));
-    expect(new Set(km).size).toBeGreaterThan(1);
+  it('trucks cover realistic, different distances in a day (10–60 km, at least 5 km apart)', () => {
+    const km = ['TP-21', 'WT-07', 'FB-14', 'LB-02', 'LB-05', 'TP-22'].map(c => distanceKm(yesterdayReadings(c)));
+    for (const d of km) {
+      expect(d).toBeGreaterThanOrEqual(10);
+      expect(d).toBeLessThanOrEqual(60);
+    }
+    expect(Math.max(...km) - Math.min(...km)).toBeGreaterThanOrEqual(5);
   });
 
   it('a generator stays put: no movement all day', () => {
@@ -186,5 +190,38 @@ describe('J2 — a rented asset sits at the renter\'s site during the rental', (
     const readings = getReadingsForAsset(asset('WL-06'), anchorDay(), clock.now());
     expect(readings.length).toBeGreaterThan(0);
     for (const r of readings.filter(r => r.moving)) expect(km(r, target)).toBeLessThan(1);
+  });
+});
+
+describe('J2 — plant and lifting stay near their working site (§9)', () => {
+  // The site an asset works at: its renter's site while a rental is active, otherwise its home site.
+  const workingSite = (code: string, atMs: number) => {
+    const a = asset(code);
+    const rental = seed.bookings.find(b => b.assetId === a.id && b.renterSiteId &&
+      new Date(b.start).getTime() <= atMs && atMs <= new Date(b.end).getTime());
+    return site(rental ? rental.renterSiteId! : a.homeSiteId);
+  };
+  const anchorDay = () => clock.startOfDubaiDay(clock.now());
+  const maxOffsetM = (code: string) => {
+    const centre = workingSite(code, anchorDay()).center;
+    const readings = getReadingsForAsset(asset(code), anchorDay(), clock.now());
+    expect(readings.length).toBeGreaterThan(0);
+    return Math.max(...readings.map(r => km(r, centre) * 1000));
+  };
+
+  it.each(['EX-04', 'WL-06', 'GR-01', 'CP-03'])('plant %s stays within 300 m of its working site', code => {
+    expect(maxOffsetM(code)).toBeLessThanOrEqual(300);
+  });
+
+  it.each(['TH-04', 'TH-01'])('lifting %s makes short moves: within 150 m of its working site', code => {
+    expect(maxOffsetM(code)).toBeLessThanOrEqual(150);
+  });
+
+  it('a working plant asset logs real distance (the odometer accumulates)', () => {
+    const day = yesterdayDubai();
+    const rs = getReadingsForAsset(asset('EX-04'), day, day + DAY - 1);
+    const travelled = rs.at(-1)!.gnssOdometerKm - rs[0].gnssOdometerKm;
+    expect(travelled).toBeGreaterThan(0.5);
+    expect(travelled).toBeLessThan(60);
   });
 });
