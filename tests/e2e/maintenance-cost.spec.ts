@@ -67,15 +67,6 @@ test.describe('maintenance board', () => {
     await expect(page.getByText('Service history')).toBeVisible();
     await expect(page.getByText('250 h service — oil, filters, coolant top-up')).toBeVisible();
   });
-
-  test('before the Later phase the screen is locked', async ({ page }) => {
-    await signIn(page, USERS.khalid);
-    await page.goto('/');
-    await page.getByRole('button', { name: /Day 1/ }).click();
-    await page.goto('/app/maintenance');
-    await expect(page.getByText('Not available')).toBeVisible();
-    await expect(page.getByText(/arrives in the Later phase/)).toBeVisible();
-  });
 });
 
 test.describe('cost & ROI', () => {

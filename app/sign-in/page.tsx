@@ -73,7 +73,7 @@ export default function SignInPage() {
           </div>
 
           <h1 className="text-xl font-semibold text-ink text-center mb-1">{t('sign_in.title', 'Sign in')}</h1>
-          <p className="text-sm text-grey-500 text-center mb-6">{t('sign_in.picker.subtitle', 'Pick a user to see Kasper as them, or sign in with email.')}</p>
+          <p className="text-sm text-grey-500 text-center mb-6">{t('sign_in.picker.subtitle', 'Pick a role to see Kasper as that person, or sign in with email.')}</p>
 
           <UserPicker />
 

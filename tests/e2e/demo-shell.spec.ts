@@ -81,19 +81,17 @@ test.describe('demo bar tools', () => {
     await expect(page.getByText(/Report|Alert/).first()).toBeVisible();
   });
 
-  test('reset asks twice, restores the seed, switches and clock, and signs out', async ({ page }) => {
+  test('reset asks twice, restores the seed and clock, and signs out', async ({ page }) => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await signIn(page, USERS.sara);
-    await page.getByRole('button', { name: /^Day 1$/ }).click();
     await openTools(page);
     await page.getByRole('button', { name: 'Reset demo data' }).click();
     await expect(page.getByRole('button', { name: /Click again — this clears every demo change/ })).toBeVisible();
     await page.getByRole('button', { name: /Click again/ }).click();
     // Reset signs out and lands on sign-in.
     await expect(page).toHaveURL(/\/sign-in/);
-    // Signing back in shows the default phase: the switches were restored.
+    // Signing back in works from a clean seed.
     await signIn(page, USERS.sara);
-    await expect(page.getByRole('button', { name: /^Later$/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Kasper Console' })).toBeVisible();
   });
 });

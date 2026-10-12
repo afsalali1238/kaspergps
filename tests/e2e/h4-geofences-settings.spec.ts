@@ -20,8 +20,8 @@ test.describe('H4.4 — geofences on assets and reports', () => {
     await expect(page.getByText(/^(Inside: .+|Outside all geofences)$/)).toHaveCount(0);
   });
 
-  test('the geofence report is offered in Phase 2 to a company with a geofence', async ({ page }) => {
-    await demo(page, { email: USERS.omar, on: '/app/reports', phase: 'Phase 2' });
+  test('the geofence report is offered to a company with a geofence', async ({ page }) => {
+    await demo(page, { email: USERS.omar, on: '/app/reports' });
     const geofenceType = page.getByRole('button', { name: /^Geofence\b/ }).first();
     await geofenceType.click();
     await expect(geofenceType).toHaveAttribute('aria-pressed', 'true');

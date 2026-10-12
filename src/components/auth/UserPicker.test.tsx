@@ -28,7 +28,7 @@ function renderPicker() {
   );
 }
 
-const userSelect = () => screen.getByLabelText('User') as HTMLSelectElement;
+const userSelect = () => screen.getByLabelText('Person') as HTMLSelectElement;
 const roleSelect = () => screen.getByLabelText('Role') as HTMLSelectElement;
 
 describe('UserPicker', () => {
@@ -43,27 +43,26 @@ describe('UserPicker', () => {
     resetDb();
   });
 
-  it('lists every user, grouped by company with Kasper first', () => {
+  it('starts on Tenant Admin with Khalid preselected, and offers five roles', () => {
     renderPicker();
+    const roles = within(roleSelect()).getAllByRole('option').map(o => o.textContent);
+    expect(roles).toEqual(['Kasper Admin', 'Kasper Ops', 'Tenant Admin', 'Site User', 'Link viewer (no account)']);
+    expect(roleSelect().value).toBe('tenant_admin');
+    expect(userSelect().value).toBe('u-khalid');
     const options = within(userSelect()).getAllByRole('option');
-    expect(options).toHaveLength(db.getState().users.length);
-    const groups = [...userSelect().querySelectorAll('optgroup')].map(g => g.label);
-    expect(groups[0]).toBe('Kasper');
-    expect(groups).toContain('Al Noor Transport');
-    expect(groups).toContain('Palm Contracting');
-    // The first user is preselected, so one click signs in.
-    expect((screen.getByRole('button', { name: 'Sign in as Sara Haddad' }) as HTMLButtonElement).disabled).toBe(false);
+    for (const option of options) expect(option.textContent).toContain('Tenant Admin');
   });
 
-  it('narrows the list to the chosen role', () => {
+  it('switching role lands on that role\'s default person', () => {
     renderPicker();
     fireEvent.change(roleSelect(), { target: { value: 'site_user' } });
+    expect(userSelect().value).toBe('u-deepa');
     const options = within(userSelect()).getAllByRole('option');
     const siteUsers = db.getState().users.filter(u => ['site_user'].includes(u.role));
     expect(options).toHaveLength(siteUsers.length);
-    for (const option of options) expect(option.textContent).toContain('Site User');
-    // Sites are shown with the role, so a reviewer can pick the right person.
     expect(options.map(o => o.textContent).join('|')).toContain('Deepa Shah — Site User · Dubai South Hub, Palm Crescent Works');
+    fireEvent.change(roleSelect(), { target: { value: 'kasper_ops' } });
+    expect(userSelect().value).toBe('u-ravi');
   });
 
   it('signs a tenant admin into the app', () => {
@@ -77,12 +76,14 @@ describe('UserPicker', () => {
 
   it('signs Kasper staff into the console', () => {
     renderPicker();
+    fireEvent.change(roleSelect(), { target: { value: 'kasper_admin' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in as Sara Haddad' }));
     expect(nav.replace).toHaveBeenCalledWith('/console');
   });
 
   it('refuses a deactivated user with the sign-in message', () => {
     renderPicker();
+    fireEvent.change(roleSelect(), { target: { value: 'site_user' } });
     fireEvent.change(userSelect(), { target: { value: 'u-karim' } });
     expect(within(userSelect()).getByRole('option', { name: /Karim Old.*\(deactivated\)/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sign in as Karim Old' }));
@@ -93,6 +94,7 @@ describe('UserPicker', () => {
 
   it('welcomes and activates an invited user', async () => {
     renderPicker();
+    fireEvent.change(roleSelect(), { target: { value: 'site_user' } });
     fireEvent.change(userSelect(), { target: { value: 'u-sam' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in as Sam Invite' }));
     expect((await screen.findByRole('status')).textContent).toContain('Welcome to Kasper, Sam.');
@@ -100,9 +102,11 @@ describe('UserPicker', () => {
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/app'), { timeout: 3000 });
   });
 
-  it('opens the outside hirer tracking link', () => {
+  it('the Link viewer opens the outside hirer tracking link, with no person to pick', () => {
     renderPicker();
-    fireEvent.click(screen.getByRole('button', { name: "Open the outside hirer's tracking link" }));
+    fireEvent.change(roleSelect(), { target: { value: 'link_viewer' } });
+    expect(screen.queryByLabelText('Person')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: "Open the hirer's tracking link" }));
     expect(nav.push).toHaveBeenCalledWith(expect.stringMatching(/^\/t\/k7Qm2Xc9TpLw4ZaN8rVb3Ye5$/));
   });
 });

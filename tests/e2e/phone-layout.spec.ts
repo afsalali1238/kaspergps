@@ -39,7 +39,7 @@ test('the demo bar fits a 390 px phone: every control is on screen', async ({ pa
   test.skip((page.viewportSize()?.width ?? 0) > 500, 'phone layout only');
   await page.setViewportSize({ width: 390, height: 844 });
   await demo(page, { email: USERS.omar, on: '/app' });
-  for (const name of ['Day 1', 'Later', 'Features', 'Scenarios', 'Tools']) {
+  for (const name of ['Features', 'Scenarios', 'Tools']) {
     const control = page.locator('.demo-bar').getByText(name, { exact: true }).first();
     await expect(control, `${name} is in the demo bar`).toBeVisible();
     const box = await control.boundingBox();

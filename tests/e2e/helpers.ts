@@ -84,12 +84,7 @@ export async function jumpTo(page: Page, preset: string | RegExp): Promise<void>
   await expect(page.getByText('Jump to')).toHaveCount(0);
 }
 
-/** Phase switch in the demo bar. */
-export async function setPhase(page: Page, phase: 'Day 1' | 'Phase 2' | 'Later'): Promise<void> {
-  await page.locator('.demo-bar').getByRole('button', { name: phase, exact: true }).click();
-}
-
-/** Sales view toggle (separate from Show hidden). */
+/** Sales view toggle. */
 export async function setSalesView(page: Page, on: boolean): Promise<void> {
   // The button shows the CURRENT state, so to reach `on` we click the button
   // labelled with the opposite state.
@@ -148,13 +143,11 @@ export async function demo(
     email?: string;
     user?: string;
     on?: string;
-    phase?: 'Day 1' | 'Phase 2' | 'Later';
     scenario?: number;
   } = {}
 ): Promise<void> {
   if (options.email) await signIn(page, options.email);
   else await goTo(page, options.on ?? '/app');
-  if (options.phase) await setPhase(page, options.phase);
   if (options.user) await viewAs(page, options.user);
   if (options.on) await goTo(page, options.on);
   if (options.scenario) await startScenario(page, options.scenario);
