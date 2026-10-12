@@ -13,6 +13,10 @@ test.describe('S21 — the sales view locks Tier 3 cards', () => {
 
     await setSalesView(page, true);
     await expect(page.getByText(/Needs ALL-CAN300 \(Tier 3\)/).first()).toBeVisible();
+    // J5.7: the locked cards sit below the asset's real content, not above the map.
+    const locked = (await page.getByTestId('locked-features').boundingBox())!;
+    const map = (await page.locator('.leaflet-container').first().boundingBox())!;
+    expect(locked.y).toBeGreaterThan(map.y + map.height);
 
     await setSalesView(page, false);
     await expect(page.getByText(/Needs ALL-CAN300/)).toHaveCount(0);
