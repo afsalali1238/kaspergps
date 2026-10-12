@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Reading } from '@/domain/types';
+import { groupTrips } from '@/domain/trips';
 import {
   advancePlayhead,
   buildPins,
@@ -11,8 +12,12 @@ import {
   stepPlayhead,
   trailDistanceKm,
   trailUntil,
+  PIN_ROW_GAP_PCT,
   PLAYBACK_GAP_MS,
   REDUCED_MOTION_STEP_MS,
+  pinRows,
+  pinMarkerHtml,
+  type PlaybackPin,
 } from './playback';
 
 const T0 = Date.parse('2026-10-10T08:00:00Z');
@@ -213,6 +218,8 @@ describe('event pins (spec 11.15)', () => {
       geofenceEvents: over.geofenceEvents ?? [],
     });
 
+  const of = (pins: PlaybackPin[], kind: PlaybackPin['kind']) => pins.filter(p => p.kind === kind);
+
   it('one over-speed pin per run, at its first reading, labelled with the top speed', () => {
     const readings = [
       reading(0, { speedKmh: 60 }),
@@ -221,7 +228,7 @@ describe('event pins (spec 11.15)', () => {
       reading(min(3), { speedKmh: 90 }),
       reading(min(4), { speedKmh: 102 }),
     ];
-    const pins = pin({ readings });
+    const pins = of(pin({ readings }), 'overspeed');
     expect(pins.map(p => [p.kind, p.label])).toEqual([
       ['overspeed', 'Over speed 104 km/h'],
       ['overspeed', 'Over speed 102 km/h'],
@@ -239,9 +246,9 @@ describe('event pins (spec 11.15)', () => {
       reading(0, { fuelLevelPct: 80 }),
       reading(min(1), { fuelLevelPct: 65 }),
     ];
-    expect(pin({ readings, tier: 2 }).map(p => p.kind)).toEqual(['fuel_drop']);
-    expect(pin({ readings, tier: 3 })[0].label).toBe('Fuel fell 15 points');
-    expect(pin({ readings, tier: 1 })).toEqual([]);
+    expect(of(pin({ readings, tier: 2 }), 'fuel_drop').map(p => p.kind)).toEqual(['fuel_drop']);
+    expect(of(pin({ readings, tier: 3 }), 'fuel_drop')[0].label).toBe('Fuel fell 15 points');
+    expect(of(pin({ readings, tier: 1 }), 'fuel_drop')).toEqual([]);
   });
 
   it('a fuel drop across a data gap is not measured, so it gives no pin', () => {
@@ -249,7 +256,129 @@ describe('event pins (spec 11.15)', () => {
       reading(0, { fuelLevelPct: 80 }),
       reading(min(20), { fuelLevelPct: 40 }),
     ];
-    expect(pin({ readings, tier: 3 })).toEqual([]);
+    expect(of(pin({ readings, tier: 3 }), 'fuel_drop')).toEqual([]);
+  });
+
+  it('a refill of 5 points or more gives a pin on Tier 2 and 3, never on Tier 1', () => {
+    const readings = [
+      reading(0, { fuelLevelPct: 40 }),
+      reading(min(1), { fuelLevelPct: 44 }),
+      reading(min(2), { fuelLevelPct: 60 }),
+    ];
+    expect(of(pin({ readings, tier: 2 }), 'refuel').map(p => p.label)).toEqual(['Refuelled 16 points']);
+    expect(of(pin({ readings, tier: 3 }), 'refuel')).toHaveLength(1);
+    // 4 points on its own is below the 5-point rule.
+    expect(of(pin({ readings: readings.slice(0, 2), tier: 3 }), 'refuel')).toEqual([]);
+    expect(of(pin({ readings, tier: 1 }), 'refuel')).toEqual([]);
+  });
+
+  it('a refill across a data gap is not measured, so it gives no pin', () => {
+    const readings = [
+      reading(0, { fuelLevelPct: 40 }),
+      reading(min(20), { fuelLevelPct: 90 }),
+    ];
+    expect(of(pin({ readings, tier: 3 }), 'refuel')).toEqual([]);
+  });
+
+  it('harsh events in the readings become pins, in words, with their place', () => {
+    const readings = [
+      reading(0),
+      reading(min(1), { event: 'harsh_brake', lat: 25.4, lng: 55.6 }),
+      reading(min(2), { event: 'harsh_accel' }),
+      reading(min(3), { event: 'harsh_corner' }),
+    ];
+    const pins = of(pin({ readings }), 'harsh');
+    expect(pins.map(p => p.label)).toEqual(['Harsh braking', 'Harsh acceleration', 'Harsh cornering']);
+    expect(pins[0].atMs).toBe(T0 + min(1));
+    expect(pins[0].lat).toBe(25.4);
+    expect(pins[0].lng).toBe(55.6);
+  });
+
+  it('a power cut becomes one pin where the vehicle feed goes dead', () => {
+    const readings = [
+      reading(0, { extVoltage: 24 }),
+      reading(min(1), { extVoltage: 12.4 }),
+      reading(min(2), { extVoltage: 0.1, lat: 25.5, lng: 55.7 }),
+      reading(min(3), { extVoltage: 0 }),
+      reading(min(4), { extVoltage: 0.1 }),
+    ];
+    const pins = of(pin({ readings }), 'power_cut');
+    expect(pins).toHaveLength(1);
+    expect(pins[0].label).toBe('Power cut — on tracker battery');
+    expect(pins[0].atMs).toBe(T0 + min(2));
+    expect([pins[0].lat, pins[0].lng]).toEqual([25.5, 55.7]);
+  });
+
+  it('a single low reading that rebounds gives no power-cut pin', () => {
+    const readings = [
+      reading(0, { extVoltage: 24 }),
+      reading(min(1), { extVoltage: 0.4 }),
+      reading(min(2), { extVoltage: 26 }),
+    ];
+    expect(of(pin({ readings }), 'power_cut')).toEqual([]);
+  });
+
+  it('rolling with the ignition off is a towing pin, one per run', () => {
+    const readings = [
+      reading(0, { speedKmh: 0 }),
+      // Parked, then dragged: moving with the ignition off.
+      reading(min(1), { ignition: false, moving: false, speedKmh: 4 }),
+      reading(min(2), { ignition: false, moving: false, speedKmh: 4 }),
+      reading(min(3), { ignition: false, moving: false, speedKmh: 0 }),
+      reading(min(4), { ignition: true, speedKmh: 40 }), // driven away: not towing
+    ];
+    const pins = of(pin({ readings }), 'towing');
+    expect(pins.map(p => p.label)).toEqual(['Moved with ignition off']);
+    expect(pins[0].atMs).toBe(T0 + min(1));
+  });
+
+  it('a long window full of short trips gets no trip-boundary pins', () => {
+    // An excavator working on one site shuffles about: the trip rule calls each shuffle a
+    // trip, and 30 of them would fill the scrubber with pins that repeat the state colours.
+    const readings = Array.from({ length: 30 }, (_, i) => [
+      reading(i * min(20), { speedKmh: 40 }),
+      reading(i * min(20) + min(6), { speedKmh: 0 }),
+    ]).flat();
+    const pins = pin({ readings });
+    expect(of(pins, 'trip_start')).toEqual([]);
+    expect(of(pins, 'trip_stop')).toEqual([]);
+    // The trips themselves are still there for the Trips tab; only the pins are dropped.
+    expect(groupTrips(readings).length).toBeGreaterThan(3);
+  });
+
+  it('a trip start and its stop become pins at the trip\'s own times', () => {
+    const readings = [
+      reading(0, { speedKmh: 0 }), // parked with the engine off
+      reading(min(1), { ignition: false, moving: false, speedKmh: 0 }),
+      reading(min(2), { speedKmh: 30 }), // trip starts
+      reading(min(3), { speedKmh: 50 }), // the trip's last moving reading
+      reading(min(9), { speedKmh: 0 }), // stood still 6 min: the trip ends, at min(3)
+      reading(min(20), { speedKmh: 0 }),
+    ];
+    const pins = pin({ readings });
+    // The stop sits on the trip's last reading, the same time and place the Trips tab
+    // reports as the trip's end — the readings only say it had stopped when the next one
+    // arrived, and inventing a time in between is the interpolation the spec forbids.
+    expect(of(pins, 'trip_start').map(p => p.atMs)).toEqual([T0 + min(2)]);
+    expect(of(pins, 'trip_stop').map(p => p.atMs)).toEqual([T0 + min(3)]);
+    expect(pins.filter(p => p.kind === 'trip_start' || p.kind === 'trip_stop').map(p => p.label))
+      .toEqual(['Trip started', 'Trip ended']);
+  });
+
+  it('a geofence pin carries the place the machine was at that time', () => {
+    const readings = [
+      reading(0, { lat: 25.2, lng: 55.3 }),
+      reading(min(4), { lat: 25.9, lng: 55.9 }),
+      reading(min(9), { lat: 26.1, lng: 56.1 }),
+    ];
+    const pins = pin({
+      readings,
+      geofenceEvents: [{ atMs: T0 + min(6), type: 'exit', geofenceName: 'Yard' }],
+    });
+    const fence = of(pins, 'geofence_exit')[0];
+    expect(fence.label).toBe('Left Yard');
+    expect(fence.lat).toBe(25.9);
+    expect(fence.lng).toBe(55.9);
   });
 
   it('geofence events inside the window become pins; those outside do not', () => {
@@ -273,10 +402,65 @@ describe('event pins (spec 11.15)', () => {
       readings,
       geofenceEvents: [{ atMs: T0 + min(1), type: 'enter', geofenceName: 'Gate' }],
     });
-    expect(pins.map(p => p.kind)).toEqual(['geofence_enter', 'overspeed']);
+    expect(of(pins, 'geofence_enter').map(p => p.kind)).toEqual(['geofence_enter']);
+    expect(of(pins, 'overspeed').map(p => p.kind)).toEqual(['overspeed']);
+    expect(pins.findIndex(p => p.kind === 'geofence_enter')).toBeLessThan(pins.findIndex(p => p.kind === 'overspeed'));
   });
 
   it('no readings and no events give no pins', () => {
     expect(pin({ readings: [] })).toEqual([]);
+  });
+
+  it('pins close in time are stacked into rows instead of covering each other', () => {
+    const pins: PlaybackPin[] = [
+      { atMs: T0, kind: 'trip_start', label: 'Trip started' },
+      { atMs: T0 + 30_000, kind: 'overspeed', label: 'Over speed 104 km/h' },
+      { atMs: T0 + 6 * 3_600_000, kind: 'refuel', label: 'Refuelled 40 points' },
+    ];
+    const rows = pinRows(pins, T0 - min(5), T0 + min(24 * 60));
+    // Half a minute apart is under the row gap: the second pin moves to its own row.
+    expect(rows.map(r => r.row)).toEqual([0, 1, 0]);
+    expect(rows.map(r => r.pin.atMs)).toEqual(pins.map(p => p.atMs));
+    expect(rows[0].row).toBe(0);
+  });
+
+  it('a row never holds two pins that would overlap on the scrubber', () => {
+    const pins: PlaybackPin[] = Array.from({ length: 40 }, (_, i) => ({
+      atMs: T0 + i * 20_000,
+      kind: 'trip_start' as const,
+      label: 'Trip started',
+    }));
+    const fromMs = T0 - min(5);
+    const toMs = T0 + min(20);
+    const rows = pinRows(pins, fromMs, toMs);
+    expect(rows).toHaveLength(40);
+    const total = toMs - fromMs;
+    const byRow = new Map<number, number[]>();
+    for (const { pin: p, row } of rows) {
+      const xs = byRow.get(row) ?? [];
+      xs.push(((p.atMs - fromMs) / total) * 100);
+      byRow.set(row, xs);
+    }
+    // They cannot all share one row: pins 20 seconds apart over 25 minutes sit closer
+    // together than the gap, so the layout alternates rows.
+    expect(byRow.size).toBeGreaterThan(1);
+    for (const xs of byRow.values()) {
+      for (let i = 1; i < xs.length; i++) {
+        expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(PIN_ROW_GAP_PCT);
+      }
+    }
+  });
+});
+
+describe('pin marker HTML', () => {
+  it('escapes a user-typed geofence name, so it stays text', () => {
+    const html = pinMarkerHtml('#0ca678', 'Entered "><img src=x onerror=alert(1)> · 09:12');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;');
+    expect(html.match(/<span/g)).toHaveLength(1);
+  });
+
+  it('only accepts a hex colour', () => {
+    expect(pinMarkerHtml('red;background:url(x)', 't')).toContain('background:#888888');
   });
 });

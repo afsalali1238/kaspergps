@@ -42,6 +42,28 @@ test.describe('event pins and Play this period (spec 11.3, 11.15)', () => {
     await expect(page.getByTestId('playback-readout')).toContainText('104 km/h');
   });
 
+  test('S27: the player marks trips, harsh events, towing, power cuts and refuels, on the scrubber and the map', async ({ page }) => {
+    // LB-05 was dragged out of its yard at 23:40 yesterday with the ignition off (S29's
+    // alert): the player has to show that pin, in words, and jump to it.
+    await demo(page, { email: USERS.omar, on: '/app/assets/a-lb05' });
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('button', { name: 'Play this period' }).click();
+
+    const pins = page.getByTestId('event-pins');
+    const tow = pins.getByRole('button', { name: /^Moved with ignition off at / });
+    await expect(tow).toHaveCount(1);
+    await expect(pins.getByRole('button', { name: /^Trip started at / }).first()).toBeVisible();
+    await expect(pins.getByRole('button', { name: /^Trip ended at / }).first()).toBeVisible();
+    await expect(page.getByTestId('pin-legend')).toContainText('Towing');
+
+    // The same pins are drawn on the map, and clicking one moves the playhead to it.
+    const mapTow = page.locator('.leaflet-container .trip-pin-towing');
+    await expect(mapTow).toHaveCount(1);
+    await mapTow.click();
+    await expect(page.getByTestId('playback-readout')).toContainText('Ignition off');
+    await expect(page.getByTestId('playback-readout')).toContainText('4 km/h');
+  });
+
   test('S28: Lina plays EX-04 inside her rental; AdBlue reads Not measured and RPM is shown', async ({ page }) => {
     await demo(page, { email: USERS.lina, on: '/app/assets/a-ex04' });
     await page.getByRole('button', { name: 'History', exact: true }).click();

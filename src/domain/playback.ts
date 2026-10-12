@@ -10,10 +10,15 @@
 //    wherever a gap sits.
 
 import type { Reading } from '@/domain/types';
+import { groupTrips, readingTime } from '@/domain/trips';
 import {
+  FUEL_DROP_PCT,
+  FUEL_REFUEL_RISE_PCT,
   IDLE_SPEED_KMH,
   PLAYBACK_DOWNSAMPLE_MAX,
   PLAYBACK_INTERPOLATE_MAX_SEC,
+  POWER_CUT_V,
+  POWER_OK_V,
   STALE_AFTER_SEC,
 } from '@/config/thresholds';
 
@@ -260,15 +265,73 @@ export function trailUntil(
 
 /** A reading at or above this speed is an over-speed. The planned WT-07 event runs at 104 km/h. */
 export const OVERSPEED_KMH = 100;
-/** A drop of at least this many points between two fuel readings is a fuel-drop pin (Tier 2/3). */
-export const FUEL_DROP_POINTS = 10;
 
-export type PinKind = 'overspeed' | 'fuel_drop' | 'geofence_enter' | 'geofence_exit';
+export type PinKind =
+  | 'trip_start'
+  | 'trip_stop'
+  | 'harsh'
+  | 'overspeed'
+  | 'fuel_drop'
+  | 'refuel'
+  | 'power_cut'
+  | 'towing'
+  | 'geofence_enter'
+  | 'geofence_exit';
 
 export interface PlaybackPin {
   atMs: number;
   kind: PinKind;
   label: string;
+  /** Where it happened, when the readings can say: the player draws these on the map. */
+  lat?: number;
+  lng?: number;
+}
+
+/** The accelerometer events in the readings (§8.7), in words (§11.4). */
+export const HARSH_WORDS = {
+  harsh_brake: 'Harsh braking',
+  harsh_accel: 'Harsh acceleration',
+  harsh_corner: 'Harsh cornering',
+} as const;
+
+/**
+ * Pins stacked into rows for the scrubber: two events close in time would otherwise sit
+ * on the same spot and one would cover the other (a 7-day window can hold a trip's end
+ * and an over-speed two minutes apart). Greedy: a pin goes into the first row whose last
+ * pin is at least PIN_ROW_GAP_PCT to the left, so a row never overlaps itself.
+ */
+/**
+ * The map marker for a pin, as HTML for a Leaflet divIcon. The title can hold a
+ * geofence name, which users type, so it is escaped: a fence named
+ * `"><img src=x onerror=…>` must stay text, never markup.
+ */
+export function pinMarkerHtml(colour: string, title: string): string {
+  const safe = title
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  const safeColour = /^#[0-9a-fA-F]{3,8}$/.test(colour) ? colour : '#888888';
+  return `<span title="${safe}" style="display:block;width:12px;height:12px;border-radius:50%;background:${safeColour};border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.5)"></span>`;
+}
+
+export const PIN_ROW_GAP_PCT = 1.8; // about 12 px on a 700 px scrubber
+
+export function pinRows(pins: PlaybackPin[], fromMs: number, toMs: number): { pin: PlaybackPin; row: number }[] {
+  const total = Math.max(1, toMs - fromMs);
+  const rowEnds: number[] = [];
+  return pins.map(pin => {
+    const x = ((pin.atMs - fromMs) / total) * 100;
+    let row = rowEnds.findIndex(last => x - last >= PIN_ROW_GAP_PCT);
+    if (row < 0) {
+      row = rowEnds.length;
+      rowEnds.push(x);
+    } else {
+      rowEnds[row] = x;
+    }
+    return { pin, row };
+  });
 }
 
 export interface PinGeofenceEvent {
@@ -278,11 +341,42 @@ export interface PinGeofenceEvent {
 }
 
 /**
- * Pins for one trip window. Over-speed gets one pin per run, at its first reading,
- * labelled with the run's top speed. Fuel-drop pins need two readings that are
- * close enough in time that the drop is not measured across a data gap, and only
- * Tier 2/3 have fuel. Geofence pins come from the caller, who has already limited
- * them to the viewer's own fences. Pins are sorted by time.
+ * Where a pin sits, when the readings can say: the position of the reading in force at
+ * atMs (the last one at or before it, else the first one after it). Named apart from
+ * positionAt(), which answers a different question about the playhead.
+ */
+function pinPosition(sorted: Reading[], atMs: number): { lat: number; lng: number } | undefined {
+  let found: Reading | undefined;
+  for (const r of sorted) {
+    if (readingTime(r) <= atMs) found = r;
+    else {
+      found = found ?? r;
+      break;
+    }
+  }
+  return found ? { lat: found.lat, lng: found.lng } : undefined;
+}
+
+/**
+ * Trip boundaries get pins only in a window this short. A machine that works on one site
+ * shuffles about all day, and the trip rule (correctly) calls each shuffle a trip: a
+ * seven-day window of an excavator holds 66 of them, so its player would carry 132
+ * identical pins that say nothing the coloured state track does not already show. In a
+ * window with a few trips — a single trip played from the Trips tab (S27), or a day of a
+ * truck — the boundary pins are the useful thing, so there they stay. The Trips tab list
+ * itself is never filtered.
+ */
+export const PIN_TRIP_MAX = 3;
+
+/**
+ * Pins for one playback window (spec 11.15): where trips start and end (when the window
+ * is short enough for them to mean something, see PIN_TRIP_MAX), harsh events, over-speed,
+ * refuels and fuel drops (Tier 2/3 only), power cuts, towing and the viewer's own geofence
+ * events. Every pin carries its position when the readings can place it, so the player can
+ * draw it on the map too. Pins are sorted by time.
+ *
+ * All of them come from the readings (or, for geofences, from the caller's already
+ * permission-checked events): the same source the screens and the alerts use.
  */
 export function buildPins(args: {
   readings: Reading[];
@@ -293,37 +387,122 @@ export function buildPins(args: {
 }): PlaybackPin[] {
   const { tier, fromMs, toMs, geofenceEvents } = args;
   const sorted = sortReadings(args.readings).filter(r => {
-    const t = readingMs(r);
+    const t = readingTime(r);
     return t >= fromMs && t <= toMs;
   });
   const pins: PlaybackPin[] = [];
+  const where = (atMs: number) => pinPosition(sorted, atMs);
 
+  // Trip start and stop, from the same rule the Trips tab uses.
+  const trips = groupTrips(sorted);
+  if (trips.length <= PIN_TRIP_MAX) {
+    for (const trip of trips) {
+      pins.push({ atMs: trip.startMs, kind: 'trip_start', label: 'Trip started', ...where(trip.startMs) });
+      pins.push({ atMs: trip.endMs, kind: 'trip_stop', label: 'Trip ended', ...where(trip.endMs) });
+    }
+  }
+
+  // Harsh events, as the reading carries them.
+  for (const r of sorted) {
+    const event = r.event;
+    if (event !== 'harsh_brake' && event !== 'harsh_accel' && event !== 'harsh_corner') continue;
+    pins.push({ atMs: readingTime(r), kind: 'harsh', label: HARSH_WORDS[event], lat: r.lat, lng: r.lng });
+  }
+
+  // Over-speed, one pin per run, at its first reading, labelled with the run's top speed.
   let run: Reading[] = [];
   const flush = () => {
     if (run.length === 0) return;
     const top = Math.max(...run.map(r => r.speedKmh));
-    pins.push({ atMs: readingMs(run[0]), kind: 'overspeed', label: `Over speed ${Math.round(top)} km/h` });
+    const first = run[0];
+    pins.push({
+      atMs: readingTime(first),
+      kind: 'overspeed',
+      label: `Over speed ${Math.round(top)} km/h`,
+      lat: first.lat,
+      lng: first.lng,
+    });
     run = [];
   };
   for (const r of sorted) {
-    const broken = run.length > 0 && readingMs(r) - readingMs(run[run.length - 1]) > PLAYBACK_GAP_MS;
+    const broken = run.length > 0 && readingTime(r) - readingTime(run[run.length - 1]) > PLAYBACK_GAP_MS;
     if (broken) flush();
     if (r.speedKmh >= OVERSPEED_KMH) run.push(r);
     else flush();
   }
   flush();
 
+  // Towing: rolling (above the idle speed) with the ignition off.
+  let tow: Reading[] = [];
+  const flushTow = () => {
+    if (tow.length === 0) return;
+    const first = tow[0];
+    pins.push({
+      atMs: readingTime(first),
+      kind: 'towing',
+      label: 'Moved with ignition off',
+      lat: first.lat,
+      lng: first.lng,
+    });
+    tow = [];
+  };
+  for (const r of sorted) {
+    const broken = tow.length > 0 && readingTime(r) - readingTime(tow[tow.length - 1]) > PLAYBACK_GAP_MS;
+    if (broken) flushTow();
+    if (!r.ignition && r.speedKmh > IDLE_SPEED_KMH) tow.push(r);
+    else flushTow();
+  }
+  flushTow();
+
+  // Power cut: the vehicle feed goes dead while the tracker keeps reporting. A single
+  // low reading is not enough — like a geofence crossing, the drop has to hold for the
+  // next reading (or be the last one), so a flapping feed does not look like a cut every
+  // time it dips.
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const r = sorted[i];
+    if (prev.extVoltage <= POWER_OK_V || r.extVoltage >= POWER_CUT_V) continue;
+    if (readingTime(r) - readingTime(prev) > PLAYBACK_GAP_MS) continue;
+    const next = sorted[i + 1];
+    const holds = !next || next.extVoltage < POWER_CUT_V;
+    if (!holds) continue;
+    pins.push({
+      atMs: readingTime(r),
+      kind: 'power_cut',
+      label: 'Power cut — on tracker battery',
+      lat: r.lat,
+      lng: r.lng,
+    });
+  }
+
+  // Fuel: refills and thefts/drops. Only Tier 2/3 have a gauge, and a change spread
+  // across a data gap is not measured, so it gives no pin.
   if (tier >= 2) {
-    let prev: Reading | null = null;
+    let fuelPrev: Reading | null = null;
     for (const r of sorted) {
       if (r.fuelLevelPct === undefined) continue;
-      if (prev && prev.fuelLevelPct !== undefined && readingMs(r) - readingMs(prev) <= PLAYBACK_GAP_MS) {
-        const drop = prev.fuelLevelPct - r.fuelLevelPct;
-        if (drop >= FUEL_DROP_POINTS) {
-          pins.push({ atMs: readingMs(r), kind: 'fuel_drop', label: `Fuel fell ${Math.round(drop)} points` });
+      if (fuelPrev && fuelPrev.fuelLevelPct !== undefined && readingTime(r) - readingTime(fuelPrev) <= PLAYBACK_GAP_MS) {
+        const delta = r.fuelLevelPct - fuelPrev.fuelLevelPct;
+        if (delta >= FUEL_REFUEL_RISE_PCT) {
+          pins.push({
+            atMs: readingTime(r),
+            kind: 'refuel',
+            label: `Refuelled ${Math.round(delta)} points`,
+            lat: r.lat,
+            lng: r.lng,
+          });
+        }
+        if (delta <= -FUEL_DROP_PCT) {
+          pins.push({
+            atMs: readingTime(r),
+            kind: 'fuel_drop',
+            label: `Fuel fell ${Math.round(-delta)} points`,
+            lat: r.lat,
+            lng: r.lng,
+          });
         }
       }
-      prev = r;
+      fuelPrev = r;
     }
   }
 
@@ -333,6 +512,7 @@ export function buildPins(args: {
       atMs: e.atMs,
       kind: e.type === 'enter' ? 'geofence_enter' : 'geofence_exit',
       label: `${e.type === 'enter' ? 'Entered' : 'Left'} ${e.geofenceName}`,
+      ...where(e.atMs),
     });
   }
 

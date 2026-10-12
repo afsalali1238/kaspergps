@@ -26,6 +26,8 @@ Repo: `https://github.com/afsalali1238/kaspergps`. Branch from the latest `main`
 
 ## 2. Already done (don't redo)
 
+- **J6 playback pins** (every §11.15 pin kind, on the scrubber and the map; the shared trip rule in `src/domain/trips.ts`). Merged after review, with an escaping fix for the pin HTML.
+
 - J1–J7 are complete (PRs #14–#25).
 - The four seed alerts are backed by readings (PR #24); `alerts-truthful.test.ts` has no to-dos.
 - **U0 part 1, PR #26:**
@@ -44,7 +46,7 @@ Do them in order. Start a step only after the previous one is merged.
 | **U0b** | `u0b-bug-fixes` | The rest of U0, below |
 | U1 | `u1-design-system` | §3.1–3.2 (fleetx clone and copy) and §4 (fonts, tokens, type, components, icons) |
 | U2 | `u2-fleet-map` | §5–6 |
-| U3 | `u3-asset-page` | §7 |
+| U3 | `u3-asset-page` | §7. Playback pins already merged (J6, PR #27); remaining: the header, overview and Engine & fuel parts, plus **the simulator's plant micro-trips** — EX-04 logs 66 one-minute "trips" a week from site shuffles. Plant working on site must not count as trips (fix the simulator or add a minimum trip distance or duration in `src/domain/trips.ts`, with tests), then raise or remove `PIN_TRIP_MAX` in `src/domain/playback.ts`. |
 | U4 | `u4-work-screens` | §8: Alerts, Fuel, Maintenance, Reports |
 | U5 | `u5-money-admin-data` | §8: money, settings and console; §9 data |
 | U6 | `u6-phone-arabic` | §10 |

@@ -7,6 +7,11 @@ export const OFFLINE_AFTER_SEC = 1800; // 30 min
 export const IDLE_SPEED_KMH = 3;
 export const WORKING_LOAD_PCT = 25;
 export const FUEL_DROP_PCT = 10; // drop within 15 min with ignition off
+export const FUEL_REFUEL_RISE_PCT = 5; // a rise this big between two readings is a refill
+// External power (spec §8.7): below POWER_CUT_V the tracker is on its own battery; above
+// POWER_OK_V the vehicle feed is back.
+export const POWER_CUT_V = 1;
+export const POWER_OK_V = 10;
 export const LOW_BATTERY_V = 3.6;
 export const OVERSPEED_KMH = 90; // trucks
 export const GEOFENCE_CONFIRM_READINGS = 2;
