@@ -7,6 +7,7 @@ import { db } from '@/server/db';
 import { ANCHOR_MS, dubaiAt } from '@/server/seed/data';
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
 import { refuelTimesFor } from '@/server/telemetry/fuel';
+import { haversineKm } from '@/server/telemetry/movement';
 import { formatDubaiTime } from '@/lib/clock';
 import type { Alert, Asset, Reading } from '@/domain/types';
 
@@ -108,12 +109,53 @@ describe('seeded alert times (§8.7)', () => {
   });
 });
 
+describe('scripted events the readings now show (spec §8.7, §9)', () => {
+  const yardOf = (code: string) => {
+    const site = db.getState().sites.find(s => s.id === assetOf(code).homeSiteId)!;
+    return site.center;
+  };
+  const worksOf = () => {
+    const fence = db.getState().geofences.find(g => g.id === 'g-palm-crescent')!;
+    const pts = (fence.shape as { points: { lat: number; lng: number }[] }).points;
+    return {
+      lat: pts.reduce((sum, p) => sum + p.lat, 0) / pts.length,
+      lng: pts.reduce((sum, p) => sum + p.lng, 0) / pts.length,
+    };
+  };
+  const metres = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+    haversineKm(a, b) * 1000;
+
+  it('LB-05 towing: moved about 400 m with the ignition off, 23:40–23:50 yesterday', () => {
+    const from = dubaiAt(1, 23, 35);
+    const to = dubaiAt(0, 0, 0);
+    const window = readings('LB-05', from, to);
+    expect(window.length).toBeGreaterThan(0);
+    expect(window.every(r => !r.ignition)).toBe(true);
+    const yard = yardOf('LB-05');
+    const farthest = Math.max(...window.map(r => metres(yard, r)));
+    expect(farthest).toBeGreaterThan(350);
+    expect(farthest).toBeLessThan(450);
+    expect(window.some(r => r.speedKmh > 0)).toBe(true);
+    expect(alertOf('al-lb05-towing').detail).toContain('400 m');
+  });
+
+  it('WL-06 leaves the Palm Crescent works at 19:10 and is back inside by 19:55', () => {
+    const works = worksOf();
+    const out = readings('WL-06', dubaiAt(1, 19, 15), dubaiAt(1, 19, 25));
+    expect(out.length).toBeGreaterThan(0);
+    expect(Math.max(...out.map(r => metres(works, r)))).toBeGreaterThan(500);
+    const back = readings('WL-06', dubaiAt(1, 19, 52), dubaiAt(1, 19, 56));
+    expect(back.length).toBeGreaterThan(0);
+    expect(Math.min(...back.map(r => metres(works, r)))).toBeLessThan(150);
+    expect(alertOf('al-wl06-geo').detail).toContain('19:10');
+    expect(closedMs('al-wl06-geo')).toBe(dubaiAt(1, 19, 55));
+  });
+});
+
 // Events the readings do not show yet. They stay todo until the simulator produces them
 // (spec §9 scripted movements). Do not turn these into passing tests by weakening the check.
 describe.todo('seeded alerts the readings do not show yet');
-it.todo('LB-05 towing: moved 400 m with ignition off, 5 Oct 23:40 (spec §8.7) — no movement in readings');
-it.todo('LB-05 after-hours exit from Al Quoz Yard, 5 Oct 23:40 (spec §8.7, §9) — no crossing in readings');
-it.todo('WL-06 geofence exit, Palm Crescent, 5 Oct 19:10 (spec §8.7) — WL-06 stays inside the fence');
+it.todo('LB-05 after-hours exit from Al Quoz Yard, 5 Oct 23:40 (spec §8.7, §9) — LB-05 is homed at DIP, not at the Al Quoz Yard fence, so the crossing needs the spec resolved first');
 it.todo('EX-11 power cut at Ras Al Khor Yard (seed alert) — external voltage stays on in readings');
 it.todo('PU-51 idle at Dubai Hills (seed alert) — readings show ignition off, not idling');
 it.todo('FB-12 over-speed 96 km/h (seed alert) — highest FB-12 speed in the past week is 84 km/h');

@@ -9,7 +9,7 @@
 
 import type { Reading, Asset } from '@/domain/types';
 import { db, type DbRow } from '@/server/db';
-import { ANCHOR_MS } from '@/server/seed/data';
+import { ANCHOR_MS, dubaiAt } from '@/server/seed/data';
 import { ecuHoursAt } from '@/server/telemetry/ecu';
 import {
   bearingDeg, haversineKm, plantDay, generatorDay, legsDay, segmentAt, stayAt, stayWindows,
@@ -383,6 +383,10 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
       }
     }
 
+    // Scripted excursion (spec §8.7): overrides where and how the machine is for its legs.
+    const excursion = excursionAt(asset, t);
+    if (excursion) { lat = excursion.lat; lng = excursion.lng; mode = excursion.mode; speed = excursion.speed; }
+
     // Anchor forcing (spec §8.2, §1): only the last two minutes before the clock.
     if (t >= now - 2 * MIN) {
       if (MOVING_AT_ANCHOR.has(asset.code)) { mode = 'drive'; speed = 12 + prng() * 13; }
@@ -512,6 +516,59 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
     segs = withIdleTail(segs, home.center, now - 40 * MIN, now);
   }
   return sampleSegments(asset, tracker.id, segs, dayMs, end, prng);
+}
+
+// ── Scripted excursions (spec §8.7, §9) ───────────────────────────────────────
+// The two events the spec puts in yesterday's readings that the normal plan does not
+// produce: LB-05 moved 400 m with its ignition off, and WL-06 left its works (Palm Crescent)
+// and came back. Each excursion overrides the position, mode and speed for its legs only.
+
+interface ExcursionLeg { t0: number; t1: number; from: Point; to: Point; mode: Mode; speed: number }
+
+function centroidOf(points: Point[]): Point {
+  return {
+    lat: points.reduce((sum, p) => sum + p.lat, 0) / points.length,
+    lng: points.reduce((sum, p) => sum + p.lng, 0) / points.length,
+  };
+}
+
+function excursionLegs(asset: Asset): ExcursionLeg[] {
+  if (asset.code === 'LB-05') {
+    // Tow: out 400 m north from its yard, with the engine off, 23:40–23:50 yesterday.
+    const yard = siteById(asset.homeSiteId)?.center;
+    if (!yard) return [];
+    const moved = { lat: yard.lat + 0.0036, lng: yard.lng };
+    return [
+      { t0: dubaiAt(1, 23, 40), t1: dubaiAt(1, 23, 50), from: yard, to: moved, mode: 'off', speed: 4 },
+      { t0: dubaiAt(1, 23, 50), t1: dubaiAt(0, 0, 0), from: moved, to: moved, mode: 'off', speed: 0 },
+    ];
+  }
+  if (asset.code === 'WL-06') {
+    // Leaves the Palm Crescent works at 19:10, stops outside, and is back inside by 19:55.
+    const fence = db.getState().geofences.find(g => g.id === 'g-palm-crescent');
+    if (!fence || fence.shape.type !== 'polygon') return [];
+    const works = centroidOf(fence.shape.points);
+    const outside = { lat: works.lat + 0.0060, lng: works.lng };
+    return [
+      { t0: dubaiAt(1, 19, 10), t1: dubaiAt(1, 19, 20), from: works, to: outside, mode: 'drive', speed: 30 },
+      { t0: dubaiAt(1, 19, 20), t1: dubaiAt(1, 19, 45), from: outside, to: outside, mode: 'idle', speed: 0 },
+      { t0: dubaiAt(1, 19, 45), t1: dubaiAt(1, 19, 55), from: outside, to: works, mode: 'drive', speed: 30 },
+    ];
+  }
+  return [];
+}
+
+/** The excursion leg that holds at time t for this asset, sampled at t, or null. */
+function excursionAt(asset: Asset, t: number): { lat: number; lng: number; mode: Mode; speed: number } | null {
+  const leg = excursionLegs(asset).find(l => t >= l.t0 && t < l.t1);
+  if (!leg) return null;
+  const f = (t - leg.t0) / (leg.t1 - leg.t0);
+  return {
+    lat: leg.from.lat + (leg.to.lat - leg.from.lat) * f,
+    lng: leg.from.lng + (leg.to.lng - leg.from.lng) * f,
+    mode: leg.mode,
+    speed: leg.speed,
+  };
 }
 
 function mulberry32(seed: number): () => number {
