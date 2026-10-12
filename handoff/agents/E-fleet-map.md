@@ -11,6 +11,7 @@
    - rentals ending today.
    Clicking a cell filters the map.
 2. **Desktop ≥ 1280 px:**
+   - (The app's page navigation is a top bar now, B3. This rail is the map page's own fleet list, as in fleetx.)
    - **Left rail, 280 px:** search, then the fleet list, then Sites with counts. A fleet row shows a status dot, the name, `CODE · class`, a fuel or utilisation mini-bar, and a Rented badge. The selected row is tinted.
    - **Centre:** Leaflet map with a muted base layer (CARTO Positron, with OSM as fallback) and status markers with code labels. The selected marker gets an accent ring; keep clustering and add a legend.
    - **Right panel**, a `SideSheet` of 360 px, opened by a row or marker click. The URL gets `?asset=<id>`.

@@ -213,7 +213,13 @@ Add an Arabic face for `[dir=rtl]`, e.g. IBM Plex Sans Arabic, through `next/fon
 ## 5. Shell (U1–U2)
 
 ### 5.1 Layout
-- Keep the left nav at 224 px. Add a collapse-to-icons toggle at 1024–1279 px. On phones keep the existing menu sheet.
+- **Owner decision (13 Oct): top navigation like fleetx, no left sidebar.**
+  - One 56 px top bar holds: the logo + company name, the page tabs, search (⌘K), a LIVE clock pill, the bell and the user menu.
+  - Page tabs: Lucide icon + label; the active tab gets an accent underline and tint; the order follows the existing nav rules (role, phase and hardware gating are unchanged).
+  - fleetx's bar overflowed at 1440 px, so show at most 6 tabs. Map, Alerts, Reports, Fuel (when shown), Maintenance and Billing come first. The rest (Geofences, Certificates, Cost & ROI, Downloads, Schedules) go under **"More ▾"**, a dropdown with the same gating. Settings sits in the user menu.
+  - Below 1024 px the tabs collapse into "Menu ▾". On phones, keep the existing menu sheet, opened from the bar.
+  - The Kasper console gets the same top bar with its own tabs (Overview, Tenants, Assets, Trackers, CAN adapters, Bookings, then More ▾).
+  - Remove the left sidebar from `AppShell` and the console layout. Pages get the full width.
 - **Header:** company name; the search field showing a ⌘K hint; a LIVE pill showing the demo clock time (fleetx style; clicking it opens the demo clock); the bell; the user menu.
 - **Demo bar:** keep it, restyled with the tokens. Tools gains **Trigger alert ▸** (offline, power cut, fuel drop, fault, over-speed). Each one writes a real reading or alert through the simulator API, so screens update. This mirrors fleetx's demo panel.
 

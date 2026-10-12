@@ -32,9 +32,11 @@
    - `CopyButton`.
    Keep the existing exports working, so screens that aren't redesigned yet still compile.
 6. **Icons.** Add `lucide-react` and replace the nav SVGs in `AppShell` using the §4 mapping. Alerts and Maintenance are currently the same triangle.
-7. **Shell restyle.**
-   - Header: company name, a search box with a ⌘K hint, a LIVE pill showing the demo clock time (click opens the clock), the bell, and the user menu.
-   - Left nav gets tokens and an active state with an accent left border.
+7. **Shell: top navigation, no left sidebar** (owner decision, 13 Oct; spec `UI-UPGRADE.md` §5.1).
+   - One top bar: logo + company, up to 6 page tabs (icon + label, accent underline when active), "More ▾" for the rest, ⌘K search, LIVE clock pill, bell, and user menu (Settings lives there).
+   - The same for the console layout.
+   - Remove the left sidebar. Keep every nav gating rule and test (update locators only).
+   - Below 1024 px: "Menu ▾". Phones: the existing menu sheet.
    - Demo bar: **restyle only**. Agent J adds its new tools in Wave 3.
 8. **Brand.** `src/config/brand.ts` exports `PRODUCT_NAME = 'Kasper'`, and the wordmark reads from it.
 
