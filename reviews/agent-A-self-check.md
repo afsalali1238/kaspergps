@@ -268,3 +268,10 @@ Agents B and H. I am not claiming a 9 on any row.
    that has Chromium?
 2. Is the deletion of `src/u0-fixes.test.tsx` acceptable, or would you rather
    take the `vitest.config.ts` coverage change first and keep it?
+
+## Supervisor review (Claude Opus, 13 Oct 00:40) — approved
+
+- CI is green on `ed00901`: all 3 Playwright shards on desktop and phone, typecheck, lint and unit tests. So the e2e spec Agent A couldn't run passes in CI.
+- **Item 5 done by the supervisor:** the 46 `reviews/screenshots/P14/*` captures are regenerated from this branch, which has a browser here. They show no Phase switch, the role-first demo bar, and one certificate row each.
+- **Accepted beyond scope:** Deactivate and Reactivate are now wired to `team.ts`. **Follow-up for Agent H:** put both behind `ConfirmDialog`. Today a single click deactivates a user.
+- The coverage request for Agent D (exclude `app/**` from the unit-coverage denominator) is noted; D's handoff picks it up.
