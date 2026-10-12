@@ -1,6 +1,6 @@
 'use client';
 
-// Badge — the one badge shape (UI-UPGRADE §4, fleetx `.badge`): mono 10.5 px,
+// Badge — the one badge shape (UI-UPGRADE §4, reference `.badge`): mono 10.5 px,
 // radius 3, 9% tint, AA-safe tone ink.
 //
 //   <Badge tone="bad">Overdue</Badge>

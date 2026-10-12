@@ -1,7 +1,7 @@
 'use client';
 
 // MetricTile — one tile of the 2×2 metric grids on the asset page and the
-// right-hand panel (fleetx `.metrics-2`).
+// right-hand panel (reference `.metrics-2`).
 //
 //   <div className="grid grid-cols-2 gap-2">
 //     <MetricTile label="Engine hours" value="1,284" unit="h" source="ECU" />

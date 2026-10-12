@@ -103,7 +103,7 @@ export function RowMenu({ items, label, align = 'end', className = '' }: RowMenu
           }
         }}
         className={clsx(
-          'inline-flex h-10 w-10 items-center justify-center rounded-md text-slate transition-colors hover:bg-surface-2 hover:text-ink',
+          'inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-md text-slate transition-colors hover:bg-surface-2 hover:text-ink',
           open && 'bg-surface-2 text-ink',
           focusRing
         )}
@@ -137,7 +137,7 @@ export function RowMenu({ items, label, align = 'end', className = '' }: RowMenu
                 item.onSelect();
               }}
               className={clsx(
-                'flex min-h-10 w-full items-center px-3 text-start text-sm transition-colors',
+                'flex min-h-10 sm:min-h-9 w-full items-center px-3 text-start text-sm transition-colors',
                 'hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
                 item.destructive ? 'text-bad-ink' : 'text-ink'
               )}

@@ -1,6 +1,6 @@
 'use client';
 
-// Table — the data table (UI-UPGRADE §4, fleetx `.tbl`): sticky uppercase mono
+// Table — the data table (UI-UPGRADE §4, reference `.tbl`): sticky uppercase mono
 // header, 13 px rows, row hover tint, right-aligned mono numbers and an optional
 // ⋯ RowMenu at the end of each row.
 //
@@ -163,8 +163,8 @@ export function Table<T>({
                       cellPad,
                       'text-ink',
                       alignClass(col),
-                      (col.numeric || col.mono) && 'font-mono',
-                      col.numeric && 'whitespace-nowrap tabular-nums'
+                      (col.numeric || col.mono) && 'whitespace-nowrap font-mono',
+                      col.numeric && 'tabular-nums'
                     )}
                   >
                     {col.render(row)}

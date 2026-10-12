@@ -1,7 +1,7 @@
 'use client';
 
 // KpiStrip / KpiCell — the strip at the top of every screen (UI-UPGRADE §5.2,
-// fleetx `.stats-bar`): eyebrow label, mono value, one line of context, and
+// reference `.stats-bar`): eyebrow label, mono value, one line of context, and
 // where the number comes from.
 //
 //   <KpiStrip label="Fleet today">
@@ -85,7 +85,7 @@ export function KpiCell({ label, value, tone = 'neutral', context, source, onCli
   );
 
   const cellClass = clsx(
-    'relative min-w-[148px] flex-1 shrink-0 px-4 py-3 text-start',
+    'relative flex min-w-[148px] flex-1 shrink-0 flex-col justify-start px-4 py-3 text-start',
     active && 'bg-accent-tint after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-accent',
     className
   );

@@ -62,7 +62,7 @@ export function CopyButton({ value, label, showText = false, className = '' }: C
       onClick={copy}
       aria-label={label ?? t('ui.copy', 'Copy')}
       className={clsx(
-        'inline-flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-md px-2 text-xs transition-colors hover:bg-surface-2',
+        'inline-flex min-h-10 min-w-10 sm:min-h-8 sm:min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs transition-colors hover:bg-surface-2',
         state === 'copied' ? 'text-ok-ink' : state === 'failed' ? 'text-bad-ink' : 'text-slate hover:text-ink',
         focusRing,
         className
