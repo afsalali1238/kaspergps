@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { signIn } from '@/server/api';
 import { storeActions } from '@/hooks';
+import { UserPicker } from '@/components/auth/UserPicker';
 import { useT } from '@/i18n';
 
 /** How long the welcome notice stays before the redirect. */
@@ -72,7 +73,15 @@ export default function SignInPage() {
           </div>
 
           <h1 className="text-xl font-semibold text-ink text-center mb-1">{t('sign_in.title', 'Sign in')}</h1>
-          <p className="text-sm text-grey-500 text-center mb-6">{t('sign_in.subtitle', 'Enter your email to continue.')}</p>
+          <p className="text-sm text-grey-500 text-center mb-6">{t('sign_in.picker.subtitle', 'Pick a user to see Kasper as them, or sign in with email.')}</p>
+
+          <UserPicker />
+
+          <div className="flex items-center gap-3 my-6" aria-hidden="true">
+            <span className="flex-1 border-t border-line" />
+            <span className="text-xs text-grey-500">{t('sign_in.picker.or_email', 'or sign in with email')}</span>
+            <span className="flex-1 border-t border-line" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -118,7 +127,7 @@ export default function SignInPage() {
               </p>
             )}
 
-            <Button type="submit" fullWidth size="md" loading={loading}>
+            <Button type="submit" variant="secondary" fullWidth size="md" loading={loading}>
               {t('sign_in.sign_in_button', 'Sign in')}
             </Button>
           </form>
