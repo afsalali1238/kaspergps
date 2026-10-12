@@ -100,7 +100,7 @@ export function ViewAsMenu() {
           <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         {session ? (
-          <span className="truncate max-w-[120px]">
+          <span className="truncate max-w-[72px] sm:max-w-[120px]">
             {session.user.name} · {roleShort(session.user.role)}
           </span>
         ) : (
@@ -109,7 +109,7 @@ export function ViewAsMenu() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-80 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+        <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
           <div className="p-2 border-b border-[#2a2c30]">
             <select
               value={role}
