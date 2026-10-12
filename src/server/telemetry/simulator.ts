@@ -180,10 +180,23 @@ function tailReadings(asset: Asset, tail: { via?: 'plant' | 'lifting' }, dayMs: 
   return generateForBehaviour(asset, dayMs, endMs, prng);
 }
 
+/**
+ * Where an asset is based at a given moment (spec §9). During an active rental to a
+ * renter with a site, the asset sits at that site; otherwise at its own home site.
+ */
+function siteFor(asset: Asset, atMs: number) {
+  const state = db.getState();
+  const rental = state.bookings.find(b =>
+    b.assetId === asset.id && b.renterSiteId &&
+    new Date(b.start).getTime() <= atMs && atMs <= new Date(b.end).getTime());
+  const renterSite = rental ? state.sites.find(s => s.id === rental.renterSiteId) : undefined;
+  return renterSite ?? state.sites.find(s => s.id === asset.homeSiteId);
+}
+
 /** Idling tail: engine running, not moving, every 10 minutes up to the clock. */
 function generateIdleTail(asset: Asset, fromMs: number, toMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, fromMs);
   if (!site) return readings;
   const tracker = currentTrackerFor(asset);
   const trackerId = tracker?.id ?? 'unknown';
@@ -314,6 +327,7 @@ function plannedOverspeed(readings: Reading[], kmh: number, count: number): Read
 
 function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
   const prng = mulberry32(assetSeed(asset) + Math.floor(dayMs / 86400000));
+  if (asset.code === 'FB-12') return fb12DayReadings(asset, dayMs, prng);
   const dayEndDubai = dayMs + 86400000;
   const now = clock.now();
   const isOutsideAnchor = dayMs > now;
@@ -378,7 +392,7 @@ function nowMs(): number { return clock.now(); }
 
 function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const interval = 10 * 60 * 1000; // parked: every 10 min
   const odometer = rand(prng, 0, 1000) + asset.code.charCodeAt(0);
@@ -396,7 +410,7 @@ function generateParkedReadings(asset: Asset, dayMs: number, dayEnd: number, prn
 
 function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, isMoving: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const interval = isMoving ? 30 * 1000 : 10 * 60 * 1000;
   let azimuth = 0;
@@ -427,7 +441,7 @@ function generatePlantReadings(asset: Asset, dayMs: number, endMs: number, prng:
 
 function generateTruckReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const interval = 30 * 1000;
   let lat = site.center.lat;
@@ -460,7 +474,7 @@ function generateTruckReadings(asset: Asset, dayMs: number, endMs: number, prng:
 
 function generateBatteryReadings(asset: Asset, startMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, startMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -477,7 +491,7 @@ function generateBatteryReadings(asset: Asset, startMs: number, endMs: number, p
 
 function generateGeneratorReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, lowBattery: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -496,7 +510,7 @@ function generateGeneratorReadings(asset: Asset, dayMs: number, endMs: number, p
 
 function generateLightVehicleReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -601,7 +615,7 @@ function buildTripLegs(asset: Asset, home: LatLngPt, dayMs: number, prng: () => 
 
 function generateTripReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -646,7 +660,7 @@ function generateTripReadings(asset: Asset, dayMs: number, endMs: number, prng: 
 
 function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -680,7 +694,7 @@ function generateMovingReadings(asset: Asset, dayMs: number, endMs: number, prng
 
 function generateLiftingReadings(asset: Asset, dayMs: number, endMs: number, prng: () => number, isMoving: boolean): Reading[] {
   const readings: Reading[] = [];
-  const site = db.getState().sites.find(s => s.id === asset.homeSiteId);
+  const site = siteFor(asset, dayMs);
   if (!site) return readings;
   const tracker = currentTrackerAndAsset(asset);
   if (!tracker) return readings;
@@ -716,49 +730,55 @@ function currentTrackerAndAsset(asset: Asset): DbRow<'trackers'> | null {
   return db.getState().trackers.find(t => t.assetId === asset.id && t.stockStatus === 'paired') ?? null;
 }
 
-// ── FB-12 scripted movement (drives to destination) ────────────────────────────
+// ── FB-12 scripted journey (spec §8.2, §11.6) ────────────────────────────────────
+// At the anchor FB-12 is driving from Jebel Ali Yard to the Al Habtoor site in Al
+// Barsha, on a journey of about 90 minutes that started 5 minutes before the clock.
+// Before the journey it sits at the yard; after it, at the destination, engine off.
 
-export function getFB12Readings(startMs: number, endMs: number): Reading[] {
+const FB12_DEST: LatLngPt = { lat: 25.1130, lng: 55.2000 };
+const FB12_JOURNEY_MS = 90 * 60000;
+// Straight-line yard → Al Barsha distance, about 14 km (haversine).
+const FB12_KM = haversineKm({ lat: 25.0118, lng: 55.1132 }, FB12_DEST);
+const FB12_DEPART_MS = ANCHOR_MS - 5 * 60000;
+
+function fb12DayReadings(asset: Asset, dayMs: number, prng: () => number): Reading[] {
+  const yard = siteFor(asset, dayMs)?.center;
+  const tracker = currentTrackerAndAsset(asset);
+  if (!yard || !tracker) return [];
+  const trackerId = tracker.id;
+  const depart = FB12_DEPART_MS;
+  const arrive = depart + FB12_JOURNEY_MS;
+  const stop = Math.min(dayMs + 86400000, clock.now());
+  const heading = bearingDeg(yard, FB12_DEST);
+  let odometer = rand(prng, 5000, 50000);
   const readings: Reading[] = [];
-  const start = { lat: 25.0118, lng: 55.1132 };
-  const dest = { lat: 25.1130, lng: 55.2000 };
-  const startAt = ANCHOR_MS;
-  const arriveAt = ANCHOR_MS + 90 * 60000;
-  const now = clock.now();
-  const actualEnd = Math.min(endMs, Math.max(arriveAt, now));
-
-  // Linear movement with jitter
-  const duration = arriveAt - startAt;
-  const steps = Math.floor((actualEnd - startAt) / 30000);
-  const tracker = db.getState().trackers.find(t => t.id === 'tr-fb12')!;
-
-  for (let i = 0; i <= steps; i++) {
-    const t = startAt + (i / steps) * duration;
-    if (t > now) break;
-    const frac = (t - startAt) / duration;
-    const jitter = mulberry32(ANCHOR_MS + i);
-    const lat = start.lat + (dest.lat - start.lat) * frac + (jitter() - 0.5) * 0.001;
-    const lng = start.lng + (dest.lng - start.lng) * frac + (jitter() - 0.5) * 0.001;
-    const dist = frac * 35; // ~35 km total
-    const speed = Math.min(90, 60 + Math.sin(frac * Math.PI) * 25);
-
-    const r: Reading = {
-      trackerId: tracker.id,
-      deviceTime: new Date(t).toISOString(),
-      receivedAt: new Date(t + 5000).toISOString(),
-      lat, lng, speedKmh: speed, heading: 60, satellites: 10, ignition: true, moving: true,
-      extVoltage: 26.5, intBattery: 4.0, gsm: 4, gnssOdometerKm: dist,
-      fuelLevelPct: undefined, fuelUsedL: undefined, fuelRateLph: undefined,
-      rpm: undefined, canOdometerKm: undefined, coolantC: undefined,
-      engineLoadPct: undefined, engineHours: undefined, activeDtcs: undefined, adBluePct: undefined,
-    };
-    readings.push(r);
+  let t = dayMs;
+  while (t < stop) {
+    if (t < depart) {
+      readings.push(baseReading(t, trackerId, yard.lat, yard.lng, 0, 0, false, false,
+        rand(prng, 24.8, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng));
+      t = Math.min(t + 10 * 60000, depart);
+    } else if (t < arrive) {
+      // Straight-line progress over the 90-minute journey. The reported speed is the
+      // displacement over one 30 s sample, so the track and the speed agree.
+      const frac = (t - depart) / FB12_JOURNEY_MS;
+      const pos = {
+        lat: yard.lat + (FB12_DEST.lat - yard.lat) * frac + rand(prng, -0.00012, 0.00012),
+        lng: yard.lng + (FB12_DEST.lng - yard.lng) * frac + rand(prng, -0.00012, 0.00012),
+      };
+      const speed = Math.round(FB12_KM / (FB12_JOURNEY_MS / 3600000) * rand(prng, 0.9, 1.1) * 10) / 10;
+      odometer += speed * 30 / 3600;
+      readings.push(baseReading(t, trackerId, pos.lat, pos.lng, speed, heading, true, true,
+        rand(prng, 24.8, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng));
+      t += 30 * 1000;
+    } else {
+      readings.push(baseReading(t, trackerId, FB12_DEST.lat, FB12_DEST.lng, 0, 0, false, false,
+        rand(prng, 24.8, 28.0), rand(prng, 3.9, 4.1), randInt(prng, 2, 5), randInt(prng, 7, 14), odometer, prng));
+      t += 10 * 60000;
+    }
   }
-
   return readings;
 }
-
-// ── GN-01 scripted fuel drop ────────────────────────────────────────────────────
 
 export function injectGNFuelDrop(readings: Reading[]): Reading[] {
   const dropReading: Reading = {

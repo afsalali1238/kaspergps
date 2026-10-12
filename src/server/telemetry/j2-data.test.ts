@@ -116,3 +116,75 @@ describe('J2 — movement by class (§9)', () => {
     expect(moved.length).toBe(0);
   });
 });
+
+// Great-circle distance in km, for checking positions in tests.
+const km = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 6371, toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+const site = (id: string) => seed.sites.find(s => s.id === id)!;
+const MIN = 60000;
+
+describe('J2 — FB-12 scripted journey (Jebel Ali Yard → Al Habtoor site, Al Barsha)', () => {
+  const anchorDay = () => clock.startOfDubaiDay(clock.now());
+  const fb12 = () => getReadingsForAsset(asset('FB-12'), anchorDay(), clock.now());
+
+  it('waits at the Jebel Ali Yard, engine off, before it departs', () => {
+    const yard = site('s-alnoor-ja').center;
+    const wait = fb12().filter(r => {
+      const t = new Date(r.deviceTime).getTime();
+      return t >= clock.now() - 40 * MIN && t <= clock.now() - 10 * MIN;
+    });
+    expect(wait.length).toBeGreaterThan(0);
+    for (const r of wait) {
+      expect(r.moving).toBe(false);
+      expect(r.ignition).toBe(false);
+      expect(km(r, yard) * 1000).toBeLessThan(300);
+    }
+  });
+
+  it('is on the road at the anchor, with the engine on and moving', () => {
+    const last = fb12().at(-1)!;
+    expect(last.moving).toBe(true);
+    expect(last.ignition).toBe(true);
+    expect(last.speedKmh).toBeGreaterThan(0);
+  });
+
+  it('heads towards Al Barsha: the track gets closer to the destination', () => {
+    const dest = { lat: 25.1130, lng: 55.2000 };
+    const track = fb12().filter(r => r.moving);
+    // Five minutes into a 90-minute journey at the anchor: about 10 samples, about 0.8 km covered.
+    expect(track.length).toBeGreaterThanOrEqual(5);
+    const first = km(track[0], dest), last = km(track.at(-1)!, dest);
+    expect(last).toBeLessThan(first);
+    expect(first - last).toBeGreaterThan(0.4);
+  });
+
+  it('reported speed matches the distance covered (about 9–11 km/h over 14 km in 90 min)', () => {
+    const track = fb12().filter(r => r.moving);
+    const speeds = track.map(r => r.speedKmh).sort((a, b) => a - b);
+    const median = speeds[Math.floor(speeds.length / 2)];
+    expect(median).toBeGreaterThan(8);
+    expect(median).toBeLessThan(12);
+  });
+});
+
+describe('J2 — a rented asset sits at the renter\'s site during the rental', () => {
+  const anchorDay = () => clock.startOfDubaiDay(clock.now());
+
+  it('EX-04, rented to Marina Builders, works at Dubai Hills Project', () => {
+    const target = site('s-marina-dh').center;
+    const readings = getReadingsForAsset(asset('EX-04'), anchorDay(), clock.now());
+    expect(readings.length).toBeGreaterThan(0);
+    for (const r of readings.filter(r => r.moving)) expect(km(r, target)).toBeLessThan(1);
+  });
+
+  it('WL-06, rented to Palm Contracting, works at Palm Crescent Works', () => {
+    const target = site('s-palm-pc').center;
+    const readings = getReadingsForAsset(asset('WL-06'), anchorDay(), clock.now());
+    expect(readings.length).toBeGreaterThan(0);
+    for (const r of readings.filter(r => r.moving)) expect(km(r, target)).toBeLessThan(1);
+  });
+});

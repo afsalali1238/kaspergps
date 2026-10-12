@@ -2,8 +2,9 @@
 
 Date: 2026-10-12 · Agent: Claude (Haiku 5.5) · Branch `j2-simulated-data` (from `j1-verify`)
 
-Status: **partial.** Items 1, 2 (speeds and trips), 3 and 5 are done and tested. Items 2 (FB-12 route),
-4 (renter site) and the FB-12 scripted journey are not done. Phase J2 is **not** ready for review.
+Status: **partial.** The FB-12 scripted journey and the renter-site change are done and tested (items 1 and 3 below).
+Still open: realistic distances for every truck (item 2) and the plant and lifting measurements (item 4).
+Phase J2 is **not** ready for review until those are done.
 
 ## What changed
 
@@ -13,27 +14,40 @@ Status: **partial.** Items 1, 2 (speeds and trips), 3 and 5 are done and tested.
     Four assets the spec calls live (TP-21, BH-05, TH-04, PU-51) were reading idle; they now match.
   - Parked assets keep one heading all day.
   - Fuel is per asset: each tank starts the day at its own level, falls with use, gets one 40–70 point refuel, and GN-01 drops 18 points at 02:10. The old formula gave every asset the same level at the same moment (the "53% everywhere" bug).
+  - FB-12 follows a scripted journey. It waits at the Jebel Ali Yard with the engine off, leaves 5 minutes before the anchor,
+    and drives to the Al Habtoor site in Al Barsha (25.1130, 55.2000) over 90 minutes. The straight line is about 14 km, so
+    the reported speed is about 9–11 km/h, which keeps the track and the speed consistent. Afterwards it is parked at the destination.
+    This replaces the unused `getFB12Readings` helper.
+  - A rented asset sits at its renter's site while the rental is active (`siteFor`). EX-04 is at Dubai Hills Project (Marina Builders),
+    WL-06 at Palm Crescent Works (Palm Contracting). Otherwise assets stay at their home site.
   - Between-site trucks run trips: a 20-minute stop, a drive to another site of the same owner at 45–80 km/h, and back. On the anchor day the last drive covers the 40 minutes before the clock.
 
 ## Tests
 
 | Check | Result |
 | --- | --- |
-| `TZ=UTC npx vitest run` | exit 0, 753 / 753, 54 files |
-| `TZ=Asia/Dubai npx vitest run` | exit 0, 753 / 753, 54 files |
-| `src/server/telemetry/j2-data.test.ts` (new) | 17 / 17 — shift start 07:00 Dubai; day key is Dubai midnight; working assets live with engine on; EX-04 rpm 1,200–2,100; parked 10-minute interval; constant parked heading; per-asset fuel varies; GN-01 drop at 02:10; trucks 20–90 km/h; trucks cover different distances; generator stays put |
-| `src/server/seed/expected.test.ts` (status table, §8.2) | passes with all statuses matching |
+| `TZ=UTC npx vitest run` | exit 0, 759 / 759, 54 files |
+| `TZ=Asia/Dubai npx vitest run` | exit 0, 759 / 759, 54 files |
+| `src/server/telemetry/j2-data.test.ts` (new) | 23 / 23 in UTC and Dubai. Adds: FB-12 waits at the yard 10–40 min before the anchor; FB-12 is moving with the engine on at the anchor; its track gets closer to Al Barsha; median speed 8–12 km/h; EX-04 and WL-06 work within 1 km of their renter's site |
+| `src/server/seed/expected.test.ts` (status table, §8.2) | passes (included in the full run) |
 | `npm run typecheck` / `npm run lint` | exit 0 / exit 0 |
-| `rebuild.sh` (build + start) | exit 0 |
-| Playwright shards 1–3 (desktop + phone) | 354 passed, 0 failed (one screenshot flake passed on rerun), 167 skipped |
-| `tests/e2e/j2-data.spec.ts` | 4 / 4 — screenshots in `reviews/screenshots/J2/` |
+| `rebuild.sh` (build + start) | exit 0; server answers HTTP 200 |
+| Playwright shards 1/3, 2/3, 3/3 (desktop + phone) | 196 + 103 + 60 = 359 passed, 0 failed, 167 skipped |
+| `tests/e2e/j2-data.spec.ts` | 4 / 4 |
 
-## Not done (J2 gaps)
+## Screenshots
 
-1. **FB-12 scripted journey.** The spec has FB-12 driving from Jebel Ali to Al Habtoor site, Al Barsha, arriving about 90 minutes later. It does not. Today FB-12 runs ordinary trips to nearby owner sites: at the anchor it drives 1.2 km from 09:20 to 09:59. The Al Habtoor site is not in the seed sites.
-2. **Realistic distances.** Each truck covers about 7–8 km a day, because the owner's other sites are close. The spec does not give a distance; the 20–90 km/h speeds are correct.
-3. **Rented assets at the renter's site (§9, item 4).** Not changed. The asset card's location is right ("Al Habtoor site, Al Barsha"), but the readings still come from the owner's yard.
-4. **Plant within about 300 m and lifting short moves.** Not measured or changed in this phase.
-5. **Screenshots.** Two were taken (EX-04 Engine & fuel as Khalid; FB-12 Trips as Omar). The FB-12 one shows the gap in item 1.
+- `reviews/screenshots/J2/desktop-fb12-trips.png` (and phone): FB-12 Trips at the anchor shows 09:55–09:59, 0.7 km, 10 km/h, still in progress.
+- `reviews/screenshots/J2/*-ex04-engine-fuel.png`: EX-04 Engine & fuel, regenerated.
 
-Phase J2 is not ready for review until items 1 and 3 are done.
+## Open J2 items
+
+1. **FB-12 scripted journey.** Done (see What changed). The Al Habtoor site is not in the seed sites, so the destination uses the booking's
+   coordinates. Decision for review: the 90-minute journey on a 14 km straight line means about 10 km/h. A longer route or a faster
+   journey would need a different scripted timeline.
+2. **Realistic distances for other trucks.** Open. Each truck still covers about 7–8 km a day, because the owner's other sites are close.
+   The 20–90 km/h speed range is right; the distances are not yet.
+3. **Rented assets at the renter's site.** Done. The asset card's location and the readings now agree.
+4. **Plant within about 300 m and lifting short moves.** Open. Not measured or changed in this phase.
+
+Phase J2 is not ready for review until items 2 and 4 are done.
