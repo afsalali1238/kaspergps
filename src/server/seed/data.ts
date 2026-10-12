@@ -41,6 +41,33 @@ export function daysAgo(n: number): number {
 export function hoursAgo(n: number): number {
   return ANCHOR_MS - n * 3600000;
 }
+
+/**
+ * Dubai wall-clock time (spec §8.7): `daysBefore` days before the anchor's Dubai day,
+ * at hour:minute. Alert and event times are built here so they fall on the right day
+ * and agree with the readings (see src/server/seed/alerts-truthful.test.ts).
+ */
+// Dubai is UTC+4 with no daylight saving. This module must not import '@/lib/clock':
+// clock imports ANCHOR_MS from here, so the arithmetic is done locally.
+const DUBAI_OFFSET_MS = 4 * 3600000;
+const DAY_MS = 86400000;
+const DUBAI_DAY_START = Math.floor((ANCHOR_MS + DUBAI_OFFSET_MS) / DAY_MS) * DAY_MS - DUBAI_OFFSET_MS;
+const DUBAI_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function dubaiAt(daysBefore: number, hour: number, minute = 0): number {
+  return DUBAI_DAY_START - daysBefore * DAY_MS + (hour * 60 + minute) * 60000;
+}
+
+/** Dubai HH:mm, for alert detail text. */
+export function dubaiHm(ms: number): string {
+  return new Date(ms + DUBAI_OFFSET_MS).toISOString().slice(11, 16);
+}
+
+/** Dubai "d Mon HH:mm", for alert detail text. */
+export function dubaiDayHm(ms: number): string {
+  const d = new Date(ms + DUBAI_OFFSET_MS);
+  return `${d.getUTCDate()} ${DUBAI_MONTHS[d.getUTCMonth()]} ${dubaiHm(ms)}`;
+}
 export function minsAgo(n: number): number {
   return ANCHOR_MS - n * 60000;
 }
@@ -316,31 +343,31 @@ const assetRows: AssetRow[] = [
   { id: 'a-lb05', code: 'LB-05', name: 'Lowbed', type: 'Truck', assetClass: 'truck', make: 'Scania', model: 'R500', year: 2020, plateOrSerial: 'AK-3456', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-dip', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
   { id: 'a-tp21', code: 'TP-21', name: 'Tipper', type: 'Truck', assetClass: 'truck', make: 'Volvo', model: 'FMX', year: 2016, plateOrSerial: 'AK-7890', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-ja', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
   { id: 'a-tp22', code: 'TP-22', name: 'Tipper', type: 'Truck', assetClass: 'truck', make: 'Volvo', model: 'FMX', year: 2016, plateOrSerial: 'AK-1111', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-ja', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
-  { id: 'a-tp23', code: 'TP-23', name: 'Tipper', type: 'Truck', assetClass: 'truck', make: 'Hino', model: '700', year: 2015, plateOrSerial: 'AK-2222', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-dip', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-omar' },
+  { id: 'a-tp23', code: 'TP-23', name: 'Tipper', type: 'Truck', assetClass: 'truck', make: 'Hino', model: '700', year: 2015, plateOrSerial: 'AK-2222', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-dip', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
   { id: 'a-wt07', code: 'WT-07', name: 'Water tanker', type: 'Truck', assetClass: 'truck', make: 'Isuzu', model: 'FVZ', year: 2018, plateOrSerial: 'AK-3333', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-dip', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
-  { id: 'a-wt08', code: 'WT-08', name: 'Water tanker', type: 'Truck', assetClass: 'truck', make: 'Isuzu', model: 'FVZ', year: 2018, plateOrSerial: 'AK-4444', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-ja', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-omar' },
+  { id: 'a-wt08', code: 'WT-08', name: 'Water tanker', type: 'Truck', assetClass: 'truck', make: 'Isuzu', model: 'FVZ', year: 2018, plateOrSerial: 'AK-4444', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-ja', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'drives_between_sites', createdBy: 'u-omar' },
   { id: 'a-pu31', code: 'PU-31', name: 'Pickup', type: 'Pickup', assetClass: 'light_vehicle', make: 'Toyota', model: 'Hilux', year: 2021, plateOrSerial: 'AK-5555', ownerTenantId: 't-alnoor', homeSiteId: 's-alnoor-ja', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'light_vehicle_day', createdBy: 'u-omar' },
   // Tier 3 — Emirates Earthmovers (mostly ALL-CAN300)
   { id: 'a-ex04', code: 'EX-04', name: 'Excavator', type: 'Excavator', assetClass: 'plant', make: 'CAT', model: '320', year: 2020, plateOrSerial: 'EM-001', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'adBlue'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'adBlue sensor faulty — not supported' }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
-  { id: 'a-ex07', code: 'EX-07', name: 'Excavator', type: 'Excavator', assetClass: 'plant', make: 'Komatsu', model: 'PC210', year: 2019, plateOrSerial: 'EM-002', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'parked', createdBy: 'u-khalid' },
-  { id: 'a-ex11', code: 'EX-11', name: 'Excavator', type: 'Excavator', assetClass: 'plant', make: 'Hyundai', model: 'HX220', year: 2021, plateOrSerial: 'EM-003', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'faultCodes'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'faultCodes not available on this model' }, behaviour: 'drives_between_sites', createdBy: 'u-khalid' },
+  { id: 'a-ex07', code: 'EX-07', name: 'Excavator', type: 'Excavator', assetClass: 'plant', make: 'Komatsu', model: 'PC210', year: 2019, plateOrSerial: 'EM-002', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
+  { id: 'a-ex11', code: 'EX-11', name: 'Excavator', type: 'Excavator', assetClass: 'plant', make: 'Hyundai', model: 'HX220', year: 2021, plateOrSerial: 'EM-003', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'faultCodes'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'faultCodes not available on this model' }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-wl03', code: 'WL-03', name: 'Wheel loader', type: 'Wheel loader', assetClass: 'plant', make: 'CAT', model: '950', year: 2018, plateOrSerial: 'EM-004', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 300, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-wl06', code: 'WL-06', name: 'Wheel loader', type: 'Wheel loader', assetClass: 'plant', make: 'Volvo', model: 'L120', year: 2020, plateOrSerial: 'EM-005', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', tankLitres: 300, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-bd02', code: 'BD-02', name: 'Bulldozer', type: 'Bulldozer', assetClass: 'plant', make: 'CAT', model: 'D6', year: 2017, plateOrSerial: 'EM-006', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 450, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
-  { id: 'a-bh05', code: 'BH-05', name: 'Backhoe loader', type: 'Backhoe loader', assetClass: 'plant', make: 'JCB', model: '3CX', year: 2019, plateOrSerial: 'EM-007', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', tankLitres: 160, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'fuelLevel'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'fuelLevel sensor not installed on this model' }, behaviour: 'drives_between_sites', createdBy: 'u-khalid' },
+  { id: 'a-bh05', code: 'BH-05', name: 'Backhoe loader', type: 'Backhoe loader', assetClass: 'plant', make: 'JCB', model: '3CX', year: 2019, plateOrSerial: 'EM-007', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', tankLitres: 160, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'fuelLevel'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'fuelLevel sensor not installed on this model' }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-gr01', code: 'GR-01', name: 'Motor grader', type: 'Motor grader', assetClass: 'plant', make: 'CAT', model: '140K', year: 2016, plateOrSerial: 'EM-008', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 350, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'fuelLevel', 'coolantTemp'), checkedAt: new Date(daysAgo(60)).toISOString(), notes: 'fuelLevel and coolantTemp sensors absent' }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-cp03', code: 'CP-03', name: 'Soil compactor', type: 'Compactor', assetClass: 'plant', make: 'Bomag', model: 'BW213', year: 2012, plateOrSerial: 'EM-009', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'works_at_site', createdBy: 'u-khalid' },
   { id: 'a-gn01', code: 'GN-01', name: 'Generator 250 kVA', type: 'Generator', assetClass: 'power', make: 'Cummins', model: '250 kVA', year: 2020, plateOrSerial: 'EM-010', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', tankLitres: 500, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(60)).toISOString() }, behaviour: 'stationary_24h', createdBy: 'u-khalid' },
   { id: 'a-gn02', code: 'GN-02', name: 'Generator 60 kVA', type: 'Generator', assetClass: 'power', make: 'Perkins', model: '60 kVA', year: 2014, plateOrSerial: 'EM-011', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-rak', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'stationary_24h', createdBy: 'u-khalid' },
   { id: 'a-ld09', code: 'LD-09', name: 'Skid steer loader', type: 'Skid steer loader', assetClass: 'plant', make: 'Bobcat', model: 'S650', year: 2018, plateOrSerial: 'EM-012', ownerTenantId: 't-emirates', homeSiteId: 's-emirates-alq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-khalid' },
   // Tier 3 & mixed — Gulf Lift Rentals
-  { id: 'a-cr02', code: 'CR-02', name: 'Mobile crane 50 t', type: 'Mobile crane', assetClass: 'lifting', make: 'Liebherr', model: 'LTM 1050', year: 2018, plateOrSerial: 'GL-001', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(90)).toISOString() }, behaviour: 'parked', createdBy: 'u-priya' },
+  { id: 'a-cr02', code: 'CR-02', name: 'Mobile crane 50 t', type: 'Mobile crane', assetClass: 'lifting', make: 'Liebherr', model: 'LTM 1050', year: 2018, plateOrSerial: 'GL-001', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(90)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-priya' },
   { id: 'a-cr05', code: 'CR-05', name: 'Mobile crane 30 t', type: 'Mobile crane', assetClass: 'lifting', make: 'Tadano', model: 'GR-300', year: 2016, plateOrSerial: 'GL-002', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', tankLitres: 400, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'faultCodes'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'faultCodes not exposed by this crane' }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-cr08', code: 'CR-08', name: 'Crawler crane', type: 'Crawler crane', assetClass: 'lifting', make: 'Sany', model: 'SCC550', year: 2015, plateOrSerial: 'GL-003', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-th01', code: 'TH-01', name: 'Telehandler', type: 'Telehandler', assetClass: 'lifting', make: 'JCB', model: '540-170', year: 2021, plateOrSerial: 'GL-004', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', tankLitres: 140, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300'), checkedAt: new Date(daysAgo(90)).toISOString() }, behaviour: 'works_at_site', createdBy: 'u-priya' },
   { id: 'a-th04', code: 'TH-04', name: 'Telehandler', type: 'Telehandler', assetClass: 'lifting', make: 'Manitou', model: 'MT1840', year: 2019, plateOrSerial: 'GL-005', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', tankLitres: 140, canProfile: { adapter: 'ALL-CAN300', supported: allParamsExcept('ALL-CAN300', 'adBlue'), checkedAt: new Date(daysAgo(90)).toISOString(), notes: 'adBlue not fitted on this model' }, behaviour: 'works_at_site', createdBy: 'u-priya' },
   { id: 'a-fl09', code: 'FL-09', name: 'Forklift 5 t', type: 'Forklift', assetClass: 'lifting', make: 'Toyota', model: '8FBN5', year: 2022, plateOrSerial: 'GL-006', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
-  { id: 'a-fl10', code: 'FL-10', name: 'Forklift 3 t', type: 'Forklift', assetClass: 'lifting', make: 'Hyster', model: 'H30XL', year: 2017, plateOrSerial: 'GL-007', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
+  { id: 'a-fl10', code: 'FL-10', name: 'Forklift 3 t', type: 'Forklift', assetClass: 'lifting', make: 'Hyster', model: 'H30XL', year: 2017, plateOrSerial: 'GL-007', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'works_at_site', createdBy: 'u-priya' },
   { id: 'a-bl01', code: 'BL-01', name: 'Boom lift', type: 'Boom lift', assetClass: 'lifting', make: 'JLG', model: '600S', year: 2018, plateOrSerial: 'GL-008', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-sl02', code: 'SL-02', name: 'Scissor lift', type: 'Scissor lift', assetClass: 'lifting', make: 'Genie', model: 'GS-3246', year: 2020, plateOrSerial: 'GL-009', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
   { id: 'a-mw01', code: 'MW-01', name: 'Mobile welder trailer', type: 'Mobile welder', assetClass: 'power', make: 'Lincoln', model: 'Vantage', year: 2023, plateOrSerial: 'GL-010', ownerTenantId: 't-gulflift', homeSiteId: 's-gulflift-aq', canProfile: { adapter: 'none', supported: allParamsExcept('none') }, behaviour: 'parked', createdBy: 'u-priya' },
@@ -456,59 +483,40 @@ export const geofences: Geofence[] = [
 
 // Geofence events
 export const geofenceEvents: GeofenceEvent[] = [
-  { id: 'ge-001', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'exit', at: dubaiOn(-1, 19, 10) },
-  { id: 'ge-002', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'enter', at: dubaiOn(-1, 19, 55) },
-  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-lb05', type: 'exit', at: dubaiOn(-1, 23, 40) },
+  { id: 'ge-001', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'exit', at: dubaiAt(1, 19, 10) },
+  { id: 'ge-002', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'enter', at: dubaiAt(1, 19, 55) },
+  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-lb05', type: 'exit', at: dubaiAt(1, 23, 40) },
   { id: 'ge-004', geofenceId: 'g-em-hatta', assetId: 'a-bh05', type: 'enter', at: daysFromNow(1) + 10.5*3600000 },
 ];
 
 // ── Alerts ─────────────────────────────────────────────────────────────────────
 
-/**
- * Dubai wall-clock time (HH:mm) for alert text. Dubai has no daylight saving, so
- * UTC+4 is exact. Local here because clock.ts imports this file.
- */
-function dubaiHhmm(ms: number): string {
-  return new Date(ms + 4 * 3600000).toISOString().slice(11, 16);
-}
-
-// Alert times follow §8.2 and §8.7, and the simulator's readings: the time in an
-// alert's text is its openedAt, and nothing opens after the anchor.
-const TP23_POWER_CUT = hoursAgo(2); // 08:00, then on tracker battery
-const TP23_OFFLINE = minsAgo(40); // 09:20, last reading
-const EX07_OFFLINE = minsAgo(190); // 06:50, last reading
-const SL02_OFFLINE = minsAgo(2880); // two days ago, last reading
-const GN01_DROP = dubaiOn(0, 2, 10); // 02:10 last night
-const LB05_TOW = dubaiOn(-1, 23, 40); // yesterday 23:40
-const WL06_EXIT = dubaiOn(-1, 19, 10); // yesterday 19:10, back 19:55
-const BD02_FAULT = dubaiOn(0, 5, 40);
-
 export const alerts: Alert[] = [
   // Day one alerts
-  { id: 'al-ex07-offline', assetId: 'a-ex07', type: 'offline', openedAt: EX07_OFFLINE, detail: `Offline since ${dubaiHhmm(EX07_OFFLINE)}` },
-  { id: 'al-tp23-offline', assetId: 'a-tp23', type: 'offline', openedAt: TP23_OFFLINE, detail: `Offline since ${dubaiHhmm(TP23_OFFLINE)}` },
-  { id: 'al-sl02-offline', assetId: 'a-sl02', type: 'offline', openedAt: SL02_OFFLINE, detail: 'Offline for 2 days' },
+  { id: 'al-ex07-offline', assetId: 'a-ex07', type: 'offline', openedAt: ANCHOR_MS - 190 * 60000, detail: `Offline since ${dubaiHm(ANCHOR_MS - 190 * 60000)}` },
+  { id: 'al-tp23-offline', assetId: 'a-tp23', type: 'offline', openedAt: ANCHOR_MS - 40 * 60000, detail: `Offline since ${dubaiHm(ANCHOR_MS - 40 * 60000)}` },
+  { id: 'al-sl02-offline', assetId: 'a-sl02', type: 'offline', openedAt: daysAgo(2), detail: `Offline since ${dubaiDayHm(daysAgo(2))}` },
   // Phase 2 alerts
-  { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: TP23_POWER_CUT, detail: `Power cut at ${dubaiHhmm(TP23_POWER_CUT)} — running on tracker battery` },
-  { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: daysAgo(3), detail: 'Tracker battery low (3.5 V)' },
-  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: dubaiOn(-1, 15), closedAt: dubaiOn(-1, 15, 30), detail: 'Over speed: 104 km/h' },
-  { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: daysAgo(2), detail: 'Harsh driving — 3 events in last 2 days' },
-  { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: GN01_DROP, detail: `Fuel dropped 18% at ${dubaiHhmm(GN01_DROP)} with engine off` },
-  { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: BD02_FAULT, detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },
-  { id: 'al-lb05-towing', assetId: 'a-lb05', type: 'towing', openedAt: LB05_TOW, closedAt: LB05_TOW + 10 * 60000, detail: `Moved with ignition off at ${dubaiHhmm(LB05_TOW)} — 400 m` },
+  { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: ANCHOR_MS - 2 * 3600000, detail: `Power cut at ${dubaiHm(ANCHOR_MS - 2 * 3600000)} — running on tracker battery` },
+  { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: new Date(daysAgo(3)).toISOString(), detail: 'Tracker battery low (3.5 V)' },
+  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: dubaiAt(1, 7, 31), closedAt: dubaiAt(1, 7, 34), detail: 'Over speed: 104 km/h' },
+  { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: new Date(daysAgo(2)).toISOString(), detail: 'Harsh driving — 3 events in last 2 days' },
+  { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: dubaiAt(0, 2, 10), detail: 'Fuel dropped 18% at 02:10 with engine off' },
+  { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: dubaiAt(0, 5, 40), detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },
+  { id: 'al-lb05-towing', assetId: 'a-lb05', type: 'towing', openedAt: dubaiAt(1, 23, 40), closedAt: dubaiAt(1, 23, 50), detail: 'Moved with ignition off — 400 m' },
   // Tenant-owned alerts
-  { id: 'al-wl06-geo', assetId: 'a-wl06', tenantId: 't-palm', type: 'geofence_exit', openedAt: WL06_EXIT, closedAt: dubaiOn(-1, 19, 55), detail: `Left Palm Crescent works at ${dubaiHhmm(WL06_EXIT)}` },
-  { id: 'al-lb05-afterhours', assetId: 'a-lb05', tenantId: 't-emirates', type: 'after_hours_move', openedAt: LB05_TOW, closedAt: LB05_TOW + 10 * 60000, detail: `Moved out of Al Quoz Yard after hours (${dubaiHhmm(LB05_TOW)})` },
-  { id: 'al-bd02-maint', assetId: 'a-bd02', tenantId: 't-emirates', type: 'maintenance_overdue', openedAt: BD02_FAULT, detail: 'Maintenance overdue: BD-02 250 h service (30 h overdue)' },
-  { id: 'al-cr08-maint', assetId: 'a-cr08', tenantId: 't-gulflift', type: 'maintenance_overdue', openedAt: daysAgo(5), detail: 'Maintenance overdue: CR-08 annual crane inspection (5 days overdue)' },
-  { id: 'al-ex04-maint', assetId: 'a-ex04', tenantId: 't-emirates', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: EX-04 500 h service (80 h left)' },
-  { id: 'al-fb14-maint', assetId: 'a-fb14', tenantId: 't-alnoor', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: FB-14 10,000 km service (300 km left)' },
-  { id: 'al-cr02-maint', assetId: 'a-cr02', tenantId: 't-gulflift', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: CR-02 annual crane inspection (12 days left)' },
-  { id: 'al-inv0415', assetId: undefined, tenantId: 't-emirates', type: 'invoice_overdue', openedAt: daysAgo(6), detail: 'Invoice INV-EE-0415 is overdue (6 days)' },
-  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: dubaiOn(-2, 14), closedAt: dubaiOn(-2, 14, 30), detail: 'Over speed: 96 km/h on Al Noor road' },
-  { id: 'al-pu51-idle', assetId: 'a-pu51', tenantId: 't-marina', type: 'idle', openedAt: dubaiOn(-1, 11), closedAt: dubaiOn(-1, 13, 30), detail: 'PU-51 idle for 2.5 hours at Dubai Hills site' },
-  { id: 'al-gn01-lowfuel', assetId: 'a-gn01', tenantId: 't-emirates', type: 'low_fuel', openedAt: GN01_DROP + 5 * 60000, detail: 'GN-01 fuel is low after the drop — refuel soon' },
-  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: dubaiOn(-1, 17, 30), closedAt: dubaiOn(-1, 18, 15), detail: 'Power cut at Al Quoz Yard — EX-11 on battery' },
+  { id: 'al-wl06-geo', assetId: 'a-wl06', tenantId: 't-palm', type: 'geofence_exit', openedAt: dubaiAt(1, 19, 10), closedAt: dubaiAt(1, 19, 55), detail: 'Left Palm Crescent works at 19:10' },
+  { id: 'al-lb05-afterhours', assetId: 'a-lb05', tenantId: 't-emirates', type: 'after_hours_move', openedAt: dubaiAt(1, 23, 40), closedAt: dubaiAt(1, 23, 50), detail: 'Moved out of Al Quoz Yard after hours (23:40)' },
+  { id: 'al-bd02-maint', assetId: 'a-bd02', tenantId: 't-emirates', type: 'maintenance_overdue', openedAt: dubaiAt(0, 5, 40), detail: 'Maintenance overdue: BD-02 250 h service (30 h overdue)' },
+  { id: 'al-cr08-maint', assetId: 'a-cr08', tenantId: 't-gulflift', type: 'maintenance_overdue', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance overdue: CR-08 annual crane inspection (5 days overdue)' },
+  { id: 'al-ex04-maint', assetId: 'a-ex04', tenantId: 't-emirates', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: EX-04 500 h service (80 h left)' },
+  { id: 'al-fb14-maint', assetId: 'a-fb14', tenantId: 't-alnoor', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: FB-14 10,000 km service (300 km left)' },
+  { id: 'al-cr02-maint', assetId: 'a-cr02', tenantId: 't-gulflift', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: CR-02 annual crane inspection (12 days left)' },
+  { id: 'al-inv0415', assetId: undefined, tenantId: 't-emirates', type: 'invoice_overdue', openedAt: new Date(daysAgo(6)).toISOString(), detail: 'Invoice INV-EE-0415 is overdue (6 days)' },
+  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: daysAgo(2) + 14*3600000, closedAt: daysAgo(2) + 14.5*3600000, detail: 'Over speed: 96 km/h on Al Noor road' },
+  { id: 'al-pu51-idle', assetId: 'a-pu51', tenantId: 't-marina', type: 'idle', openedAt: daysAgo(1) + 11*3600000, closedAt: daysAgo(1) + 13.5*3600000, detail: 'PU-51 idle for 2.5 hours at Dubai Hills site' },
+  { id: 'al-gn01-lowfuel', assetId: 'a-gn01', tenantId: 't-emirates', type: 'low_fuel', openedAt: dubaiAt(0, 4, 37), closedAt: dubaiAt(0, 7, 0), detail: 'GN-01 fuel level at 20% — refuel soon' },
+  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: daysAgo(1) + 17.5*3600000, closedAt: daysAgo(1) + 18.25*3600000, detail: 'Power cut at Al Quoz Yard — EX-11 on battery' },
 ];
 
 // ── Tracker request ────────────────────────────────────────────────────────────

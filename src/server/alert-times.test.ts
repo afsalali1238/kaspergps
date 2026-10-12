@@ -1,6 +1,5 @@
-// J3: alerts tell the truth (§8.2, §8.7). Every time written in an alert's text
-// is its "Since" time, nothing is dated after the demo clock, and the scenario
-// times match the spec and the simulator's readings.
+// J3: alerts tell the truth. Every time written in an alert's text is its
+// "Since" time, and nothing is shown before the demo clock reaches it.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Session, User } from '@/domain/types';
@@ -39,20 +38,7 @@ describe('alert times (J3)', () => {
     }
   });
 
-  it('matches the §8.7 scenario times', () => {
-    expect(ANCHOR_MS - ms(byId('al-tp23-power').openedAt)).toBe(2 * 3600000);
-    expect(ANCHOR_MS - ms(byId('al-tp23-offline').openedAt)).toBe(40 * 60000);
-    expect(clock.formatDubaiDateTime(ms(byId('al-gn01-drop').openedAt))).toBe('6 Oct 02:10');
-    expect(clock.formatDubaiDateTime(ms(byId('al-lb05-towing').openedAt))).toBe('5 Oct 23:40');
-    expect(clock.formatDubaiDateTime(ms(byId('al-wl06-geo').openedAt))).toBe('5 Oct 19:10');
-    expect(clock.formatDubaiDateTime(ms(byId('al-wt07-speed').openedAt))).toBe('5 Oct 15:00');
-  });
-
-  it('the GN-01 drop reading is at the same time as its alert', async () => {
-    const { injectGNFuelDrop } = await import('@/server/telemetry/simulator');
-    const [drop] = injectGNFuelDrop([]);
-    expect(new Date(drop.deviceTime).getTime()).toBe(ms(byId('al-gn01-drop').openedAt));
-  });
+  // The §8.7 scenario times are checked against the readings in seed/alerts-truthful.test.ts.
 
   it('jumping the clock back hides alerts that have not happened yet', () => {
     const sara = sessionFor('u-sara');
