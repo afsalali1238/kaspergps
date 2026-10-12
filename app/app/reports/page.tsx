@@ -171,9 +171,6 @@ export default function ReportsPage() {
             >
               <div className="font-medium text-ink">{t(`reports.types.${report.id}`, report.label)}</div>
               <div className="text-xs text-grey-500 mt-0.5">{t(`reports.types.${report.id}_desc`, report.description)}</div>
-              <div className="text-xs text-grey-500 mt-1">
-                {report.phase === 'day_one' ? 'Day one' : report.phase === 'phase2' ? 'Phase 2' : 'Later'}
-              </div>
             </button>
           ))}
           {availableReports.length === 0 && (

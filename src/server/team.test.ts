@@ -119,3 +119,45 @@ describe('team — editing users', () => {
     expect(updateUserRole(omar(), user.id, 'kasper_admin').error).toContain('Tenant Admins and Site Users');
   });
 });
+
+// Agent A / U0 (handoff/agents/A-bug-fixes.md §2). Settings → Users hides the
+// Deactivate button on your own row; this is the API half of the same rule, and
+// it must refuse the call even when something reaches it (a stale tab, a crafted
+// request). The existing assertion lives inside the last-admin test, where the
+// two rules are easy to confuse, so the rule gets its own block here.
+describe('team — you can’t deactivate yourself', () => {
+  it('refuses a Tenant Admin who targets their own account', () => {
+    // Put a second active admin in Al Noor first, so the refusal is the self
+    // rule and not "every company needs at least one Tenant Admin".
+    const backup = createUser(sara(), {
+      tenantId: 't-alnoor', name: 'Backup Admin', email: 'backup.admin@alnoor.ae', role: 'tenant_admin',
+    }).data!;
+    expect(reactivateUser(sara(), backup.id).ok).toBe(true);
+
+    const auditCount = db.getState().auditEntries.length;
+    const result = deactivateUser(omar(), 'u-omar');
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('You can\u2019t deactivate your own account.');
+    expect(userById('u-omar')!.status).toBe('active');
+    // A refused change writes nothing to the audit log.
+    expect(db.getState().auditEntries).toHaveLength(auditCount);
+  });
+
+  it('refuses a Kasper Admin who targets their own account', () => {
+    const result = deactivateUser(sara(), 'u-sara');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('You can\u2019t deactivate your own account.');
+    expect(userById('u-sara')!.status).toBe('active');
+  });
+
+  it('still lets an admin deactivate somebody else', () => {
+    const temp = createUser(omar(), {
+      tenantId: 't-alnoor', name: 'Leaver', email: 'leaver@alnoor.ae', role: 'site_user', siteIds: ['s-alnoor-ja'],
+    }).data!;
+    expect(deactivateUser(omar(), temp.id).ok).toBe(true);
+    expect(userById(temp.id)!.status).toBe('deactivated');
+    // And undo it, so the seed is as the other specs expect.
+    expect(reactivateUser(omar(), temp.id).ok).toBe(true);
+  });
+});

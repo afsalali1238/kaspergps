@@ -37,11 +37,14 @@ function lastMonthPeriod(nowMs: number): { label: string; from: number; to: numb
   return { label, from, to };
 }
 
-function MucRow({ muc, canView, verifyState, onView }: {
+function MucRow({ muc, canView, canManage, verifyState, onView, onVoid, onReissue }: {
   muc: Muc;
   canView: boolean;
+  canManage: boolean;
   verifyState: MucVerifyStatus | 'checking';
   onView: (number: string) => void;
+  onVoid: (number: string) => void;
+  onReissue: (number: string) => void;
 }) {
   const seed = useDb(s => s);
   const t = useT();
@@ -49,7 +52,7 @@ function MucRow({ muc, canView, verifyState, onView }: {
   const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
 
   return (
-    <tr className="bg-paper hover:bg-paper-2">
+    <tr className="bg-paper hover:bg-paper-2" data-muc-number={muc.number}>
       <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{muc.number}</td>
       <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{asset?.code ?? '—'}</td>
       <td className="px-3 py-2 border-b border-line text-grey-700">{owner?.name ?? '—'}</td>
@@ -68,14 +71,43 @@ function MucRow({ muc, canView, verifyState, onView }: {
           <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>
         )}
       </td>
+      {/* One Actions cell: View as a button, then the management actions and
+          Verify inline. No second row, and "Voided" lives only in Status. */}
       <td className="px-3 py-2 text-right border-b border-line">
-        {muc.status === 'sealed' && canView ? (
-          <Button size="sm" onClick={() => onView(muc.number)}>{t('certificates.actions.view', 'View')}</Button>
-        ) : muc.status === 'voided' ? (
-          <span className="text-xs text-grey-500">{t('certificates.status.voided', 'Voided')}</span>
-        ) : (
-          <span className="text-xs text-grey-400">—</span>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {muc.status === 'sealed' && canView && (
+            <Button size="sm" onClick={() => onView(muc.number)}>{t('certificates.actions.view', 'View')}</Button>
+          )}
+          {canManage && muc.status === 'sealed' && (
+            <button
+              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+              onClick={() => onVoid(muc.number)}
+            >
+              {t('certificates.actions.void', 'Void')}
+            </button>
+          )}
+          {canManage && muc.status === 'voided' && (
+            <button
+              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+              onClick={() => onReissue(muc.number)}
+            >
+              {t('certificates.actions.reissue', 'Reissue')}
+            </button>
+          )}
+          {canManage && (
+            <a
+              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
+              href={`/verify/${encodeURIComponent(muc.number)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t('certificates.actions.verify', 'Verify')}
+            </a>
+          )}
+          {!(muc.status === 'sealed' && canView) && !canManage && (
+            <span className="text-xs text-grey-400">—</span>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -524,46 +556,16 @@ export default function CertificatesPage() {
             </thead>
             <tbody>
               {myMucs.map(muc => (
-                <React.Fragment key={muc.id}>
-                  <MucRow
-                    muc={muc}
-                    canView={isTenantAdmin || session.isKasper}
-                    verifyState={verifyStates[muc.id] ?? 'checking'}
-                    onView={setSelectedMuc}
-                  />
-                  {canIssue && muc.ownerTenantId === session.tenantId && (
-                    <tr className="bg-paper">
-                      <td colSpan={7} className="px-3 pb-2 border-b border-line">
-                        <div className="flex gap-2 justify-end">
-                          {muc.status === 'sealed' && (
-                            <button
-                              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-                              onClick={() => { setActionNumber(muc.number); setActionKind('void'); setActionReason(''); }}
-                            >
-                              {t('certificates.actions.void', 'Void')}
-                            </button>
-                          )}
-                          {muc.status === 'voided' && (
-                            <button
-                              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-                              onClick={() => { setActionNumber(muc.number); setActionKind('reissue'); setActionReason(''); }}
-                            >
-                              {t('certificates.actions.reissue', 'Reissue')}
-                            </button>
-                          )}
-                          <a
-                            className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-                            href={`/verify/${encodeURIComponent(muc.number)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {t('certificates.actions.verify', 'Verify')}
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
+                <MucRow
+                  key={muc.id}
+                  muc={muc}
+                  canView={isTenantAdmin || session.isKasper}
+                  canManage={canIssue && muc.ownerTenantId === session.tenantId}
+                  verifyState={verifyStates[muc.id] ?? 'checking'}
+                  onView={setSelectedMuc}
+                  onVoid={number => { setActionNumber(number); setActionKind('void'); setActionReason(''); }}
+                  onReissue={number => { setActionNumber(number); setActionKind('reissue'); setActionReason(''); }}
+                />
               ))}
             </tbody>
           </table>
