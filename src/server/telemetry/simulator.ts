@@ -473,7 +473,62 @@ function makeDayReadings(asset: Asset, dayMs: number): Reading[] {
   if (asset.code === 'WT-07' && dayMs === yesterday) return plannedOverspeed(readings, 104, 6);
   // FB-12: 96 km/h on the Al Noor road two days before the anchor, like its alert (al-fb12-speed).
   if (asset.code === 'FB-12' && dayMs === yesterday - DAY) return plannedOverspeed(readings, 96, 6);
+  // TP-21: three harsh-driving events over the two days before the anchor (al-tp21-harsh).
+  if (asset.code === 'TP-21') return plannedHarshEvents(readings, TP21_HARSH_TIMES);
+  // EX-11: the power cut its alert reports — the vehicle feed is dead while it is open
+  // (al-ex11-power, 03:30–04:15 on the anchor day, after the early return from Palm).
+  if (asset.code === 'EX-11') return withPowerCut(readings, EX11_CUT_FROM, EX11_CUT_TO);
   return readings;
+}
+
+/**
+ * TP-21's harsh-driving events (al-tp21-harsh, spec §8.7). The alert says "3 events in
+ * last 2 days" and opened two days before the anchor, so all three sit inside that
+ * window: two on its morning run the day before, one on the anchor day's run.
+ */
+const TP21_HARSH_TIMES = [dubaiAt(1, 6, 20), dubaiAt(1, 7, 0), dubaiAt(0, 7, 10)];
+const HARSH_EVENTS: NonNullable<Reading['event']>[] = ['harsh_brake', 'harsh_accel', 'harsh_corner'];
+
+/**
+ * Tags the first moving reading at or after each time — and inside that time's own
+ * Dubai day, so an event can never land on the wrong day or twice on one reading
+ * (the truck only drives in the morning, so the next day's run must not be tagged).
+ */
+function plannedHarshEvents(readings: Reading[], times: number[]): Reading[] {
+  const out = [...readings];
+  times.forEach((at, i) => {
+    const dayEnd = clock.startOfDubaiDay(at) + DAY;
+    const index = out.findIndex(r => {
+      const t = new Date(r.deviceTime).getTime();
+      return t >= at && t < dayEnd && r.moving && r.ignition && !r.event;
+    });
+    if (index >= 0) out[index] = { ...out[index], event: HARSH_EVENTS[i % HARSH_EVENTS.length] };
+  });
+  return out;
+}
+
+/** EX-11's power cut window: 03:30–04:15 Dubai on the anchor day (al-ex11-power). */
+const EX11_CUT_FROM = dubaiAt(0, 3, 30);
+const EX11_CUT_TO = dubaiAt(0, 4, 15);
+
+/**
+ * External power lost (spec §8.7, the TP-23 pattern): inside the window the tracker
+ * runs on its own battery, so the vehicle feed reads zero and the GSM/GNSS quality
+ * drops. Position and ignition are left alone — the machine did not move.
+ */
+function withPowerCut(readings: Reading[], fromMs: number, toMs: number): Reading[] {
+  const prng = mulberry32(0x5e11);
+  return readings.map(r => {
+    const t = new Date(r.deviceTime).getTime();
+    if (t < fromMs || t >= toMs) return r;
+    return {
+      ...r,
+      extVoltage: Math.round(prng() * 0.1 * 10) / 10,
+      intBattery: Math.round((3.5 + prng() * 0.3) * 100) / 100,
+      gsm: Math.floor(prng() * 3) as 0 | 1 | 2 | 3 | 4 | 5,
+      satellites: Math.floor(3 + prng() * 4),
+    };
+  });
 }
 
 /**
@@ -543,9 +598,10 @@ function makeDayReadingsRaw(asset: Asset, dayMs: number): Reading[] {
 }
 
 // ── Scripted excursions (spec §8.7, §9) ───────────────────────────────────────
-// The two events the spec puts in yesterday's readings that the normal plan does not
-// produce: LB-05 moved 400 m with its ignition off, and WL-06 left its works (Palm Crescent)
-// and came back. Each excursion overrides the position, mode and speed for its legs only.
+// Events the spec puts in readings that the normal plan does not produce: LB-05 moved
+// 400 m with its ignition off, WL-06 left its works (Palm Crescent) and came back, PU-51
+// idled for 2.5 h at Dubai Hills, and GR-01 left the Al Quoz Yard after hours. Each
+// excursion overrides the position, mode and speed for its legs only.
 
 interface ExcursionLeg { t0: number; t1: number; from: Point; to: Point; mode: Mode; speed: number }
 
@@ -565,6 +621,27 @@ function excursionLegs(asset: Asset): ExcursionLeg[] {
     return [
       { t0: dubaiAt(1, 23, 40), t1: dubaiAt(1, 23, 50), from: yard, to: moved, mode: 'off', speed: 4 },
       { t0: dubaiAt(1, 23, 50), t1: dubaiAt(0, 0, 0), from: moved, to: moved, mode: 'off', speed: 0 },
+    ];
+  }
+  if (asset.code === 'PU-51') {
+    // The long idle its alert reports (al-pu51-idle): 2.5 hours with the engine on at the
+    // Dubai Hills site, 21:00–23:30 the day before the anchor.
+    const site = siteById(asset.homeSiteId)?.center;
+    if (!site) return [];
+    return [
+      { t0: dubaiAt(1, 21, 0), t1: dubaiAt(1, 23, 30), from: site, to: site, mode: 'idle', speed: 0 },
+    ];
+  }
+  if (asset.code === 'GR-01') {
+    // After hours (al-gr01-afterhours): the grader leaves the Al Quoz Yard fence at 23:40
+    // for a short job on the neighbouring plot and is back inside by 23:55 (ge-003/ge-005).
+    const yard = siteById(asset.homeSiteId)?.center;
+    if (!yard) return [];
+    const away = { lat: yard.lat + 0.0054, lng: yard.lng + 0.0029 };
+    return [
+      { t0: dubaiAt(1, 23, 40), t1: dubaiAt(1, 23, 43), from: yard, to: away, mode: 'drive', speed: 18 },
+      { t0: dubaiAt(1, 23, 43), t1: dubaiAt(1, 23, 52), from: away, to: away, mode: 'idle', speed: 0 },
+      { t0: dubaiAt(1, 23, 52), t1: dubaiAt(1, 23, 55), from: away, to: yard, mode: 'drive', speed: 18 },
     ];
   }
   if (asset.code === 'WL-06') {

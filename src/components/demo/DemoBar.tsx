@@ -238,7 +238,7 @@ export function DemoBar() {
       </button>
 
       {/* Features panel */}
-      {featuresOpen && <FeaturesPanel />}
+      {featuresOpen && <FeaturesPanel onClose={() => setFeaturesOpen(false)} />}
 
       {/* Scenarios dropdown */}
       <div className="flex-shrink-0 relative">

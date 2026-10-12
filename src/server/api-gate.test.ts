@@ -15,6 +15,8 @@ const PURE = new Set([
   'ADAPTER_SERIAL_DUPLICATE', 'LVCAN_MODEL_ERROR', 'aed', 'invoiceStatusLabel', 'hasRole', 'isKasperStaff',
   'auditActions', 'auditEntriesToCsv', 'clockPresets', 'dubaiYesterdayAt', 'fb12PublicPath', 'presetAt',
   'periodRange', 'hoursSourceFor', 'showsUtilisation', 'REPORT_TYPES', 'viewAsGroups',
+  // Pure formatters: a capability id or an adapter name in, words out.
+  'capabilityLabel', 'tierOf',
   'actorName', 'assetCode', 'tenantName', 'useDb', 'hydrateDb', 'nextRowNumber',
   // Public by design: token-gated, no session (spec §11.14).
   'getTrackingLinkState', 'resolveTrackingLink',
@@ -30,7 +32,7 @@ const DEBT = new Set([
   'runDueSchedules', 'assetsWithoutTracker', 'currentPairingForTracker', 'currentTrackerForAsset',
   'pairingHistory', 'pairingTargetsFor', 'stockTrackers', 'activeLinksForAsset', 'expiryOptions',
   'linkEndWords', 'pastLinksForAsset', 'detectTrips', 'engineHoursToday', 'fleetTodayTotals',
-  'last7DaysIgnition', 'todayFor', 'fuelToday', 'buildIgnitionBreakdown',
+  'last7DaysIgnition', 'todayFor', 'fuelToday', 'buildIgnitionBreakdown', 'fuelWeekFor',
 ]);
 
 /** Every name exported from api.ts, with the file it comes from. */

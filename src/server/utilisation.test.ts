@@ -7,11 +7,11 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  buildIgnitionBreakdown, engineHoursToday, fleetTodayTotals, fuelToday,
+  buildIgnitionBreakdown, engineHoursToday, fleetTodayTotals, fuelToday, fuelWeekFor,
   hoursSourceFor, last7DaysIgnition, showsUtilisation, todayFor,
 } from './utilisation';
 import { burnRateLph, engineHoursIn } from '@/server/cost';
-import { seed } from '@/server/seed/data';
+import { seed, dubaiAt } from '@/server/seed/data';
 import { runReport } from '@/server/reports';
 import type { Asset, Session } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
@@ -125,8 +125,11 @@ describe('utilisation — today per asset', () => {
     expect(today.source).toBe('Estimated');
   });
 
-  it('uses the ECU source on a Tier 3 asset', () => {
-    expect(todayFor(tier3())!.source).toBe('ECU');
+  it('still says Estimated on a Tier 3 asset: this tile is ignition-on time, not ECU hours', () => {
+    // J5.3: "Today's ignition-on time" is always Estimated — the ECU engine hours
+    // are a different figure and keep their own tile in the Overview.
+    expect(todayFor(tier3())!.source).toBe('Estimated');
+    expect(engineHoursToday(tier3())).not.toBeNull();
   });
 });
 
@@ -165,6 +168,56 @@ describe('utilisation — engine hours and fuel today', () => {
     }
     // A class-average rate can never exceed the biggest tank the fleet has.
     expect(fuel.litres).toBeLessThanOrEqual(Math.max(hours, 1) * 120);
+  });
+});
+
+describe('utilisation — the Engine & fuel week (J5.3)', () => {
+  it('covers seven Dubai days ending today', () => {
+    const week = fuelWeekFor(tier3())!;
+    expect(week.days).toHaveLength(7);
+    const keys = week.days.map(d => d.key);
+    expect(keys).toEqual([...keys].sort());
+    expect(keys[keys.length - 1]).toBe(clock.dubaiDateKey(clock.now()));
+  });
+
+  it('gives a Tier 1 asset nothing to chart', () => {
+    expect(fuelWeekFor(tier1())).toBeNull();
+  });
+
+  it("marks GN-01's 02:10 drop, the theft the fuel model and the alert both describe", () => {
+    const week = fuelWeekFor(assetByCode('GN-01'))!;
+    // The alert says "Fuel dropped 18% at 02:10 with engine off" (al-gn01-drop).
+    const dropDayKey = clock.dubaiDateKey(dubaiAt(0, 2, 10));
+    const day = week.days.find(d => d.key === dropDayKey);
+    expect(day, `the week covers ${dropDayKey}`).toBeDefined();
+    expect(day!.drop).toBe(true);
+    expect(day!.levelPct).not.toBeNull();
+    // The drop sits inside the day it is drawn on, and the alert's day is the
+    // last bucket of the window (the anchor day).
+    expect(dropDayKey).toBe(week.days[week.days.length - 1].key);
+  });
+
+  it('reports litres from the ECU counter when the vehicle has no level sensor', () => {
+    const noGauge = seed.assets.find(a => hasFeature(a, 'fuel.used') && !hasFeature(a, 'fuel.level'))!;
+    const week = fuelWeekFor(noGauge)!;
+    expect(week.hasLevel).toBe(false);
+    expect(week.hasUsedCounter).toBe(true);
+    expect(week.days.every(d => d.usedSource === 'ECU')).toBe(true);
+  });
+
+  it('labels litres Estimated when the gauge is the only source', () => {
+    const base = tier3();
+    const gaugeOnly: Asset = {
+      ...base,
+      canProfile: { ...base.canProfile, supported: base.canProfile.supported.filter(p => p !== 'fuelUsed') },
+    };
+    const week = fuelWeekFor(gaugeOnly)!;
+    expect(week.hasLevel).toBe(true);
+    expect(week.hasUsedCounter).toBe(false);
+    for (const day of week.days) {
+      if (day.usedL !== null) expect(day.usedL).toBeGreaterThanOrEqual(0);
+      expect(day.usedSource).toBe('Estimated');
+    }
   });
 });
 

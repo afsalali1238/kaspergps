@@ -19,6 +19,7 @@ import { hasFeature } from '@/domain/features';
 import { distanceKm } from '@/server/trips';
 import { burnRateLph, engineHoursIn } from '@/server/cost';
 import * as clock from '@/lib/clock';
+import { FUEL_DROP_PCT } from '@/config/thresholds';
 
 const DAY_MS = 86_400_000;
 const GAP_MINUTES = 90;
@@ -155,9 +156,10 @@ export function last7DaysIgnition(asset: Asset, nowMs: number = clock.now()): Ig
 export interface TodayView {
   /** Kilometres driven since Dubai midnight, from the trip rule (never interpolated). */
   distanceKm: number;
-  /** Ignition-on hours since Dubai midnight, labelled by `source`. */
+  /** Ignition-on hours since Dubai midnight — always derived from the ignition line. */
   ignitionHours: number;
-  source: HoursSource;
+  /** Always `Estimated`: this tile is ignition-on time, never ECU engine hours (J5.3). */
+  source: Extract<HoursSource, 'Estimated'>;
 }
 
 /** Today's distance and ignition-on time for one asset (spec 11.3 Overview). */
@@ -169,7 +171,7 @@ export function todayFor(asset: Asset, nowMs: number = clock.now()): TodayView |
   return {
     distanceKm: n1(distanceKm(asset, dayStart, nowMs)),
     ignitionHours: n1(day.movingHours + day.stationaryHours),
-    source: hoursSourceFor(asset),
+    source: 'Estimated',
   };
 }
 
@@ -211,6 +213,115 @@ export function fuelToday(asset: Asset, nowMs: number = clock.now()): FuelToday 
 
   const hours = Math.max(0, engineHoursIn(asset, dayStart, nowMs));
   return { litres: n1(hours * burnRateLph(asset)), source: 'Estimated' };
+}
+
+/** A refuel shows as a step up in the level gauge: 5 points is far more than burn. */
+export const REFUEL_RISE_PCT = 5;
+
+export interface FuelWeekDay {
+  /** Dubai date key, YYYY-MM-DD. */
+  key: string;
+  /** Display date, "5 Oct". */
+  date: string;
+  /** Last level-gauge reading of the day, or null when nothing was measured. */
+  levelPct: number | null;
+  /** Litres used in the day: the ECU counter when it reports, else the level gauge. */
+  usedL: number | null;
+  usedSource: 'ECU' | 'Estimated';
+  /** The gauge stepped up: a refuel. */
+  refuel: boolean;
+  /** The gauge fell by FUEL_DROP_PCT or more with the engine off: a possible theft. */
+  drop: boolean;
+}
+
+export interface FuelWeek {
+  /** Seven Dubai days, oldest first, ending with today. */
+  days: FuelWeekDay[];
+  /** Does this asset have a level gauge at all? */
+  hasLevel: boolean;
+  /** Is the litres figure measured (fuel used counter) or modelled (gauge)? */
+  hasUsedCounter: boolean;
+}
+
+/**
+ * The Engine & fuel tab's seven-day series (spec 11.3): the level gauge per day,
+ * litres used per day, and a refuel ▲ / drop ▼ marker wherever the readings show
+ * one. Both markers come from the readings themselves — a rise of REFUEL_RISE_PCT
+ * or more between two readings is a refill, and a fall of FUEL_DROP_PCT or more
+ * inside 15 minutes with the engine off is the theft pattern of §12 — so the chart
+ * and the alert tell the same story.
+ */
+export function fuelWeekFor(asset: Asset, nowMs: number = clock.now()): FuelWeek | null {
+  const hasLevel = hasFeature(asset, 'fuel.level');
+  const hasUsedCounter = hasFeature(asset, 'fuel.used');
+  if (!hasLevel && !hasUsedCounter) return null;
+
+  const dayStart = clock.startOfDubaiDay(nowMs);
+  const fromMs = dayStart - 6 * DAY_MS;
+  const readings = getReadingsForAsset(asset, fromMs, nowMs)
+    .slice()
+    .sort((a, b) => readingMs(a) - readingMs(b));
+
+  const tank = asset.tankLitres ?? 300;
+  const days = new Map<string, FuelWeekDay>();
+  for (let t = fromMs; t <= nowMs; t += DAY_MS) {
+    const key = clock.dubaiDateKey(t);
+    if (days.has(key)) continue;
+    days.set(key, {
+      key,
+      date: clock.formatDubaiDate(t),
+      levelPct: null,
+      usedL: null,
+      usedSource: hasUsedCounter ? 'ECU' : 'Estimated',
+      refuel: false,
+      drop: false,
+    });
+  }
+
+  let prev: Reading | null = null;
+  for (const r of readings) {
+    const day = days.get(clock.dubaiDateKey(readingMs(r)));
+    if (!day) { prev = r; continue; }
+    if (r.fuelLevelPct !== undefined) day.levelPct = n1(r.fuelLevelPct);
+
+    const prevLevel = prev?.fuelLevelPct;
+    if (prev && prevLevel !== undefined && r.fuelLevelPct !== undefined) {
+      const gapMs = readingMs(r) - readingMs(prev);
+      const delta = r.fuelLevelPct - prevLevel;
+      if (delta >= REFUEL_RISE_PCT) day.refuel = true;
+      if (delta <= -FUEL_DROP_PCT && gapMs <= 15 * 60_000 && !r.ignition) day.drop = true;
+    }
+    prev = r;
+  }
+
+  // Litres per day. The counter is measured; without one the gauge's falls are
+  // converted with the tank size and the day is labelled Estimated.
+  const byDay = new Map<string, Reading[]>();
+  for (const r of readings) {
+    const key = clock.dubaiDateKey(readingMs(r));
+    const list = byDay.get(key);
+    if (list) list.push(r); else byDay.set(key, [r]);
+  }
+  for (const [key, list] of byDay) {
+    const day = days.get(key);
+    if (!day) continue;
+    if (hasUsedCounter) {
+      const counted = list.filter(r => r.fuelUsedL !== undefined);
+      if (counted.length >= 2) {
+        day.usedL = n1(Math.max(0, (counted[counted.length - 1].fuelUsedL ?? 0) - (counted[0].fuelUsedL ?? 0)));
+      }
+    } else {
+      let litres = 0;
+      for (let i = 1; i < list.length; i++) {
+        const a = list[i - 1].fuelLevelPct;
+        const b = list[i].fuelLevelPct;
+        if (a !== undefined && b !== undefined && b < a) litres += ((a - b) / 100) * tank;
+      }
+      day.usedL = n1(litres);
+    }
+  }
+
+  return { days: Array.from(days.values()), hasLevel, hasUsedCounter };
 }
 
 export interface FleetTodayTotals {
