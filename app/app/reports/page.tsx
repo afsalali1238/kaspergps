@@ -8,7 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { Button, EmptyState } from '@/components/ui';
-import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo } from '@/server/api';
+import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId } from '@/server/api';
 import * as clock from '@/lib/clock';
 
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
@@ -54,10 +54,10 @@ export default function ReportsPage() {
   const labelMap = useMemo(() => (session ? labelIdsByAsset(session) : new Map<string, string[]>()), [session]);
 
   const scopeAssetIds = useMemo(() => {
-    if (scope === 'site') return assets.filter(a => a.homeSiteId === siteId).map(a => a.id);
+    if (scope === 'site') return assets.filter(a => session && viewerSiteId(session, a.id) === siteId).map(a => a.id);
     if (scope === 'label') return assets.filter(a => (labelMap.get(a.id) ?? []).includes(labelId)).map(a => a.id);
     return selectedAssetIds;
-  }, [scope, siteId, labelId, labelMap, selectedAssetIds, assets]);
+  }, [scope, siteId, labelId, labelMap, selectedAssetIds, assets, session]);
 
   // §11.5: a report type is listed only if at least one selected (or visible)
   // asset supports it, and the phase allows it.
@@ -85,7 +85,7 @@ export default function ReportsPage() {
 
   if (!session) return null;
 
-  const siteOptions = Array.from(new Set(assets.map(a => a.homeSiteId))).map(id => ({
+  const siteOptions = Array.from(new Set(assets.map(a => viewerSiteId(session, a.id)).filter((id): id is string => Boolean(id)))).map(id => ({
     id,
     name: seed.sites.find(s => s.id === id)?.name ?? id,
   }));

@@ -39,6 +39,7 @@ export function UserPicker() {
   const sites = useDb(s => s.sites);
   const assets = useDb(s => s.assets);
   const bookings = useDb(s => s.bookings);
+  const grantOverrides = useDb(s => s.grantOverrides);
 
   const [choice, setChoice] = useState<PickerRole>('tenant_admin');
   const [picked, setPicked] = useState('');
@@ -48,8 +49,8 @@ export function UserPicker() {
 
   const isLinkViewer = choice === 'link_viewer';
   const groups = useMemo(
-    () => (choice === 'link_viewer' ? [] : viewAsGroups({ users, tenants, sites, assets, bookings }, '', choice)),
-    [users, tenants, sites, assets, bookings, choice]
+    () => (choice === 'link_viewer' ? [] : viewAsGroups({ users, tenants, sites, assets, bookings, grantOverrides }, '', choice)),
+    [users, tenants, sites, assets, bookings, grantOverrides, choice]
   );
   const rows = groups.flatMap(g => g.rows);
   // Keep the pick while it is still in the list; otherwise the role's default person, then the first shown.

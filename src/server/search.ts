@@ -3,7 +3,7 @@
 
 import { db } from '@/server/db';
 import type { Session } from '@/domain/types';
-import { visibleAssetIds } from '@/server/access';
+import { visibleAssetIds, viewerSiteName } from '@/server/access';
 
 export interface AssetSearchHit {
   id: string;
@@ -24,7 +24,7 @@ export function searchAssets(session: Session | null, query: string, limit = 6):
   return db.getState().assets
     .filter(a => visible.has(a.id))
     .filter(a => {
-      const site = db.getState().sites.find(s => s.id === a.homeSiteId)?.name ?? '';
+      const site = viewerSiteName(session, a.id);
       if (!q) return true;
       return [a.code, a.name, site, a.plateOrSerial, a.make, a.model]
         .filter(Boolean)
@@ -32,7 +32,7 @@ export function searchAssets(session: Session | null, query: string, limit = 6):
     })
     .slice(0, limit)
     .map(a => {
-      const siteName = db.getState().sites.find(s => s.id === a.homeSiteId)?.name ?? '';
+      const siteName = viewerSiteName(session, a.id);
       return {
         id: a.id,
         code: a.code,

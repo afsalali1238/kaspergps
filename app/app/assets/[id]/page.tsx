@@ -9,7 +9,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents, viewerSiteId } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, Reading, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
@@ -312,7 +312,8 @@ export default function AssetDetailPage() {
 
   const canAcknowledgeAlerts = session ? can(session, 'alert.acknowledge', asset?.id) : false;
 
-  const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
+  // A renter sees the site on their rental, never the owner's yard.
+  const site = useMemo(() => (asset && session ? seed.sites.find(s => s.id === viewerSiteId(session, asset.id)) : null), [asset, session]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
 
   const currentBooking = useMemo(() => {

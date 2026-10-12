@@ -3,10 +3,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db, resetDb } from '@/server/db';
 import { viewAsGroups, type ViewAsState } from './view-as';
+import { visibleAssetIds, getRelationship } from '@/server/access';
+import { isKasperStaff } from '@/server/capabilities';
+import type { Session } from '@/domain/types';
 
 function state(): ViewAsState {
   const s = db.getState();
-  return { users: s.users, tenants: s.tenants, sites: s.sites, assets: s.assets, bookings: s.bookings };
+  return { users: s.users, tenants: s.tenants, sites: s.sites, assets: s.assets, bookings: s.bookings, grantOverrides: s.grantOverrides };
 }
 
 describe('View as: live groups and badges', () => {
@@ -79,5 +82,21 @@ describe('View as: role dropdown', () => {
     expect(kasper.every(r => r.user.role === 'kasper_ops')).toBe(true);
     const everyone = viewAsGroups(state(), '', 'all').flatMap(g => g.rows);
     expect(everyone.length).toBe(db.getState().users.length);
+  });
+
+  it('"renting N" counts only rentals the user can see right now (J4.7)', () => {
+    const rows = viewAsGroups(state(), '').flatMap(g => g.rows);
+    const renting = (id: string) => {
+      const label = rows.find(r => r.user.id === id)!.badges.find(b => b.label.startsWith('renting'))?.label;
+      return label ? Number(label.split(' ')[1]) : 0;
+    };
+    // EX-11's access ended early, so Deepa rents 3, not 4.
+    expect(renting('u-deepa')).toBe(3);
+    // Matches the map: the badge equals the number of visible assets held as renter.
+    for (const user of db.getState().users.filter(u => !isKasperStaff(u.role) && u.status === 'active')) {
+      const session: Session = { userId: user.id, user, tenantId: user.tenantId, siteIds: user.siteIds, role: user.role, isKasper: false };
+      const asRenter = visibleAssetIds(session).filter(id => getRelationship(session, id) === 'renter');
+      expect(renting(user.id), user.name).toBe(asRenter.length);
+    }
   });
 });
