@@ -81,7 +81,8 @@ function toView(alert: Alert, session: Session): AlertView {
     type: alert.type,
     typeLabel: TYPE_LABELS[alert.type] ?? alert.type,
     typeWords: alert.detail,
-    status: alert.closedAt ? 'closed' : alert.acknowledgedAt ? 'acknowledged' : 'open',
+    // A close that lies after the demo clock hasn't happened yet.
+    status: alert.closedAt && toMs(alert.closedAt) <= clock.now() ? 'closed' : alert.acknowledgedAt ? 'acknowledged' : 'open',
     openedAt: alert.openedAt,
     acknowledgedBy: alert.acknowledgedBy,
     acknowledgedAt: alert.acknowledgedAt,
@@ -97,6 +98,8 @@ const HARDWARE_TYPES: { type: string; feature: string }[] = [
 ];
 
 function alertVisible(session: Session, alert: Alert, phase: string): boolean {
+  // An alert never shows before it happened: jumping the clock back hides it.
+  if (toMs(alert.openedAt) > clock.now()) return false;
   // Day one: offline alerts only.
   if (phase === 'day_one' && alert.type !== 'offline') return false;
 

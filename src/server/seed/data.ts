@@ -456,40 +456,59 @@ export const geofences: Geofence[] = [
 
 // Geofence events
 export const geofenceEvents: GeofenceEvent[] = [
-  { id: 'ge-001', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'exit', at: daysAgo(1) + 19.167*3600000 },
-  { id: 'ge-002', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'enter', at: daysAgo(1) + 19.917*3600000 },
-  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-lb05', type: 'exit', at: daysAgo(1) + 23.667*3600000 },
+  { id: 'ge-001', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'exit', at: dubaiOn(-1, 19, 10) },
+  { id: 'ge-002', geofenceId: 'g-palm-crescent', assetId: 'a-wl06', type: 'enter', at: dubaiOn(-1, 19, 55) },
+  { id: 'ge-003', geofenceId: 'g-em-afterhours', assetId: 'a-lb05', type: 'exit', at: dubaiOn(-1, 23, 40) },
   { id: 'ge-004', geofenceId: 'g-em-hatta', assetId: 'a-bh05', type: 'enter', at: daysFromNow(1) + 10.5*3600000 },
 ];
 
 // ── Alerts ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Dubai wall-clock time (HH:mm) for alert text. Dubai has no daylight saving, so
+ * UTC+4 is exact. Local here because clock.ts imports this file.
+ */
+function dubaiHhmm(ms: number): string {
+  return new Date(ms + 4 * 3600000).toISOString().slice(11, 16);
+}
+
+// Alert times follow §8.2 and §8.7, and the simulator's readings: the time in an
+// alert's text is its openedAt, and nothing opens after the anchor.
+const TP23_POWER_CUT = hoursAgo(2); // 08:00, then on tracker battery
+const TP23_OFFLINE = minsAgo(40); // 09:20, last reading
+const EX07_OFFLINE = minsAgo(190); // 06:50, last reading
+const SL02_OFFLINE = minsAgo(2880); // two days ago, last reading
+const GN01_DROP = dubaiOn(0, 2, 10); // 02:10 last night
+const LB05_TOW = dubaiOn(-1, 23, 40); // yesterday 23:40
+const WL06_EXIT = dubaiOn(-1, 19, 10); // yesterday 19:10, back 19:55
+const BD02_FAULT = dubaiOn(0, 5, 40);
+
 export const alerts: Alert[] = [
   // Day one alerts
-  { id: 'al-ex07-offline', assetId: 'a-ex07', type: 'offline', openedAt: new Date(daysAgo(3)).toISOString(), detail: 'Offline since 07:42' },
-  { id: 'al-tp23-offline', assetId: 'a-tp23', type: 'offline', openedAt: daysAgo(1) + 9.33*3600000, detail: 'Offline since 14:32' },
-  { id: 'al-sl02-offline', assetId: 'a-sl02', type: 'offline', openedAt: new Date(daysAgo(2)).toISOString(), detail: 'Offline since 09:15' },
+  { id: 'al-ex07-offline', assetId: 'a-ex07', type: 'offline', openedAt: EX07_OFFLINE, detail: `Offline since ${dubaiHhmm(EX07_OFFLINE)}` },
+  { id: 'al-tp23-offline', assetId: 'a-tp23', type: 'offline', openedAt: TP23_OFFLINE, detail: `Offline since ${dubaiHhmm(TP23_OFFLINE)}` },
+  { id: 'al-sl02-offline', assetId: 'a-sl02', type: 'offline', openedAt: SL02_OFFLINE, detail: 'Offline for 2 days' },
   // Phase 2 alerts
-  { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: daysAgo(1) + 10.167*3600000, detail: 'Power cut at 12:10 — running on tracker battery' },
-  { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: new Date(daysAgo(3)).toISOString(), detail: 'Tracker battery low (3.5 V)' },
-  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: daysAgo(1) + 15*3600000, closedAt: daysAgo(1) + 15.5*3600000, detail: 'Over speed: 104 km/h' },
-  { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: new Date(daysAgo(2)).toISOString(), detail: 'Harsh driving — 3 events in last 2 days' },
-  { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: daysAgo(1) + 26.167*3600000, detail: 'Fuel dropped 18% at 02:10 with engine off' },
-  { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: daysAgo(0) + 5.667*3600000, detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },
-  { id: 'al-lb05-towing', assetId: 'a-lb05', type: 'towing', openedAt: daysAgo(1) + 23.667*3600000, closedAt: daysAgo(1) + 23.833*3600000, detail: 'Moved with ignition off — 400 m' },
+  { id: 'al-tp23-power', assetId: 'a-tp23', type: 'power_cut', openedAt: TP23_POWER_CUT, detail: `Power cut at ${dubaiHhmm(TP23_POWER_CUT)} — running on tracker battery` },
+  { id: 'al-gn02-battery', assetId: 'a-gn02', type: 'low_battery', openedAt: daysAgo(3), detail: 'Tracker battery low (3.5 V)' },
+  { id: 'al-wt07-speed', assetId: 'a-wt07', type: 'overspeed', openedAt: dubaiOn(-1, 15), closedAt: dubaiOn(-1, 15, 30), detail: 'Over speed: 104 km/h' },
+  { id: 'al-tp21-harsh', assetId: 'a-tp21', type: 'harsh_driving', openedAt: daysAgo(2), detail: 'Harsh driving — 3 events in last 2 days' },
+  { id: 'al-gn01-drop', assetId: 'a-gn01', type: 'fuel_drop', openedAt: GN01_DROP, detail: `Fuel dropped 18% at ${dubaiHhmm(GN01_DROP)} with engine off` },
+  { id: 'al-bd02-fault', assetId: 'a-bd02', type: 'fault_code', openedAt: BD02_FAULT, detail: 'Fault code SPN 110 FMI 0 — Engine coolant temperature high' },
+  { id: 'al-lb05-towing', assetId: 'a-lb05', type: 'towing', openedAt: LB05_TOW, closedAt: LB05_TOW + 10 * 60000, detail: `Moved with ignition off at ${dubaiHhmm(LB05_TOW)} — 400 m` },
   // Tenant-owned alerts
-  { id: 'al-wl06-geo', assetId: 'a-wl06', tenantId: 't-palm', type: 'geofence_exit', openedAt: daysAgo(1) + 19.167*3600000, closedAt: daysAgo(1) + 19.917*3600000, detail: 'Left Palm Crescent works at 19:10' },
-  { id: 'al-lb05-afterhours', assetId: 'a-lb05', tenantId: 't-emirates', type: 'after_hours_move', openedAt: daysAgo(1) + 23.667*3600000, closedAt: daysAgo(1) + 23.833*3600000, detail: 'Moved out of Al Quoz Yard after hours (23:40)' },
-  { id: 'al-bd02-maint', assetId: 'a-bd02', tenantId: 't-emirates', type: 'maintenance_overdue', openedAt: daysAgo(0) + 5.667*3600000, detail: 'Maintenance overdue: BD-02 250 h service (30 h overdue)' },
-  { id: 'al-cr08-maint', assetId: 'a-cr08', tenantId: 't-gulflift', type: 'maintenance_overdue', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance overdue: CR-08 annual crane inspection (5 days overdue)' },
-  { id: 'al-ex04-maint', assetId: 'a-ex04', tenantId: 't-emirates', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: EX-04 500 h service (80 h left)' },
-  { id: 'al-fb14-maint', assetId: 'a-fb14', tenantId: 't-alnoor', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: FB-14 10,000 km service (300 km left)' },
-  { id: 'al-cr02-maint', assetId: 'a-cr02', tenantId: 't-gulflift', type: 'maintenance_due', openedAt: new Date(daysAgo(5)).toISOString(), detail: 'Maintenance due soon: CR-02 annual crane inspection (12 days left)' },
-  { id: 'al-inv0415', assetId: undefined, tenantId: 't-emirates', type: 'invoice_overdue', openedAt: new Date(daysAgo(6)).toISOString(), detail: 'Invoice INV-EE-0415 is overdue (6 days)' },
-  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: daysAgo(2) + 14*3600000, closedAt: daysAgo(2) + 14.5*3600000, detail: 'Over speed: 96 km/h on Al Noor road' },
-  { id: 'al-pu51-idle', assetId: 'a-pu51', tenantId: 't-marina', type: 'idle', openedAt: daysAgo(1) + 11*3600000, closedAt: daysAgo(1) + 13.5*3600000, detail: 'PU-51 idle for 2.5 hours at Dubai Hills site' },
-  { id: 'al-gn01-lowfuel', assetId: 'a-gn01', tenantId: 't-emirates', type: 'low_fuel', openedAt: daysAgo(0) + 4*3600000, detail: 'GN-01 fuel level at 12% — refuel soon' },
-  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: daysAgo(1) + 17.5*3600000, closedAt: daysAgo(1) + 18.25*3600000, detail: 'Power cut at Al Quoz Yard — EX-11 on battery' },
+  { id: 'al-wl06-geo', assetId: 'a-wl06', tenantId: 't-palm', type: 'geofence_exit', openedAt: WL06_EXIT, closedAt: dubaiOn(-1, 19, 55), detail: `Left Palm Crescent works at ${dubaiHhmm(WL06_EXIT)}` },
+  { id: 'al-lb05-afterhours', assetId: 'a-lb05', tenantId: 't-emirates', type: 'after_hours_move', openedAt: LB05_TOW, closedAt: LB05_TOW + 10 * 60000, detail: `Moved out of Al Quoz Yard after hours (${dubaiHhmm(LB05_TOW)})` },
+  { id: 'al-bd02-maint', assetId: 'a-bd02', tenantId: 't-emirates', type: 'maintenance_overdue', openedAt: BD02_FAULT, detail: 'Maintenance overdue: BD-02 250 h service (30 h overdue)' },
+  { id: 'al-cr08-maint', assetId: 'a-cr08', tenantId: 't-gulflift', type: 'maintenance_overdue', openedAt: daysAgo(5), detail: 'Maintenance overdue: CR-08 annual crane inspection (5 days overdue)' },
+  { id: 'al-ex04-maint', assetId: 'a-ex04', tenantId: 't-emirates', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: EX-04 500 h service (80 h left)' },
+  { id: 'al-fb14-maint', assetId: 'a-fb14', tenantId: 't-alnoor', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: FB-14 10,000 km service (300 km left)' },
+  { id: 'al-cr02-maint', assetId: 'a-cr02', tenantId: 't-gulflift', type: 'maintenance_due', openedAt: daysAgo(5), detail: 'Maintenance due soon: CR-02 annual crane inspection (12 days left)' },
+  { id: 'al-inv0415', assetId: undefined, tenantId: 't-emirates', type: 'invoice_overdue', openedAt: daysAgo(6), detail: 'Invoice INV-EE-0415 is overdue (6 days)' },
+  { id: 'al-fb12-speed', assetId: 'a-fb12', tenantId: 't-alnoor', type: 'overspeed', openedAt: dubaiOn(-2, 14), closedAt: dubaiOn(-2, 14, 30), detail: 'Over speed: 96 km/h on Al Noor road' },
+  { id: 'al-pu51-idle', assetId: 'a-pu51', tenantId: 't-marina', type: 'idle', openedAt: dubaiOn(-1, 11), closedAt: dubaiOn(-1, 13, 30), detail: 'PU-51 idle for 2.5 hours at Dubai Hills site' },
+  { id: 'al-gn01-lowfuel', assetId: 'a-gn01', tenantId: 't-emirates', type: 'low_fuel', openedAt: GN01_DROP + 5 * 60000, detail: 'GN-01 fuel is low after the drop — refuel soon' },
+  { id: 'al-ex11-power', assetId: 'a-ex11', tenantId: 't-emirates', type: 'power_cut', openedAt: dubaiOn(-1, 17, 30), closedAt: dubaiOn(-1, 18, 15), detail: 'Power cut at Al Quoz Yard — EX-11 on battery' },
 ];
 
 // ── Tracker request ────────────────────────────────────────────────────────────

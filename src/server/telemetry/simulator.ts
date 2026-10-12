@@ -4,7 +4,7 @@
 
 import type { Reading, Asset } from '@/domain/types';
 import { db, type DbRow } from '@/server/db';
-import { ANCHOR_MS } from '@/server/seed/data';
+import { ANCHOR_MS, dubaiOn } from '@/server/seed/data';
 import { ecuHoursAt } from '@/server/telemetry/ecu';
 import * as clock from '@/lib/clock';
 import { OFFLINE_AFTER_SEC, STALE_AFTER_SEC } from '@/config/thresholds';
@@ -613,8 +613,9 @@ export function getFB12Readings(startMs: number, endMs: number): Reading[] {
 export function injectGNFuelDrop(readings: Reading[]): Reading[] {
   const dropReading: Reading = {
     trackerId: 'tr-gn01',
-    deviceTime: new Date(ANCHOR_MS - 1 * 24 * 3600000 + 2 * 3600000 + 10 * 60000).toISOString(),
-    receivedAt: new Date(ANCHOR_MS - 1 * 24 * 3600000 + 2 * 3600000 + 10 * 60000 + 5000).toISOString(),
+    // 02:10 Dubai on the anchor day ("last night", §8.7), the same time as its alert.
+    deviceTime: new Date(dubaiOn(0, 2, 10)).toISOString(),
+    receivedAt: new Date(dubaiOn(0, 2, 10) + 5000).toISOString(),
     lat: 25.1366, lng: 55.2311, speedKmh: 0, heading: 0, satellites: 8,
     ignition: false, moving: false,
     extVoltage: 12.6, intBattery: 3.5, gsm: 3, gnssOdometerKm: 100,
