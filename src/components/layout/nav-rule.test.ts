@@ -2,7 +2,7 @@
 // "Page not found" on Certificates and Cost; Omar (Tier 1) has no certificates.
 import { describe, it, expect } from 'vitest';
 import { db } from '@/server/db';
-import { navItemAllowed } from './AppShell';
+import { navItemAllowed, routeGate } from './AppShell';
 import type { Session } from '@/domain/types';
 
 const CERTIFICATES = { href: '/app/certificates', capability: 'muc.view', phase: 'phase2' } as const;
@@ -22,7 +22,7 @@ function sessionFor(userId: string): Session {
 }
 
 // navItemAllowed takes the full NavItem; these fixtures carry only what the rule reads.
-const item = (x: { href: string; capability: string; phase: string }) => ({ ...x, label: x.href, labelKey: x.href, icon: null }) as never;
+const item = (x: { href: string; capability: string; phase: string; ownerOnly?: boolean }) => ({ ...x, label: x.href, labelKey: x.href, icon: null }) as never;
 
 describe('nav rule for routes (H2.6)', () => {
   it('Mark (Site User) is not allowed on Certificates or Cost', () => {
@@ -45,5 +45,16 @@ describe('nav rule for routes (H2.6)', () => {
     const sara = sessionFor('u-sara');
     expect(navItemAllowed(sara, item(COST), 'phase2')).toBe(false);
     expect(navItemAllowed(sara, item(COST), 'later')).toBe(true);
+  });
+
+  it('Maintenance and Cost are hidden for a company that owns nothing (J4.6)', () => {
+    const fatima = sessionFor('u-fatima'); // Palm rents everything
+    const maintenance = item({ href: '/app/maintenance', capability: 'maintenance.view', phase: 'later', ownerOnly: true });
+    const cost = item({ ...COST, ownerOnly: true });
+    expect(navItemAllowed(fatima, maintenance, 'later')).toBe(false);
+    expect(navItemAllowed(fatima, cost, 'later')).toBe(false);
+    expect(routeGate(fatima, cost, 'later')).toEqual({ kind: 'locked', reason: expect.stringMatching(/rents its equipment/) });
+    // An owner keeps them.
+    expect(navItemAllowed(sessionFor('u-khalid'), cost, 'later')).toBe(true);
   });
 });

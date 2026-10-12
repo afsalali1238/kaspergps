@@ -33,14 +33,16 @@ for (const { email, path } of SCREENS) {
   });
 }
 
-// H4.7: the demo bar wraps on a phone instead of hiding its right-hand controls
-// in a box that scrolls. Every control must sit inside the screen.
-test('the demo bar fits a 390 px phone: every control is on screen', async ({ page }) => {
+// H4.7 / J5.5: the demo bar is one row on a phone (Features, Scenarios and Tools
+// show as icons), and every control sits inside the screen.
+test('the demo bar fits a 390 px phone in one row: every control is on screen', async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 0) > 500, 'phone layout only');
   await page.setViewportSize({ width: 390, height: 844 });
   await demo(page, { email: USERS.omar, on: '/app' });
-  for (const name of ['Day 1', 'Later', 'Features', 'Scenarios', 'Tools']) {
-    const control = page.locator('.demo-bar').getByText(name, { exact: true }).first();
+  const barHeight = await page.locator('.demo-bar').first().evaluate(el => (el as HTMLElement).offsetHeight);
+  expect(barHeight, 'the demo bar is a single row').toBeLessThanOrEqual(44);
+  for (const name of ['View as', 'Clock', 'Features', 'Scenarios', 'Tools']) {
+    const control = page.locator('.demo-bar').getByRole('button', { name, exact: true }).first();
     await expect(control, `${name} is in the demo bar`).toBeVisible();
     const box = await control.boundingBox();
     expect(box, `${name} has a box`).not.toBeNull();
@@ -66,3 +68,22 @@ for (const path of PUBLIC_PAGES) {
     expect(overflow, `page is ${overflow}px wider than the screen`).toBeLessThanOrEqual(1);
   });
 }
+
+// J5.5: a demo-bar menu opened on a phone stays on screen.
+test('the Scenarios menu opens inside a 390 px screen and shows at least 10 scenarios', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) > 500, 'phone layout only');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await demo(page, { email: USERS.omar, on: '/app' });
+  await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
+  const menu = page.getByText('Guided walkthroughs').locator('xpath=../..');
+  const box = (await menu.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  const rows = menu.locator('button');
+  let shown = 0;
+  for (let i = 0; i < Math.min(await rows.count(), 20); i++) {
+    const r = await rows.nth(i).boundingBox();
+    if (r && r.y + r.height <= box.y + box.height) shown++;
+  }
+  expect(shown, 'scenarios visible without scrolling').toBeGreaterThanOrEqual(10);
+});

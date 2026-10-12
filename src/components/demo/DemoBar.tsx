@@ -90,7 +90,8 @@ export function DemoBar() {
   };
 
   // Scenarios for the current user first — starting any of them switches user.
-  const orderedScenarios = [...SCENARIOS].sort((a, b) => {
+  // S20 and S41 only demonstrated the Phase switch, which is gone.
+  const orderedScenarios = SCENARIOS.filter(s => s.id !== 20 && s.id !== 41).sort((a, b) => {
     const rank = (s: Scenario) => (s.user === null || s.user === session?.userId ? 0 : 1);
     return rank(a) - rank(b) || a.id - b.id;
   });
@@ -153,9 +154,9 @@ export function DemoBar() {
   }
 
   return (
-    <div ref={barRef} className="demo-bar fixed top-0 left-0 right-0 z-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
+    <div ref={barRef} className="demo-bar fixed top-0 left-0 right-0 z-50 px-2 sm:px-3 py-1.5 flex flex-wrap items-center gap-1 sm:gap-2">
       {/* DEMO tag */}
-      <span className="demo-tag flex-shrink-0 text-[9px]">DEMO</span>
+      <span className="demo-tag flex-shrink-0 text-[9px] hidden sm:inline">DEMO</span>
 
       <ViewAsMenu />
 
@@ -166,10 +167,10 @@ export function DemoBar() {
           aria-label="Clock"
           className="flex-shrink-0 bg-[#1a1b20] text-paper text-[10px] font-mono px-2 py-1 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
-          {currentTimeStr} · {currentDateStr}
+          {currentTimeStr}<span className="hidden sm:inline"> · {currentDateStr}</span>
         </button>
         {clockOpen && (
-          <div className="absolute top-full right-0 mt-1 w-72 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+          <div className="absolute top-full right-0 mt-1 w-72 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
             <div className="p-2 border-b border-[#2a2c30]">
               <div className="text-[10px] text-paper/50 font-mono">Simulated clock · Dubai</div>
               <div className="text-sm text-paper mt-0.5">{currentDateStr} · {currentTimeStr}</div>
@@ -206,39 +207,12 @@ export function DemoBar() {
         )}
       </div>
 
-      {/* Phase switch */}
-      <div className="flex-shrink-0 flex items-center bg-[#1a1b20] border border-[#2a2c30] rounded-lg overflow-hidden">
-        {(['day_one', 'phase2', 'later'] as const).map(p => (
-          <button
-            key={p}
-            onClick={() => storeActions.setDemoSwitches({ phase: p })}
-            className={clsx(
-              'px-2 py-1 text-[10px] font-mono transition-colors',
-              switches.phase === p
-                ? 'bg-yellow/10 text-yellow border-r border-yellow-dark/40'
-                : 'bg-transparent text-paper/60 hover:text-paper'
-            )}
-          >
-            {p === 'day_one' ? 'Day 1' : p === 'phase2' ? 'Phase 2' : 'Later'}
-          </button>
-        ))}
-      </div>
-
-      {/* Show hidden */}
-      <button
-        onClick={() => storeActions.setDemoSwitches({ showHidden: !switches.showHidden })}
-        className={clsx(
-          'flex-shrink-0 px-2 py-1 text-[10px] font-mono rounded-lg border transition-colors',
-          switches.showHidden
-            ? 'bg-yellow/10 text-yellow border-yellow-dark/40'
-            : 'bg-[#1a1b20] text-paper/60 border-[#2a2c30] hover:text-paper'
-        )}
-      >
-        {switches.showHidden ? 'Show hidden: ON' : 'Show hidden: OFF'}
-      </button>
+      {/* Phase and Show hidden were removed (owner, 12 Oct): the demo always shows every
+          phase, and actions a user can't take are simply absent, as in the product. */}
 
       {/* Sales view */}
       <button
+        aria-label={`Sales view: ${switches.salesView ? 'ON' : 'OFF'}`}
         onClick={() => storeActions.setDemoSwitches({ salesView: !switches.salesView })}
         className={clsx(
           'flex-shrink-0 px-2 py-1 text-[10px] font-mono rounded-lg border transition-colors',
@@ -247,18 +221,20 @@ export function DemoBar() {
             : 'bg-[#1a1b20] text-paper/60 border-[#2a2c30] hover:text-paper'
         )}
       >
-        Sales view: {switches.salesView ? 'ON' : 'OFF'}
+        <span className="hidden sm:inline">Sales view: {switches.salesView ? 'ON' : 'OFF'}</span>
+        <span className="sm:hidden">Sales {switches.salesView ? '●' : '○'}</span>
       </button>
 
       {/* Features button */}
       <button
         onClick={() => setFeaturesOpen(!featuresOpen)}
+        aria-label="Features"
         className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
-          <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 8l3-3 3 3M2 5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M1.5 2.5l1 1 1.5-1.5M1.5 6.5l1 1 1.5-1.5M5.5 3h3.5M5.5 7h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        Features
+        <span className="hidden sm:inline">Features</span>
       </button>
 
       {/* Features panel */}
@@ -268,19 +244,20 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setScenariosOpen(!scenariosOpen)}
+          aria-label="Scenarios"
           className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
-            <path d="M5 1a4 4 0 100 8 4 4 0 000-8zM2 7l3-3 3 3M2 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M3 2l5 3-5 3V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
           </svg>
-          Scenarios
+          <span className="hidden sm:inline">Scenarios</span>
         </button>
         {scenariosOpen && (
-          <div className="absolute top-full left-0 mt-1 w-72 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+          <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
             <div className="p-2 border-b border-[#2a2c30]">
               <div className="text-[10px] text-paper/50 font-mono">Guided walkthroughs</div>
             </div>
-            <div className="max-h-80 overflow-y-auto p-2 space-y-0.5">
+            <div className="max-h-[min(70vh,640px)] overflow-y-auto p-2 space-y-0.5">
               {orderedScenarios.map(s => {
                 const who = s.user ? dbSnapshot.users.find(u => u.id === s.user) : null;
                 const notForUser = s.user !== null && s.user !== session?.userId;
@@ -293,21 +270,22 @@ export function DemoBar() {
                       storeActions.setWalkthrough({ scenarioId: s.id, stepIndex: 0 });
                       setScenariosOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-start gap-2 ${notForUser ? 'opacity-50' : 'text-paper/80'}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-start gap-2 ${notForUser ? 'text-paper/60' : 'text-paper/80'}`}
                   >
                     <span className="text-yellow/80 font-medium flex-shrink-0 mt-0.5">
                       S{s.id}{done ? ' ✓' : ''}
                     </span>
                     <span>
                       {s.label}
-                      <span className="block text-[10px] text-paper/40">
-                        {who ? `runs as ${who.name}` : 'keeps the current user'}
+                      {/* One line under the title, so at least 10 scenarios fit the menu (J5.6).
+                          A scenario for someone else switches to them in the same click. */}
+                      <span className={`block text-[10px] ${notForUser ? 'text-yellow/70' : 'text-paper/40'}`}>
+                        {who
+                          ? notForUser
+                            ? `runs as ${who.name} — click to switch to ${who.name.split(' ')[0]}`
+                            : `runs as ${who.name}`
+                          : 'keeps the current user'}
                       </span>
-                      {notForUser && who && (
-                        <span className="block text-[10px] text-yellow/70">
-                          Not for this user — switch to {who.name.split(' ')[0]} to try this (click to switch)
-                        </span>
-                      )}
                     </span>
                   </button>
                 );
@@ -321,15 +299,16 @@ export function DemoBar() {
       <div className="flex-shrink-0 relative">
         <button
           onClick={() => setToolsOpen(!toolsOpen)}
+          aria-label="Tools"
           className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
             <path d="M3 2l5 5-5 5M3 6l4 4M2 3a1 1 0 100 2 1 1 0 000-2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Tools
+          <span className="hidden sm:inline">Tools</span>
         </button>
         {toolsOpen && (
-          <div className="absolute top-full right-0 mt-1 w-60 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+          <div className="absolute top-full right-0 mt-1 w-60 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
             <div className="p-2 border-b border-[#2a2c30]">
               <div className="text-[10px] text-paper/50 font-mono">Developer tools</div>
             </div>

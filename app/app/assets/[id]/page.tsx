@@ -9,7 +9,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   TierChip, Badge, Button, StatusBadge, SourceLabel,
 } from '@/components/ui';
-import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents } from '@/server/api';
+import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents, viewerSiteId } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, Reading, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
@@ -312,7 +312,8 @@ export default function AssetDetailPage() {
 
   const canAcknowledgeAlerts = session ? can(session, 'alert.acknowledge', asset?.id) : false;
 
-  const site = useMemo(() => asset ? seed.sites.find(s => s.id === asset.homeSiteId) : null, [asset]);
+  // A renter sees the site on their rental, never the owner's yard.
+  const site = useMemo(() => (asset && session ? seed.sites.find(s => s.id === viewerSiteId(session, asset.id)) : null), [asset, session]);
   const ownerTenant = useMemo(() => asset ? seed.tenants.find(t => t.id === asset.ownerTenantId) : null, [asset]);
 
   const currentBooking = useMemo(() => {
@@ -660,17 +661,6 @@ export default function AssetDetailPage() {
       )}
 
       {/* Tab content */}
-      {/* Sales view: hardware features this asset lacks, as quiet locked cards (H3.3). */}
-      {shownTab === 'overview' && lockedCards.length > 0 && (
-        <div data-testid="locked-features" className="grid gap-2 md:grid-cols-2">
-          {lockedCards.map(card => (
-            <div key={card.key} className="bg-surface border border-line rounded-lg p-3 text-sm">
-              <div className="font-medium text-grey-700">{card.label}</div>
-              <div className="text-xs text-grey-500 mt-1">{card.reason}</div>
-            </div>
-          ))}
-        </div>
-      )}
       {shownTab === 'overview' && (
         <div className="space-y-4">
           {/* Mini map */}
@@ -894,6 +884,18 @@ export default function AssetDetailPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+      {/* Sales view: hardware features this asset lacks, as quiet locked cards (H3.3),
+          below the asset's real content (J5.7). */}
+      {shownTab === 'overview' && lockedCards.length > 0 && (
+        <div data-testid="locked-features" className="grid gap-2 md:grid-cols-2">
+          {lockedCards.map(card => (
+            <div key={card.key} className="bg-surface border border-line rounded-lg p-3 text-sm">
+              <div className="font-medium text-grey-700">{card.label}</div>
+              <div className="text-xs text-grey-500 mt-1">{card.reason}</div>
+            </div>
+          ))}
         </div>
       )}
 

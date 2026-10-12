@@ -16,7 +16,7 @@ import { LabelCombobox } from '@/components/labels/LabelCombobox';
 import { GeofenceOverlayLayer, type OverlayFence } from '@/components/geofences/GeofenceMap';
 import {
   useDb, isAssetVisible, getRelationship, getReadingForAsset, visibleAlerts, fleetTodayTotals, engineHoursToday, hoursSourceFor, computeStatus,
-  can, labelIdsByAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, visibleGeofences,
+  can, labelIdsByAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, visibleGeofences, viewerSiteId,
 } from '@/server/api';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
@@ -233,14 +233,14 @@ export default function MapPage() {
       if (!isAssetVisible(session, a.id)) return false;
       const status = computeStatus(a);
       if (statusFilter !== 'all' && status !== statusFilter) return false;
-      if (selectedSite && a.homeSiteId !== selectedSite) return false;
+      if (selectedSite && viewerSiteId(session, a.id) !== selectedSite) return false;
       if (selectedClass && a.assetClass !== selectedClass) return false;
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
       if (selectedTier !== 'all' && tier !== selectedTier) return false;
       if (session.tenantId) {
-        const booking = seed.bookings.find(b => b.assetId === a.id && b.renterTenantId === session.tenantId);
-        if (rentedFilter === 'owned' && booking) return false;
-        if (rentedFilter === 'rented' && !booking) return false;
+        const rentedIn = getRelationship(session, a.id) === 'renter';
+        if (rentedFilter === 'owned' && rentedIn) return false;
+        if (rentedFilter === 'rented' && !rentedIn) return false;
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -257,7 +257,7 @@ export default function MapPage() {
     }).map(a => {
       const status = computeStatus(a);
       const tier = a.canProfile.adapter === 'ALL-CAN300' ? 3 : a.canProfile.adapter === 'LVCAN200' ? 2 : 1;
-      const site = seed.sites.find(s => s.id === a.homeSiteId);
+      const site = seed.sites.find(s => s.id === viewerSiteId(session!, a.id));
       const rel = getRelationship(session!, a.id);
       const isRented = rel === 'renter';
       const reading = getReadingForAsset(a);

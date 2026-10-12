@@ -9,6 +9,7 @@ import { computeStatus } from '@/server/telemetry/simulator';
 import { can, isKasperStaff } from '@/server/capabilities';
 import { recordCrossTenantView } from '@/server/audit';
 import * as clock from '@/lib/clock';
+import { viewerSiteId, viewerSiteName } from '@/server/access';
 
 export interface ApiResult<T> {
   success: boolean;
@@ -120,7 +121,7 @@ function isBookingActive(b: DbRow<'bookings'>): boolean {
   return b.status === 'active' || b.status === 'scheduled';
 }
 
-function assetToView(asset: DbRow<'assets'>, _session: Session): AssetView {
+function assetToView(asset: DbRow<'assets'>, session: Session): AssetView {
   return {
     id: asset.id,
     code: asset.code,
@@ -133,8 +134,9 @@ function assetToView(asset: DbRow<'assets'>, _session: Session): AssetView {
     plateOrSerial: asset.plateOrSerial,
     ownerTenantId: asset.ownerTenantId,
     ownerName: db.getState().tenants.find(t => t.id === asset.ownerTenantId)?.name ?? '',
-    homeSiteId: asset.homeSiteId,
-    homeSiteName: db.getState().sites.find(s => s.id === asset.homeSiteId)?.name ?? '',
+    // A renter sees the site on their rental, never the owner's yard.
+    homeSiteId: viewerSiteId(session, asset.id) ?? '',
+    homeSiteName: viewerSiteName(session, asset.id),
     tankLitres: asset.tankLitres,
     canProfile: asset.canProfile,
     status: computeStatus(asset, clock.now()),
@@ -170,7 +172,7 @@ export type { Session };
 // Screens (app/** and src/components/**) import server code only from this file
 // (architecture test, rule 6). Every function below enforces its own access check
 // through can(); this file is a list of re-exports, not a second permission layer.
-export { anyAssetHasFeature, getRelationship, historyFloor, isAssetVisible, visibleAssetIds } from './access';
+export { anyAssetHasFeature, getRelationship, historyFloor, isAssetVisible, visibleAssetIds, viewerSiteId, viewerSiteName, ownsAnyAsset } from './access';
 export { ADAPTER_SERIAL_DUPLICATE, LVCAN_MODEL_ERROR, adapterForAsset, fitAdapter, fittedAssetFor, fittingHistory, markAdapterFaulty, modelFitsAsset, registerAdapter, removeAdapter, stockAdapters } from './adapters';
 export { acknowledgeAlert, alertTypesIn, bellAlerts, visibleAlerts } from './alerts';
 export type { AlertView } from './alerts';

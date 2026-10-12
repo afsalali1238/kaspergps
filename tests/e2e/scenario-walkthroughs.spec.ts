@@ -10,7 +10,12 @@ test.beforeEach(async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 0) < 900, 'the walkthrough card is laid out for desktop');
 });
 
+// S20 and S41 demonstrate the Phase switch, which the demo no longer has (it always
+// shows everything), so they are not in the Scenarios menu.
+const REMOVED = new Set([20, 41]);
+
 for (let id = 1; id <= 50; id++) {
+  if (REMOVED.has(id)) continue;
   test(`S${id} runs from the Scenarios menu to Finish`, async ({ page }) => {
     await demo(page, { email: USERS.sara });
     await page.getByRole('button', { name: 'Scenarios' }).click();

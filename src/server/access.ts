@@ -62,6 +62,30 @@ export function getGrantEnd(booking: Booking): number {
   return end;
 }
 
+/** Whether the viewer's company owns at least one asset (Kasper staff: always). */
+export function ownsAnyAsset(session: Session): boolean {
+  if (session.isKasper) return true;
+  return db.getState().assets.some(a => a.ownerTenantId === session.tenantId);
+}
+
+/**
+ * The site this viewer knows the asset by (§11.2, H2.7). Kasper and the owner see
+ * its home site. A renter sees only the site on their own rental, never the
+ * owner's yard; with no current rental, none.
+ */
+export function viewerSiteId(session: Session, assetId: string): string | null {
+  const asset = db.getState().assets.find(a => a.id === assetId);
+  if (!asset) return null;
+  if (session.isKasper || asset.ownerTenantId === session.tenantId) return asset.homeSiteId;
+  return findActiveGrantFor(session, assetId)?.renterSiteId ?? null;
+}
+
+/** The name of viewerSiteId, or '' when the viewer knows no site for it. */
+export function viewerSiteName(session: Session, assetId: string): string {
+  const id = viewerSiteId(session, assetId);
+  return id ? db.getState().sites.find(s => s.id === id)?.name ?? '' : '';
+}
+
 export function getRelationship(session: Session, assetId: string): 'kasper' | 'owner' | 'renter' | 'none' {
   if (session.isKasper) return 'kasper';
   const asset = db.getState().assets.find(a => a.id === assetId);

@@ -3,7 +3,6 @@
 // line — nothing else, noindex.
 
 import { expect, test } from '@playwright/test';
-import { demo, setPhase, USERS } from './helpers';
 
 const SEALED = 'MUC-2026-09-EX-04-01';
 const VOIDED = 'MUC-2026-09-WL-03-01';
@@ -45,29 +44,5 @@ test.describe('certificate verification', () => {
     await expect(page).toHaveURL(new RegExp(`/verify/${SEALED}`));
     await expect(page.getByText('Does not match its seal — contact Kasper.')).toBeVisible();
     expect(dialogMessages.join(' ')).toContain('tampered');
-  });
-});
-
-test.describe('certificates are gated by the phase switch', () => {
-  const gate = 'Certificates are available in Phase 2';
-
-  test('Day 1 keeps the screen locked with the reason', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, phase: 'Day 1', on: '/app/certificates' });
-    await expect(page.getByText(gate)).toBeVisible();
-  });
-
-  test('the asset tab opens only when the phase does', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, phase: 'Day 1', on: '/app/assets/a-ex04' });
-    // Tabs a user can't use are hidden, not greyed out (spec 'UI rules', H3.3):
-    // on Day 1 the Certificates tab is absent, and Phase 2 brings it back.
-    await expect(page.getByRole('button', { name: 'Certificates', exact: true })).toHaveCount(0);
-
-    await setPhase(page, 'Phase 2');
-    await expect(page.getByRole('button', { name: 'Certificates', exact: true })).toBeVisible();
-  });
-
-  test('Phase 2 unlocks the screen', async ({ page }) => {
-    await demo(page, { email: USERS.khalid, phase: 'Phase 2', on: '/app/certificates' });
-    await expect(page.getByText(gate)).toHaveCount(0);
   });
 });
