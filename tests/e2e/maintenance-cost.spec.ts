@@ -4,7 +4,7 @@
 // totals row, the asset ROI panel, and who is allowed to see the cost screen.
 
 import { expect, test } from '@playwright/test';
-import { signIn, USERS } from './helpers';
+import { openMore, signIn, USERS } from './helpers';
 
 test.describe('maintenance board', () => {
   test('sorts the fleet into overdue, due soon and ok with alert lines', async ({ page }) => {
@@ -109,6 +109,7 @@ test.describe('cost & ROI', () => {
     await signIn(page, USERS.mark);
     await page.goto('/app/cost');
     await expect(page.getByText('Page not found')).toBeVisible();
+    await openMore(page); // every allowed tab on screen, so "none" means none
     await expect(page.getByRole('link', { name: 'Cost & ROI' })).toHaveCount(0);
   });
 

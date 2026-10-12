@@ -4,7 +4,7 @@
 // two demo-runner views (audit log Demo view, simulated email outbox).
 
 import { expect, test } from '@playwright/test';
-import { openTools, signIn, USERS } from './helpers';
+import { navLink, openMore, openTools, signIn, USERS } from './helpers';
 
 test.describe('sign-in and role homes', () => {
   test('Kasper staff land in the console, customers in the app', async ({ page }) => {
@@ -39,12 +39,13 @@ test.describe('sign-in and role homes', () => {
     test.skip((page.viewportSize()?.width ?? 0) < 900, 'the console is desktop only');
     await signIn(page, USERS.sara);
     for (const label of ['Tenants', 'Assets', 'Trackers', 'CAN adapters', 'Bookings', 'Requests', 'Billing', 'Kasper team', 'Import', 'Audit log']) {
-      await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible();
+      await expect(await navLink(page, label), label).toBeVisible();
     }
 
     // Ops: no billing, no Kasper team, no audit log (spec 5.1).
     await signIn(page, USERS.ravi);
-    await expect(page.getByRole('link', { name: 'Trackers', exact: true })).toBeVisible();
+    await expect(await navLink(page, 'Trackers')).toBeVisible();
+    await openMore(page); // every allowed tab on screen, so "none" means none
     for (const label of ['Billing', 'Kasper team', 'Audit log']) {
       await expect(page.getByRole('link', { name: label, exact: true })).toHaveCount(0);
     }

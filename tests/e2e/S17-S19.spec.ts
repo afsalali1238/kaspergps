@@ -2,7 +2,7 @@
 // Tenant Admin actions a customer can take (inviting a user).
 
 import { expect, test } from '@playwright/test';
-import { demo, goTo, startScenario, USERS } from './helpers';
+import { demo, goTo, openMore, startScenario, USERS } from './helpers';
 
 test.describe('S17 — Ravi pairs a spare tracker to LD-09', () => {
   test('the trackers screen offers Pair on a spare and Ravi has no Admin screens', async ({ page }) => {
@@ -12,6 +12,7 @@ test.describe('S17 — Ravi pairs a spare tracker to LD-09', () => {
     await expect(page.getByRole('button', { name: 'Register many' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pair', exact: true }).first()).toBeVisible();
     // Ops never sees Kasper Admin's screens.
+    await openMore(page); // every allowed tab on screen, so "none" means none
     await expect(page.getByRole('link', { name: 'Kasper team' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Audit log' })).toHaveCount(0);
   });

@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import type { Session } from '@/domain/types';
 import { searchAssets } from '@/server/api';
 import { useT, useHref } from '@/i18n';
+import { Search } from 'lucide-react';
 
 interface SearchCommandProps {
   session: Session | null;
@@ -96,10 +97,12 @@ export function SearchCommand({ session }: SearchCommandProps) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="hidden sm:flex items-center gap-1.5 bg-paper border border-line rounded-lg px-2.5 py-1.5 text-sm text-grey-500 w-48 hover:border-grey-500 transition-colors"
+        aria-label={t('shell.search', 'Search')}
+        title={t('shell.search', 'Search')}
+        className="hidden sm:flex items-center justify-center min-[1760px]:justify-start gap-1.5 bg-paper border border-line rounded-lg h-9 w-9 min-[1760px]:w-56 min-[1760px]:px-2.5 text-sm text-grey-500 hover:border-grey-500 transition-colors"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1" /><path d="M8 8l2 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
-        <span className="flex-1 text-start">{t('shell.search_placeholder', 'Type to search assets…')}</span>
+        <Search size={15} aria-hidden className="shrink-0" />
+        <span className="hidden min-[1760px]:inline flex-1 text-start truncate">{t('shell.search_placeholder', 'Type to search assets…')}</span>
       </button>
 
       {open && (

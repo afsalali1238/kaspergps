@@ -6,11 +6,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { anyAssetHasFeature, ownsAnyAsset, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
+import { TopTabs } from '@/components/layout/TopTabs';
+import { Map as MapIcon, TriangleAlert, BarChart3, Download, Fence, BadgeCheck, CreditCard, Wrench, TrendingUp, Settings, Bell, ChevronDown, Menu, LogOut, Monitor, Users } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
-import { useSession, useSwitches } from '@/hooks';
+import { useSession, useSwitches, useNow } from '@/hooks';
 import type { Session } from '@/domain/types';
 
 interface NavItem {
@@ -98,82 +100,18 @@ export function routeGate(
   return { kind: 'ok' };
 }
 
+// Priority order (UI-UPGRADE.md §5.1): the first tabs stay in the top bar at every
+// desktop width; the later ones move under "More" when the bar is narrow.
 const navItems: NavItem[] = [
-  {
-    href: '/app',
-    labelKey: 'nav.map',
-    label: 'Map',
-    capability: 'asset.view',
-    phase: 'day_one',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1C4.1 1 1 4.1 1 8s3.1 7 7 7 7-3.1 7-7-3.1-7-7-7zm-5 8l4.5-5 1 1-4.5 5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    href: '/app/alerts',
-    labelKey: 'nav.alerts',
-    label: 'Alerts',
-    capability: 'alert.view',
-    phase: 'day_one',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 15h14L8 1zm0 5l3 3-3 3M8 8V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    href: '/app/reports',
-    labelKey: 'nav.reports',
-    label: 'Reports',
-    capability: 'report.run',
-    phase: 'day_one',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h6l3 3v9.5a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v2h6v2H3V4zm-1 3h8v8h2V6H2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-  },
-  {
-    href: '/app/downloads',
-    labelKey: 'nav.downloads',
-    label: 'Downloads',
-    capability: 'report.run',
-    phase: 'day_one',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1a4 4 0 100 8 4 4 0 000-8zM3 14v-5h10v5M6 10l3-3 3 3M6 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    href: '/app/geofences',
-    labelKey: 'nav.geofences',
-    label: 'Geofences',
-    capability: 'geofence.view',
-    phase: 'phase2',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5"/><path d="M8 3a5 5 0 000 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 1"/></svg>,
-  },
-  {
-    href: '/app/certificates',
-    labelKey: 'nav.certificates',
-    label: 'Certificates',
-    capability: 'muc.view',
-    phase: 'phase2',
-    featureKey: 'muc',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6h2M4 8h6M4 10h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-  },
-  {
-    href: '/app/billing',
-    labelKey: 'nav.billing',
-    label: 'Billing',
-    capability: 'billing.view',
-    phase: 'phase2',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M1 6h14M6 11h5M9 8h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-  },
-  {
-    href: '/app/maintenance',
-    labelKey: 'nav.maintenance',
-    label: 'Maintenance',
-    capability: 'maintenance.view',
-    phase: 'later',
-    ownerOnly: true,
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 10h14L8 1zm0 4l3 3-3 3M8 7V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
-  {
-    href: '/app/cost',
-    labelKey: 'nav.cost',
-    label: 'Cost & ROI',
-    capability: 'cost.view',
-    phase: 'later',
-    ownerOnly: true,
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14l4-4 3 3 3-6 1 1 3 3M4 2v3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  },
+  { href: '/app', labelKey: 'nav.map', label: 'Map', capability: 'asset.view', phase: 'day_one', icon: <MapIcon size={16} strokeWidth={1.75} /> },
+  { href: '/app/alerts', labelKey: 'nav.alerts', label: 'Alerts', capability: 'alert.view', phase: 'day_one', icon: <TriangleAlert size={16} strokeWidth={1.75} /> },
+  { href: '/app/reports', labelKey: 'nav.reports', label: 'Reports', capability: 'report.run', phase: 'day_one', icon: <BarChart3 size={16} strokeWidth={1.75} /> },
+  { href: '/app/maintenance', labelKey: 'nav.maintenance', label: 'Maintenance', capability: 'maintenance.view', phase: 'later', ownerOnly: true, icon: <Wrench size={16} strokeWidth={1.75} /> },
+  { href: '/app/billing', labelKey: 'nav.billing', label: 'Billing', capability: 'billing.view', phase: 'phase2', icon: <CreditCard size={16} strokeWidth={1.75} /> },
+  { href: '/app/geofences', labelKey: 'nav.geofences', label: 'Geofences', capability: 'geofence.view', phase: 'phase2', icon: <Fence size={16} strokeWidth={1.75} /> },
+  { href: '/app/certificates', labelKey: 'nav.certificates', label: 'Certificates', capability: 'muc.view', phase: 'phase2', featureKey: 'muc', icon: <BadgeCheck size={16} strokeWidth={1.75} /> },
+  { href: '/app/cost', labelKey: 'nav.cost', label: 'Cost & ROI', capability: 'cost.view', phase: 'later', ownerOnly: true, icon: <TrendingUp size={16} strokeWidth={1.75} /> },
+  { href: '/app/downloads', labelKey: 'nav.downloads', label: 'Downloads', capability: 'report.run', phase: 'day_one', icon: <Download size={16} strokeWidth={1.75} /> },
 ];
 
 function formatNotificationTime(
@@ -220,26 +158,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     ? ({ kind: 'not_found' } as const)
     : routeGate(session, routeItem, currentPhase);
 
+  // The asset page belongs to the Map tab (you reach it from the map).
+  const isActive = (itemHref: string) =>
+    pathname === itemHref ||
+    (itemHref !== '/app' && pathname.startsWith(itemHref + '/')) ||
+    (itemHref === '/app' && pathname.startsWith('/app/assets/'));
+
   const isCustomer = session && !session.isKasper;
   const showMobileNav = isCustomer;
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
-      {/* Top bar */}
-      <header className="bg-surface border-b border-line px-4 lg:px-6 h-14 flex items-center justify-between sticky top-0 z-40" style={{ top: 'var(--demo-bar-h)' }}>
-        <div className="flex items-center gap-3">
-          {/* Kasper wordmark */}
+      {/* Top bar: brand, page tabs (no left sidebar; UI-UPGRADE.md §5.1), then tools. */}
+      <header className="bg-surface border-b border-line ps-4 pe-3 lg:ps-5 h-14 flex items-center gap-3 lg:gap-5 sticky top-0 z-40 shadow-panel" style={{ top: 'var(--demo-bar-h)' }}>
+        <div className="flex items-center gap-3 shrink-0">
           <Link href={session?.isKasper ? '/console' : href('/app')} className="flex items-center gap-2 flex-shrink-0">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <rect width="22" height="22" rx="5" fill="#141518" />
-              <text x="0" y="16" fontSize="14" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
+            <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden>
+              <rect width="22" height="22" rx="5" className="fill-ink" />
+              <text x="11" y="16" textAnchor="middle" direction="ltr" fontSize="14" fontFamily="var(--font-mono)" className="fill-yellow" fontWeight="700">K</text>
             </svg>
-            <span className="text-sm font-semibold text-ink hidden sm:block">{t('shell.brand', 'Kasper')}</span>
+            <span className="text-section text-ink hidden sm:block">{t('shell.brand', 'Kasper')}</span>
           </Link>
-
-          {/* Company name (customer) or Viewing (Kasper) */}
           {session && (
-            <span className="text-sm text-grey-700 hidden md:block">
+            <span className="text-sm text-grey-700 hidden md:block border-s border-line ps-3 max-w-44 truncate">
               {session.isKasper
                 ? t('shell.all_tenants', 'All tenants')
                 : session.user.tenantId
@@ -249,7 +190,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 self-stretch">
+          <TopTabs
+            label={t('shell.pages', 'Pages')}
+            moreLabel={t('shell.more', 'More')}
+            tabs={visibleNavItems.map(item => ({
+              href: href(item.href),
+              label: t(item.labelKey, item.label),
+              icon: item.icon,
+              active: isActive(item.href),
+            }))}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {session && <LivePill />}
           {/* Search */}
           <SearchCommand session={session} />
 
@@ -258,12 +213,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="relative">
               <button
                 onClick={() => setIsBellOpen(!isBellOpen)}
-                className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700 transition-colors"
+                className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700 transition-colors"
                 aria-label={t('shell.notifications', 'Notifications')}
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 1a4 4 0 00-4 4v4.5a1 1 0 001 1h6.5a1 1 0 001-1V5a4 4 0 00-4-4zm0 1.5a2.5 2.5 0 012.5 2.5v3.5a1 1 0 01-1 1H6a1 1 0 01-1-1V5a2.5 2.5 0 012.5-2.5zm1.5 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
+                <Bell size={17} strokeWidth={1.75} aria-hidden />
                 {bellCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                     {bellCount}
@@ -342,22 +295,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           )}
+          {/* Settings (§11.8: company admin only) */}
+          {settingsAllowed(session) && (
+            <Link
+              href={href('/app/settings')}
+              aria-label={t('shell.settings', 'Settings')}
+              title={t('shell.settings', 'Settings')}
+              aria-current={pathname === '/app/settings' || pathname.startsWith('/app/settings/') ? 'page' : undefined}
+              className={clsx(
+                'hidden lg:flex w-9 h-9 items-center justify-center rounded-lg transition-colors',
+                pathname.startsWith('/app/settings') ? 'bg-yellow/10 text-ink' : 'text-grey-700 hover:bg-paper-2 hover:text-ink',
+              )}
+            >
+              <Settings size={17} strokeWidth={1.75} aria-hidden />
+            </Link>
+          )}
           {/* User menu */}
           {session && (
             <div className="relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 text-sm text-grey-700 hover:text-ink transition-colors"
+                aria-expanded={isUserMenuOpen}
+                className="flex items-center gap-2 h-9 ps-1 pe-2 rounded-lg text-sm text-grey-700 hover:bg-paper-2 hover:text-ink transition-colors"
               >
-                <span className="w-6 h-6 rounded-full bg-ink/10 text-ink text-[10px] font-semibold flex items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-ink text-yellow text-[11px] font-semibold flex items-center justify-center">
                   {session.user.name.charAt(0)}
                 </span>
-                <span className="hidden lg:inline">{session.user.name}</span>
-                <span className="text-grey-500">·</span>
-                <span className="text-grey-500 text-xs">{roleLabel(session.user.role, t)}</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ms-1 text-grey-500">
-                  <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <span className="text-grey-500 text-xs hidden xl:inline">{roleLabel(session.user.role, t)}</span>
+                <ChevronDown size={14} aria-hidden className="text-grey-500" />
               </button>
 
               {isUserMenuOpen && (
@@ -366,6 +331,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="px-3 py-2 border-b border-line">
                     <div className="text-sm font-medium text-ink">{session.user.name}</div>
                     <div className="text-xs text-grey-500">{roleLabel(session.user.role, t)}</div>
+                    {!session.isKasper && session.user.tenantId && (
+                      <div className="text-xs text-grey-500 mt-0.5">{tenantRows.find(r => r.id === session.user.tenantId)?.name}</div>
+                    )}
                   </div>
 
                   {/* Menu items */}
@@ -376,10 +344,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {/* Users & sites (Kasper only) */}
                     {session.isKasper && (
                       <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M1 1h12v12H1z" stroke="currentColor" strokeWidth="1"/>
-                          <path d="M4 1v12M7 1v12M10 1v12" stroke="currentColor" strokeWidth="1"/>
-                        </svg>
+                        <Users size={14} aria-hidden />
                         {t('shell.users_and_sites', 'Users & sites')}
                       </button>
                     )}
@@ -387,19 +352,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {/* Console (Kasper only) */}
                     {session.isKasper && (
                       <Link href="/console" className="w-full flex items-center gap-2 px-3 py-2 text-sm text-grey-700 hover:bg-paper-2 transition-colors">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1"/>
-                          <path d="M5 7l2 2 2-2M7 5v4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                        </svg>
+                        <Monitor size={14} aria-hidden />
                         {t('shell.console', 'Console')}
                       </Link>
                     )}
 
                     {/* Sign out */}
                     <Link href="/sign-in" className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red hover:bg-paper-2 transition-colors">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
+                      <LogOut size={14} aria-hidden />
                       {t('shell.sign_out', 'Sign out')}
                     </Link>
                   </div>
@@ -407,68 +367,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           )}
+          {/* Mobile menu button */}
+          {showMobileNav && (
+            <button
+              onClick={() => setMobileNavOpen(!mobileNavOpen)}
+              aria-expanded={mobileNavOpen}
+              aria-label={t('shell.open_menu', 'Open menu')}
+              className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
+            >
+              <Menu size={18} aria-hidden />
+            </button>
+          )}
         </div>
 
-        {/* Mobile menu button */}
-        {showMobileNav && (
-          <button
-            onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            aria-expanded={mobileNavOpen}
-            aria-label={t('shell.open_menu', 'Open menu')}
-            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-paper-2 text-grey-700"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
-        )}
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left nav (desktop). Shown to customers too: on a wide screen the bottom bar is hidden, so this is their only nav. */}
-        <nav className="w-56 bg-surface border-e border-line flex-shrink-0 overflow-y-auto hidden lg:flex flex-col">
-          <div className="flex flex-col gap-0.5 p-2">
-            {visibleNavItems.map(item => {
-              const isActive = pathname === item.href || (item.href !== '/app' && pathname.startsWith(item.href));
-              return (
-                <Link
-                  key={item.href}
-                  href={href(item.href)}
-                  className={clsx(
-                    'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
-                      : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
-                  )}
-                >
-                  {item.icon}
-                  {t(item.labelKey, item.label)}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Settings */}
-          {settingsAllowed(session) && (
-            <div className="mt-auto border-t border-line p-2">
-              <Link
-                href={href('/app/settings')}
-                className={clsx(
-                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  pathname === '/app/settings'
-                    ? 'bg-yellow/10 text-ink border-s-2 border-yellow -ms-[1px]'
-                    : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
-                )}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M8 1v2M8 13v2M13 8h2M4 8h2M12.5 3.5l1.5 1.5M3.5 12.5l1.5-1.5M12.5 12.5l-1.5-1.5M3.5 3.5l1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {t('shell.settings', 'Settings')}
-              </Link>
-            </div>
-          )}
-        </nav>
 
         {/* Phones: every allowed item lives in a bottom sheet (spec 11), opened from the header. */}
         {showMobileNav && mobileNavOpen && (
@@ -502,7 +416,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 sm:pb-6">
+        <main className="flex-1 min-w-0 overflow-y-auto p-4 lg:p-6 pb-20 sm:pb-6">
           {/* Keyed by user: a switch of user remounts the page, so no state
               from the previous user's screen survives it. */}
           <div key={session?.userId ?? 'signed-out'}>
@@ -528,6 +442,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+/** LIVE pill: the demo clock's Dubai time, so the presenter always sees "now". */
+function LivePill() {
+  const t = useT();
+  const now = useNow();
+  return (
+    <span className="hidden min-[1760px]:inline-flex items-center gap-1.5 h-7 rounded-full bg-paper-2 border border-line px-2.5 font-mono text-[11px] text-ink me-1" data-testid="live-pill">
+      <span className="w-1.5 h-1.5 rounded-full bg-live" aria-hidden />
+      {t('shell.live', 'LIVE')} {clock.formatDubaiTime(now)}
+    </span>
   );
 }
 

@@ -216,7 +216,9 @@ Add an Arabic face for `[dir=rtl]`, e.g. IBM Plex Sans Arabic, through `next/fon
 - **Owner decision (13 Oct): top navigation like fleetx, no left sidebar.**
   - One 56 px top bar holds: the logo + company name, the page tabs, search (⌘K), a LIVE clock pill, the bell and the user menu.
   - Page tabs: Lucide icon + label; the active tab gets an accent underline and tint; the order follows the existing nav rules (role, phase and hardware gating are unchanged).
-  - fleetx's bar overflowed at 1440 px, so show at most 6 tabs. Map, Alerts, Reports, Fuel (when shown), Maintenance and Billing come first. The rest (Geofences, Certificates, Cost & ROI, Downloads, Schedules) go under **"More ▾"**, a dropdown with the same gating. Settings sits in the user menu.
+  - fleetx's bar overflowed at 1440 px, so the bar shows 4 tabs from 1024 px, 6 from 1280 px and 7 from 1600 px (pure CSS, `TopTabs`). Map, Alerts, Reports, Fuel (when shown), Maintenance and Billing come first. The rest (Geofences, Certificates, Cost & ROI, Downloads, Schedules) go under **"More ▾"**, a dropdown with the same gating. Settings is a gear icon in the bar (company admins only).
+  - The full search box and the LIVE pill appear from 1760 px; narrower bars show a search icon. The company name shows from 768 px.
+  - Built in B3. `tests/e2e/j5-nav-widths.spec.ts` checks the bar fits at 1024–1920 px; e2e helpers `navLink()` and `openMore()` reach a tab under More. A "no such link" check must call `openMore()` first, or it passes trivially.
   - Below 1024 px the tabs collapse into "Menu ▾". On phones, keep the existing menu sheet, opened from the bar.
   - The Kasper console gets the same top bar with its own tabs (Overview, Tenants, Assets, Trackers, CAN adapters, Bookings, then More ▾).
   - Remove the left sidebar from `AppShell` and the console layout. Pages get the full width.

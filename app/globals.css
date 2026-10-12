@@ -221,17 +221,21 @@ body[data-demo-collapsed='true'] {
   unicode-bidi: isolate;
 }
 
-/* Numbers, times, plates and asset codes stay on the Latin grid in Arabic. */
-[dir="rtl"] .font-mono {
-  direction: ltr;
-  unicode-bidi: isolate;
-  display: inline-block;
-}
+/* Numbers, times, plates and asset codes stay on the Latin grid in Arabic.
+   In @layer base so a utility (hidden, flex, …) on the same element still wins;
+   unlayered, this display used to beat `hidden` and showed hidden mono text in Arabic. */
+@layer base {
+  [dir="rtl"] .font-mono {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline-block;
+  }
 
-/* Arrows that point "forward" in English point the other way in Arabic. */
-[dir="rtl"] .arrow-forward {
-  transform: scaleX(-1);
-  display: inline-block;
+  /* Arrows that point "forward" in English point the other way in Arabic. */
+  [dir="rtl"] .arrow-forward {
+    transform: scaleX(-1);
+    display: inline-block;
+  }
 }
 
 /* ── Type scale (UI upgrade §4) ───────────────────────────────────────────────
