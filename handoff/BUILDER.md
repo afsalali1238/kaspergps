@@ -1,5 +1,7 @@
 # Builder work order: Kasper GPS UI/UX upgrade (U0–U8)
 
+> **Parallel build (12 Oct, 23:15):** the remaining work is split across 10 agents in 3 waves. **Use `handoff/agents/README.md` and your own `handoff/agents/<X>.md` instead of §3 below.** §1 (decisions), §4 (review loop), §5 (PR checklist), §6 (send-back rules) and §7 (sandbox notes) of this file still apply to every agent.
+
 **You are the builder.** You write the code, one step per pull request. **Claude Opus is the supervisor:** it reviews every PR, asks for changes, and merges. You never merge.
 
 **Read first, in order:**
