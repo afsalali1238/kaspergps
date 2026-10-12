@@ -80,11 +80,14 @@ export function currentMeter(plan: MaintenancePlan, asset: Asset, atMs = clock.n
       source: plan.kmSource === 'can' ? 'CAN odometer' : 'GPS distance',
     };
   }
-  const since = plan.hoursSource === 'estimated'
-    ? Math.max(0, estimatedHoursAt(asset, atMs) - estimatedHoursAt(asset, doneMs))
-    : Math.max(0, ecuHoursAt(asset, atMs) - ecuHoursAt(asset, doneMs));
+  // An ECU plan reads the engine's own hour meter: the same number the asset page shows
+  // (one number, one source). Estimated hours have no meter, so they count on from the
+  // reading logged at the last service.
+  const value = plan.hoursSource === 'estimated'
+    ? plan.lastDoneValue + Math.max(0, estimatedHoursAt(asset, atMs) - estimatedHoursAt(asset, doneMs))
+    : ecuHoursAt(asset, atMs);
   return {
-    value: Math.round((plan.lastDoneValue + since) * 10) / 10,
+    value: Math.round(value * 10) / 10,
     unit: 'h',
     source: plan.hoursSource === 'estimated' ? 'Estimated (ignition hours)' : hoursSourceLabel(asset),
   };
@@ -225,6 +228,23 @@ export function maintenanceAlerts(session: Session, atMs = clock.now()): { state
     ...board.overdue.map(s => ({ state: 'overdue' as const, text: `Maintenance overdue: ${s.asset.code} — ${s.plan.name}` })),
     ...board.dueSoon.map(s => ({ state: 'due_soon' as const, text: `Maintenance due soon: ${line(s)}` })),
   ];
+}
+
+/**
+ * The maintenance alert line for an asset's plan, from the same snapshot the board
+ * uses, so the alert never disagrees with the Maintenance page or the asset page.
+ * "Maintenance due soon: EX-04 500 h service (80 h left)".
+ */
+export function maintenanceAlertText(assetId: string, atMs = clock.now()): string | null {
+  const asset = db.getState().assets.find(a => a.id === assetId);
+  const plan = db.getState().maintenancePlans.find(p => p.assetId === assetId);
+  if (!asset || !plan) return null;
+  const s = planSnapshot(plan, asset, atMs);
+  const amount = (n: number) => s.unit === 'km'
+    ? `${Math.round(n).toLocaleString('en-US')} km`
+    : s.unit === 'days' ? `${Math.round(n)} ${Math.round(n) === 1 ? 'day' : 'days'}` : `${Math.round(n)} h`;
+  if (s.state === 'overdue') return `Maintenance overdue: ${asset.code} ${plan.name} (${amount(Math.abs(s.remaining))} overdue)`;
+  return `Maintenance due soon: ${asset.code} ${plan.name} (${amount(Math.max(0, s.remaining))} left)`;
 }
 
 export function canManageMaintenance(session: Session, assetId?: string): boolean {

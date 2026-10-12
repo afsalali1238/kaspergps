@@ -710,7 +710,7 @@ export default function AssetDetailPage() {
             <div className="bg-surface border border-line rounded-lg p-4">
               <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.speed', 'Speed')}</div>
               <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                {reading ? `${reading.speedKmh} km/h` : '—'}
+                {reading ? `${Math.round(reading.speedKmh)} km/h` : '—'}
               </div>
             </div>
             <div className="bg-surface border border-line rounded-lg p-4">
@@ -719,12 +719,15 @@ export default function AssetDetailPage() {
                 {reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : '—'}
               </div>
             </div>
+            {/* The tracker's own battery. With a Power tile below (vehicle voltage), it is that tile's sub-line instead. */}
+            {(isTier1 || !hasFeature(asset, 'power.status')) && (
             <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.battery', 'Battery')}</div>
+              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.tracker_battery_label', 'Tracker battery')}</div>
               <div className="text-lg font-semibold mt-1 font-mono">
                 {reading ? `${reading.intBattery.toFixed(1)} V` : '—'}
               </div>
             </div>
+            )}
           </div>
 
           {/* Today: distance and ignition-on time (spec 11.3 "Overview"). */}

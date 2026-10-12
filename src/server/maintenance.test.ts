@@ -40,10 +40,10 @@ describe('maintenance — the board', () => {
   });
 
   it('writes the headline the way the spec does', () => {
-    expect(planSnapshot(plan('mp-ex04'), asset('a-ex04')).headline).toBe('Due at 8,500 h · ECU — 95 h left');
+    expect(planSnapshot(plan('mp-ex04'), asset('a-ex04')).headline).toBe('Due at 8,500 h · ECU — 80 h left') // §8.10;
     expect(planSnapshot(plan('mp-cr02'), asset('a-cr02')).headline).toBe('Due 21 Oct (15 days)');
     expect(planSnapshot(plan('mp-cr08'), asset('a-cr08')).headline).toBe('Overdue — was due 1 Oct (5 days ago)');
-    expect(planSnapshot(plan('mp-bd02'), asset('a-bd02')).headline).toBe('Overdue — due at 14,950 h · ECU (110 h over)');
+    expect(planSnapshot(plan('mp-bd02'), asset('a-bd02')).headline).toBe('Overdue — due at 14,950 h · ECU (30 h over)') // §8.10;
     // Bases are labelled, never silently mixed.
     expect(planSnapshot(plan('mp-tp22'), asset('a-tp22')).source).toBe('Estimated (ignition hours)');
     expect(planSnapshot(plan('mp-fb14'), asset('a-fb14')).source).toBe('GPS distance');
@@ -62,7 +62,7 @@ describe('maintenance — the board', () => {
       'Maintenance overdue: BD-02 — 250 h service',
       'Maintenance overdue: CR-08 — Annual crane inspection',
       'Maintenance due soon: CR-02 Annual crane inspection (21 Oct)',
-      'Maintenance due soon: EX-04 500 h service (95 h left)',
+      'Maintenance due soon: EX-04 500 h service (80 h left)',
       'Maintenance due soon: PU-51 10,000 km service (1,450 km left)',
     ]);
   });
@@ -83,10 +83,11 @@ describe('maintenance — the board', () => {
 });
 
 describe('maintenance — reading a plan meter', () => {
-  it('adds what the asset has put on the meter since the service', () => {
+  it('reads an ECU plan off the engine hour meter, and counts distance on from the service', () => {
     const meter = currentMeter(plan('mp-ex04'), asset('a-ex04'));
     expect(meter.unit).toBe('h');
-    expect(meter.value).toBeCloseTo(8405, 0); // 8,000 h at the service + 45 days × 9 h
+    // §8.10: EX-04 reads ~8,420 h now — the same number its asset page shows.
+    expect(meter.value).toBeCloseTo(8420, 0);
     expect(currentMeter(plan('mp-pu51'), asset('a-pu51')).value).toBeCloseTo(11550, 0); // 3,000 km + 90 × 95
     expect(currentMeter(plan('mp-cr02'), asset('a-cr02')).unit).toBe('days');
   });

@@ -12,7 +12,7 @@ export const BEHAVIOUR_HOURS_PER_DAY: Record<Asset['behaviour'], number> = {
   parked: 1,
   works_at_site: 9,
   drives_between_sites: 6,
-  stationary_24h: 0,
+  stationary_24h: 20, // a generator runs most of the day and night
   light_vehicle_day: 4,
 };
 
@@ -20,6 +20,8 @@ export const BEHAVIOUR_HOURS_PER_DAY: Record<Asset['behaviour'], number> = {
 const ECU_HOURS_AT_ANCHOR: Record<string, number> = {
   'EX-04': 8420,
   'BD-02': 14980,
+  // Oil change logged at 2,000 h on 1 Oct; about 20 h a day since (§8.10: plan Ok).
+  'GN-01': 2100,
 };
 
 const n1 = (v: number) => Math.round(v * 10) / 10;
