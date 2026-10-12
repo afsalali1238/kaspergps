@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -13,7 +12,10 @@
   --paper-2: #F6F6F3;
   --line: #E8E8E3;
   --grey-700: #5B5F66;
-  --grey-500: #9A9CA1;
+  /* Secondary text. Was #9A9CA1 (about 2.6:1 on the page background, below WCAG AA);
+     now passes AA (about 4.6:1). Pure decoration uses --muted. */
+  --grey-500: #6B6F76;
+  --muted: #9A9CA1;
   --red: #D64545;
   --green: #1F9A6D;
 
@@ -32,7 +34,18 @@
   --border: #E8E8E3;
   --text: #141518;
   --text-secondary: #5B5F66;
-  --text-muted: #9A9CA1;
+  --text-muted: #6B6F76;
+
+  /* Status tints (9%), from the fleetx reference */
+  --ok-tint: rgba(31, 154, 109, .09);
+  --warn-tint: rgba(230, 175, 0, .09);
+  --bad-tint: rgba(214, 69, 69, .09);
+  --info: #3D6E96;
+  --info-tint: rgba(61, 110, 150, .09);
+  --zone-2: #6E6398;
+  --line-2: #D8D8D2;
+  --shadow-sm: 0 1px 3px rgba(20, 21, 24, .08), 0 1px 2px rgba(20, 21, 24, .04);
+  --shadow-md: 0 4px 12px rgba(20, 21, 24, .1), 0 2px 4px rgba(20, 21, 24, .06);
   --demo-bar-bg: #141518;
 }
 
@@ -60,11 +73,21 @@
   --color-text: var(--text);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+  --color-muted: var(--muted);
+  --color-ok-tint: var(--ok-tint);
+  --color-warn-tint: var(--warn-tint);
+  --color-bad-tint: var(--bad-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+  --color-zone-2: var(--zone-2);
+  --color-line-2: var(--line-2);
+  --shadow-panel: var(--shadow-sm);
+  --shadow-pop: var(--shadow-md);
   --color-demo-bar-bg: var(--demo-bar-bg);
 
-  --font-heading: "Space Grotesk", sans-serif;
-  --font-body: "Hanken Grotesk", sans-serif;
-  --font-mono: "Space Mono", monospace;
+  --font-heading: "Space Grotesk", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
 }
 
 * {
@@ -185,4 +208,44 @@ body[data-demo-collapsed='true'] {
 [dir="rtl"] .arrow-forward {
   transform: scaleX(-1);
   display: inline-block;
+}
+
+/* ── Type scale (UI upgrade §4) ───────────────────────────────────────────────
+   Three text levels plus eyebrow labels and data values. IDs, times and codes
+   always use the mono face. */
+@utility text-title {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility text-section {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+@utility text-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+@utility text-data {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+}
+
+@utility text-data-sm {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
 }
