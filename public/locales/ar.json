@@ -290,7 +290,8 @@
       "ecu_partial": "ECU · جزئي · اليوم",
       "km": "{value} كم",
       "since_midnight": "منذ منتصف الليل بتوقيت دبي",
-      "tracker_battery": "بطارية جهاز التتبع {value}"
+      "tracker_battery": "بطارية جهاز التتبع {value}",
+      "tracker_battery_label": "بطارية جهاز التتبع"
     },
     "history": {
       "positions": "المواقع",

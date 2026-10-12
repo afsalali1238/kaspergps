@@ -11,6 +11,7 @@ import { recordAuditForSession } from '@/server/audit';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
 import { can } from '@/server/capabilities';
+import { maintenanceAlertText } from '@/server/maintenance';
 
 export interface AlertView {
   id: string;
@@ -61,7 +62,10 @@ function toView(alert: Alert, session: Session): AlertView {
     siteName: asset ? viewerSiteName(session, asset.id) : '',
     type: alert.type,
     typeLabel: TYPE_LABELS[alert.type] ?? alert.type,
-    typeWords: alert.detail,
+    // Maintenance lines are computed from the plan, so they match the board and the asset page.
+    typeWords: (alert.type === 'maintenance_due' || alert.type === 'maintenance_overdue') && alert.assetId
+      ? maintenanceAlertText(alert.assetId) ?? alert.detail
+      : alert.detail,
     // A close that lies after the demo clock hasn't happened yet.
     status: alert.closedAt && toMs(alert.closedAt) <= clock.now() ? 'closed' : alert.acknowledgedAt ? 'acknowledged' : 'open',
     openedAt: alert.openedAt,
