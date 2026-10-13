@@ -5,9 +5,7 @@ The UI upgrade (`handoff/UI-UPGRADE.md`, target 9/10 in every area) is split int
 - **The supervisor is Claude Opus.** It reviews every PR and merges it. No agent merges, pushes to `main`, or edits another agent's files.
 - **Owner decision (13 Oct, 00:36):** pages go in a **top navigation bar like fleetx; no left sidebar** (`UI-UPGRADE.md` §5.1; built in B3).
 
-**Remaining work, merge order and the builder prompt: `handoff/REMAINING.md` (13 Oct, 12:30).**
-
-**This folder replaces the step list in `handoff/BUILDER.md`.** `BUILDER.md` §1 (owner decisions), §4 (review loop), §5 (PR checklist) and §6 (send-back rules) still apply to every agent.
+**What's left, how each chunk is delivered, the merge checklist and the builder prompts: `handoff/REMAINING.md`.** This file keeps the file-ownership table and the shared-file rules.
 
 ## Waves
 
@@ -46,15 +44,3 @@ An agent edits **only** the files it owns, plus new files inside its own folders
 - **`src/server/api.ts`:** add exports only, at the end of the file, under a comment `// ── Agent <X> ──`. Never edit existing lines.
 - **`src/components/ui/**`** belongs to B. Wave 2 agents use these components and don't edit them. If one is missing a prop, put the change in your own folder (wrap the component) and request it from B through the supervisor.
 - **Server domain logic** (`src/server/*.ts` other than C's files): an agent may add **new** files for its screen (e.g. `src/server/fuel-screen.ts`). Changing existing server files needs supervisor approval in the PR description.
-
-## Every agent's starting prompt
-
-> Read `handoff/agents/README.md`, `handoff/agents/<X>.md`, `handoff/BUILDER.md` (§1, §4–§7) and the sections of `handoff/UI-UPGRADE.md` your file names. Branch from the latest `main` as `agent-<x>-<slug>`. Do only your scope and edit only your files. When done: run every check, write `reviews/agent-<X>-self-check.md`, open one PR, post `Agent <X> ready for review: PR #<n>`, and stop.
-
-## Supervisor's merge gate (for every PR)
-
-1. CI is green (3 shards, desktop and phone) and the self-check has exit codes for every command.
-2. The diff stays inside the agent's ownership list. Anything else needs a justification in the PR.
-3. The `BUILDER.md` §5 checklist is met.
-4. Screens: the before/after screenshots are inspected, and the supervisor re-runs and opens them itself.
-5. The scorecard rows the agent claims (`UI-UPGRADE.md` §2) are backed by evidence.

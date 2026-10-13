@@ -1,4 +1,4 @@
-// Billing tab order and default tab (Agent A / U0, handoff/agents/A-bug-fixes.md §1).
+// Billing tab order and default tab (Agent A / U0, PR #29).
 //
 // The bug: `useState<TabId>('received')` put an owner who issues invoices and
 // receives none on an empty Received tab. These tests pin the replacement rule

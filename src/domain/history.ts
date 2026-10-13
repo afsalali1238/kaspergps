@@ -12,7 +12,7 @@ import { buildSpans, readingMs, type Span } from '@/domain/playback';
 export type HistoryPeriod = '24h' | '7d' | 'custom';
 
 export const HISTORY_DAY_MS = 86_400_000;
-/** Custom ranges are capped so one query stays bounded (a decision, see reviews/H4-self-check.md). */
+/** Custom ranges are capped so one query stays bounded (a design decision from H4). */
 export const HISTORY_CUSTOM_MAX_DAYS = 31;
 /** Gap rows shorter than this are noise (a leading silence of seconds), so they are not shown. */
 export const HISTORY_GAP_ROW_MIN_MS = 60_000;

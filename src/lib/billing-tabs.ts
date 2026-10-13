@@ -1,6 +1,6 @@
 // Which Billing tabs exist, and which one the page opens on.
 //
-// Agent A / U0 (handoff/agents/A-bug-fixes.md §1): the page used to hard-code
+// Agent A / U0 (PR #29): the page used to hard-code
 // `useState<TabId>('received')`, so an owner who issues invoices and receives
 // none (Khalid) landed on an empty table. The rule now is: honour the tab the
 // visitor picked while it still exists, otherwise open on the first tab that has

@@ -1,6 +1,6 @@
 # Handoff: Kasper GPS UI/UX upgrade to 9/10 everywhere (12 Oct 2026)
 
-This is the specification. **The builder works from `handoff/BUILDER.md`** (the work order, review loop and PR checklist), with this file for the details. Claude Opus supervises: it reviews and merges every PR.
+This is the specification. **Builders work from `handoff/REMAINING.md`** (the queue, delivery steps and merge checklist), with this file for the details. The owner's later decisions are in `BUILD_PROMPT.md` §0a and override this file where they differ (e.g. top navigation, no sidebar; role-first login). Claude Opus supervises: it reviews and merges every PR.
 
 **Goal:** every area of the prototype scores **at least 9 / 10** on the scorecard in §2, judged by the measurable checks there. Keep everything that already works: rules, roles, privacy, honest data sources and tests. Rebuild the look, layout and workflows using the best of the old fleetx dashboard.
 
