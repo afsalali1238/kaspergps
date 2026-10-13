@@ -127,11 +127,10 @@ export default function ReportsPage() {
         <KpiCell
           label={t('reports_page.gen_this_month', 'Generated this month')}
           value={formatNumber(generatedThisMonth)}
-          source="From runs"
         />
         <KpiCell
           label={t('reports_page.next_scheduled', 'Next scheduled')}
-          value={nextScheduled}
+          value={nextScheduled ?? t('reports_page.none_scheduled', 'None scheduled')}
         />
       </KpiStrip>
 
@@ -141,7 +140,10 @@ export default function ReportsPage() {
         value={tab}
         onChange={setTab}
         tabs={tabs}
+        idPrefix="reports-tabs"
       />
+
+      <div role="tabpanel" id={`reports-tabs-panel-${tab}`} aria-labelledby={`reports-tabs-tab-${tab}`}>
 
       {/* Reports Tab */}
       {tab === 'reports' && (
@@ -162,6 +164,10 @@ export default function ReportsPage() {
                 {availableReports.map(report => (
                   <button
                     key={report.id}
+                    type="button"
+                    // The name comes first for screen readers; the cadence badge is extra.
+                    aria-label={`${t(`reports.types.${report.id}`, report.label)}, ${REPORT_BADGE[report.id]}`}
+                    aria-describedby={`report-desc-${report.id}`}
                     onClick={() => {
                       setRunPanelType(report.id);
                       setRunPanelOpen(true);
@@ -176,7 +182,7 @@ export default function ReportsPage() {
                       <Badge tone="neutral">{REPORT_BADGE[report.id]}</Badge>
                     </div>
                     <div className="text-sm font-medium text-ink">{t(`reports.types.${report.id}`, report.label)}</div>
-                    <div className="text-xs text-grey-500 leading-snug">{t(`reports.types.${report.id}_desc`, report.description)}</div>
+                    <div id={`report-desc-${report.id}`} className="text-xs text-grey-500 leading-snug">{t(`reports.types.${report.id}_desc`, report.description)}</div>
                   </button>
                 ))}
               </div>
@@ -252,6 +258,7 @@ export default function ReportsPage() {
           )}
         </div>
       )}
+      </div>
 
       {/* Run Panel — 3-step wizard */}
       {runPanelOpen && (

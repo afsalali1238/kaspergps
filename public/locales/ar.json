@@ -1480,6 +1480,8 @@
     "paused": "متوقّف",
     "freq_daily": "يومياً",
     "freq_weekly": "أسبوعياً",
-    "freq_monthly": "شهرياً"
+    "freq_monthly": "شهرياً",
+    "none_scheduled": "لا توجد جداول",
+    "run_panel_label": "تشغيل تقرير"
   }
 }

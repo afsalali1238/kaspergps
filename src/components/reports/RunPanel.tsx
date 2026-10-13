@@ -27,7 +27,7 @@ interface RunPanelProps {
 export function RunPanel({ onClose, onRunComplete, initialReport }: RunPanelProps) {
   const t = useT();
   const session = useSession();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(initialReport ? 2 : 1); // a card click has already picked the type
   const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(initialReport ?? null);
   const [scope, setScope] = useState<ScopeType>('multiple_assets');
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
@@ -164,7 +164,7 @@ export function RunPanel({ onClose, onRunComplete, initialReport }: RunPanelProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-surface rounded-t-2xl sm:rounded-xl shadow-pop overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t('reports_page.run_panel_label', 'Run a report')} className="w-full max-w-2xl bg-surface rounded-t-2xl sm:rounded-xl shadow-pop overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="border-b border-line px-4 py-3 bg-surface-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-4">
