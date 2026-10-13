@@ -13,6 +13,8 @@ test.describe('S1 — Omar: a no-CAN fleet stays Tier 1', () => {
     await expect(page.getByText(/\d+ assets/).first()).toBeVisible();
     // Every Al Noor asset is Tier 1, so the Tier filter is not offered at all.
     await expect(page.getByText('Tier:')).toHaveCount(0);
+    // The statuses sit in the one filter bar's Status menu (Agent E).
+    await page.getByRole('button', { name: /^Status:/ }).first().click();
     await expect(page.getByText('No tracker').first()).toBeVisible();
   });
 
