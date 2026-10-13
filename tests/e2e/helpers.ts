@@ -181,3 +181,45 @@ export async function openMore(page: Page): Promise<void> {
   const more = page.getByTestId('top-nav').getByRole('button', { name: 'More' });
   if ((await more.count()) && (await more.isVisible()) && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
 }
+
+/**
+ * The five test roles of the usability kit (UI-UPGRADE §11), plus Kasper Admin.
+ * Each maps to one seeded account; sign-in is by email, so this never depends
+ * on the role picker's layout.
+ */
+export const ROLE_USERS = {
+  owner: USERS.khalid,      // Owner — Emirates Earthmovers (Tier 3 fleet)
+  renter: USERS.lina,       // Renter — Marina Builders
+  siteUser: USERS.mark,     // Site User — Gulf Lift, Al Quoz site
+  kasperOps: USERS.ravi,    // Kasper Ops
+  kasperAdmin: USERS.sara,  // Kasper Admin
+} as const;
+
+export type TestRole = keyof typeof ROLE_USERS;
+
+/** Sign in as one of the test roles and wait for its home screen. */
+export async function signInAsRole(page: Page, role: TestRole): Promise<void> {
+  await signIn(page, ROLE_USERS[role]);
+}
+
+/** 'a-ex04' → 'EX-04': the seed's asset ids are the lower-cased code with an `a-` prefix. */
+export function assetCode(id: string): string {
+  return id.replace(/^a-/, '').replace(/^([a-z]+)(\d+)$/, '$1-$2').toUpperCase();
+}
+
+/** Open an asset's page by id (e.g. 'a-ex04') and wait until its code is on screen. */
+export async function openAsset(page: Page, id: string): Promise<void> {
+  await goTo(page, `/app/assets/${id}`);
+  await expect(page.getByText(assetCode(id), { exact: true }).first()).toBeVisible();
+}
+
+/**
+ * Let a client-rendered screen finish painting before reading it. `networkidle`
+ * never settles on screens that poll, so this waits for the load event, then
+ * for two animation frames and a short pause for effects that fetch on mount.
+ */
+export async function settle(page: Page, ms = 600): Promise<void> {
+  await page.waitForLoadState('load');
+  await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+  await page.waitForTimeout(ms);
+}
