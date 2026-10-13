@@ -12,6 +12,7 @@ One line per step, with its status, PR, merge commit and date. Hourly runs and t
 | F — asset page | F1 **merged** (header, 2×2 Overview, End-access confirm; `reviews/F1-self-check.md`). F2 not started (local draft of the History timeline parked) | F1: #38 | | 2026-10-13 |
 | G — alerts, fuel, maintenance | G1 (Alerts: severity groups, KPI strip, Acknowledge all, rules panel, DB v2 `alertRules`) **merged** (`reviews/G1-self-check.md`); G2 not started | G1: #39 | | 2026-10-13 |
 | H — reports and money | not started (local draft of the H1 Recently generated table parked; fix list in `handoff/REMAINING.md`) | | | |
+| R — role-first entry (owner, 13 Oct) | not started (`handoff/ROLE-LOGIN.md`) | | | |
 | I — console | not started | | | |
 | J — phone, Arabic, final | not started | | | |
 

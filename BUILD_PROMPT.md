@@ -24,6 +24,7 @@ This file is the product spec (PRD). The prototype is built (P1–P14). Since th
 | D10 | Reports and Downloads | **One Reports screen**: report cards, a run panel, then a "Recently generated" table (Download again re-checks permission). `/app/downloads` redirects there. | §11.13 Downloads page |
 | D11 | Numbers | Every number has a source label or reads "Not measured"; no raw floats; one formatter (`src/lib/format.ts`); no invented savings, ROI multiples or forecasts. Last month's data varies by asset. | §6.4, §11.19 |
 | D12 | Design system | Self-hosted Space Grotesk / Hanken Grotesk / Space Mono / IBM Plex Sans Arabic; tokens in `app/globals.css`; no raw hex in screens; Lucide icons; secondary text AA (#676B72). | §3, §4 styling |
+| D13 | Entry and roles (13 Oct 15:09) | **`/` is a role picker**: 8 persona cards (role + context such as Tier 1/3, owner, renter, client, site user) plus the hirer link. No names, emails or passwords on screen. Pick a card to enter that role's home; **Log out returns to `/`** to try another. The demo bar shows a role chip and "Switch role" instead of View as. The email form moves to `/dev/sign-in` (tests only). Spec: `handoff/ROLE-LOGIN.md`. | §10 item 1 (View as), §11.1 layout (messages stay for production), D8 |
 
 ---
 
