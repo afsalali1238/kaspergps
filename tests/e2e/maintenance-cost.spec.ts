@@ -61,7 +61,7 @@ test.describe('maintenance board', () => {
   test('the asset detail page carries the plan and its history', async ({ page }) => {
     await signIn(page, USERS.khalid);
     await page.goto('/app/assets/a-bd02');
-    await page.getByRole('button', { name: 'Maintenance' }).click();
+    await page.getByRole('tab', { name: 'Maintenance' }).click();
     await expect(page.getByText('Service plans')).toBeVisible();
     await expect(page.getByText('250 h service').first()).toBeVisible();
     await expect(page.getByText('Service history')).toBeVisible();
