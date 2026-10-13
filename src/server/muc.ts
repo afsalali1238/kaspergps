@@ -13,7 +13,7 @@ import { fail, ok } from '@/server/result';
 import type { OpResult } from '@/server/result';
 
 import { getReadingsForAsset } from '@/server/telemetry/simulator';
-import { ecuHoursAt } from '@/server/telemetry/ecu';
+import { ecuHoursAt, engineHoursBetween } from '@/server/telemetry/ecu';
 import { hasFeature } from '@/domain/features';
 import { MUC_GAP_RULE, MUC_MAX_GAP_H } from '@/config/thresholds';
 import { canonicalMucPayload, sealMucPayload, sha256Hex, verifyMucPayloadSeal } from '@/server/muc-canonical';
@@ -81,59 +81,82 @@ export interface EcuBreakdown {
 const GAP_MINUTES = 90;
 
 /**
- * Per-day engine/working/idling hours plus the gaps, from the simulator readings.
- * A gap is a stretch longer than 90 minutes with no reading: the ECU kept
- * counting, those hours are disclosed but can't be attributed to a day.
+ * Per-day engine/working/idling hours plus the gaps.
+ *
+ * C2 (one number, one source): the hours are the ECU meter's own count, the same
+ * `ecuHoursAt` the asset page and the maintenance plan read, so a certificate's
+ * closing hours match the meter on the asset page. The readings say which days
+ * have data, where the gaps are and how the running time split between working
+ * (moving) and idling. A gap is a stretch longer than 90 minutes with no reading:
+ * the ECU kept counting, so those hours are disclosed as gap hours and not given
+ * to a day.
  */
 export function buildEcuBreakdown(asset: Asset, fromMs: number, toMs: number): EcuBreakdown {
-  const readings = getReadingsForAsset(asset, fromMs, toMs);
-  const days = new Map<string, EcuDayBucket>();
+  const readings = getReadingsForAsset(asset, fromMs, toMs)
+    .slice()
+    .sort((a, b) => new Date(a.deviceTime).getTime() - new Date(b.deviceTime).getTime());
   const gaps: { from: number; to: number }[] = [];
-  let gapHours = 0;
   let maxGapHours = 0;
 
   const dayKey = (ms: number) => clock.formatDubaiDate(ms).replace(/ /g, ' ');
 
-  // Day keys are display strings ("5 Oct"), so order by each day's first reading, not by the string.
-  const dayStartMs = new Map<string, number>();
+  // Which days have readings, and how each day's running time split (from the readings).
+  const seen = new Map<string, { startMs: number; moving: number; on: number }>();
   let prevMs: number | null = null;
   for (const r of readings) {
     const t = new Date(r.deviceTime).getTime();
     const key = dayKey(t);
-    if (!dayStartMs.has(key) || t < dayStartMs.get(key)!) dayStartMs.set(key, t);
-    let bucket = days.get(key);
-    if (!bucket) {
-      bucket = { date: key, engineHours: 0, workingHours: 0, idlingHours: 0, gapMinutes: 0 };
-      days.set(key, bucket);
-    }
+    const day = seen.get(key) ?? { startMs: clock.startOfDubaiDay(t), moving: 0, on: 0 };
+    seen.set(key, day);
     if (prevMs !== null && t - prevMs > GAP_MINUTES * 60000) {
       gaps.push({ from: prevMs, to: t });
       const gapH = (t - prevMs) / 3600000;
-      gapHours += gapH * 0.5; // disclosed assumption: engine ran half the gap
       if (gapH > maxGapHours) maxGapHours = gapH;
-      bucket.gapMinutes += Math.round((t - prevMs) / 60000);
-    }
-    if (prevMs !== null && t > prevMs && t - prevMs <= GAP_MINUTES * 60000) {
+    } else if (prevMs !== null && t > prevMs && r.ignition) {
       const hours = (t - prevMs) / 3600000;
-      if (r.ignition) {
-        bucket.engineHours += hours;
-        if (r.moving) bucket.workingHours += hours;
-        else bucket.idlingHours += hours;
-      }
+      day.on += hours;
+      if (r.moving) day.moving += hours;
     }
-    prevMs = t;
+    if (prevMs === null || t > prevMs) prevMs = t;
   }
 
-  const ordered = [...days.values()]
-    .map(d => ({
-      ...d,
-      engineHours: n1(d.engineHours),
-      workingHours: n1(d.workingHours),
-      idlingHours: n1(d.idlingHours),
-    }))
-    .sort((a, b) => (dayStartMs.get(a.date) ?? 0) - (dayStartMs.get(b.date) ?? 0));
+  // The meter counts up to the last reading we have (a machine that stopped
+  // reporting has no reading to close on).
+  const endMs = prevMs === null ? fromMs : Math.min(toMs, prevMs);
+  const gapMeter = (lo: number, hi: number) => gaps.reduce((sum, g) => {
+    const a = Math.max(lo, g.from);
+    const b = Math.min(hi, g.to);
+    return b > a ? sum + engineHoursBetween(asset, a, b) : sum;
+  }, 0);
+  const gapMinutesIn = (lo: number, hi: number) => gaps.reduce((sum, g) => {
+    const a = Math.max(lo, g.from);
+    const b = Math.min(hi, g.to);
+    return b > a ? sum + (b - a) / 60000 : sum;
+  }, 0);
 
-  return { days: ordered, gaps, gapHours: n1(gapHours), maxGapHours: Math.round(maxGapHours * 10) / 10 };
+  const ordered = [...seen.entries()]
+    .sort((a, b) => a[1].startMs - b[1].startMs)
+    .map(([date, d]) => {
+      const lo = Math.max(fromMs, d.startMs);
+      const hi = Math.min(endMs, d.startMs + 86400000);
+      const metered = hi > lo ? engineHoursBetween(asset, lo, hi) : 0;
+      const engine = Math.max(0, metered - (hi > lo ? gapMeter(lo, hi) : 0));
+      const working = d.on > 0 ? engine * (d.moving / d.on) : 0;
+      return {
+        date,
+        engineHours: n1(engine),
+        workingHours: n1(working),
+        idlingHours: n1(engine - working),
+        gapMinutes: hi > lo ? Math.round(gapMinutesIn(lo, hi)) : 0,
+      };
+    });
+
+  return {
+    days: ordered,
+    gaps,
+    gapHours: n1(gapMeter(fromMs, endMs)),
+    maxGapHours: Math.round(maxGapHours * 10) / 10,
+  };
 }
 
 // ── Issue / void / reissue ────────────────────────────────────────────────────

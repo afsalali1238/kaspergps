@@ -204,7 +204,7 @@ export default function CostPage() {
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right">
                   <div><Amount value={r.revenueAed} /></div>
-                  <SourceLabel source="From invoices" className="mt-0.5" />
+                  <SourceLabel source={r.lines.find(l => l.key === 'revenue')!.basis === 'Days on hire' ? 'Days on hire' : 'From invoices'} className="mt-0.5" />
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right">
                   <div><Amount value={r.fuelAed} /></div>

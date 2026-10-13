@@ -156,3 +156,58 @@ describe('cost — ROI and inputs', () => {
     setDieselPrice(sara(), 3.05);
   });
 });
+
+describe('cost — last month varies (UI-UPGRADE §9.1, C2)', () => {
+  it('no two assets share the same fuel, idle and utilisation for the month', () => {
+    const { fromMs, toMs } = lastMonth();
+    const rows = costRows(sara(), fromMs, toMs);
+    expect(rows.length).toBeGreaterThan(20);
+    const keys = rows.map(r => `${r.fuelAed}|${r.idleHours}|${r.utilisationPct}`);
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    expect(dupes).toEqual([]);
+    // No repeated 6,588 AED fuel line and no flat 90 % utilisation.
+    expect(rows.filter(r => r.fuelAed === 6588)).toEqual([]);
+    expect(new Set(rows.filter(r => r.asset.behaviour === 'works_at_site').map(r => r.utilisationPct)).size).toBeGreaterThan(5);
+  });
+
+  it('keeps utilisation a share of the available time, never above 100 %', () => {
+    const { fromMs, toMs } = lastMonth();
+    const rows = costRows(sara(), fromMs, toMs);
+    expect(rows.every(r => r.utilisationPct >= 0 && r.utilisationPct <= 100)).toBe(true);
+    // A generator is available round the clock: its hours are measured against 24 h a day.
+    const gn01 = rows.find(r => r.asset.code === 'GN-01')!;
+    expect(gn01.utilisationPct).toBe(Math.round((gn01.engineHours / (30 * 24)) * 1000) / 10);
+  });
+
+  it('a site machine mostly rests on a Friday, so its September hours sit below 30 × 9 h', () => {
+    const { fromMs, toMs } = lastMonth();
+    const ex04 = costRows(khalid(), fromMs, toMs).find(r => r.asset.id === 'a-ex04')!;
+    expect(ex04.engineHours).toBeLessThan(270);
+    expect(ex04.engineHours).toBeGreaterThan(150);
+  });
+
+  it('counts the current bookings\u2019 days in the month as well as the invoices', () => {
+    const { fromMs, toMs } = lastMonth();
+    const rows = costRows(sara(), fromMs, toMs);
+    // CR-02: the September invoice (BK-0983) plus BK-1002's first day on hire, 30 Sep, at AED 3,500/day.
+    const cr02 = rows.find(r => r.asset.id === 'a-cr02')!;
+    expect(cr02.revenueAed).toBe(60800 + 3500);
+    const revenue = cr02.lines.find(l => l.key === 'revenue')!;
+    expect(revenue.basis).toBe('Days on hire');
+    expect(revenue.note).toContain('BK-1002');
+    // EX-11: BK-1010 is hourly with an 8 h daily minimum, so its one September day earns at least 8 h × AED 175.
+    const ex11 = rows.find(r => r.asset.id === 'a-ex11')!;
+    expect(ex11.revenueAed).toBeGreaterThanOrEqual(8 * 175);
+    // A cancelled booking earns nothing (CR-05, BK-1009).
+    expect(costRows(sara(), periodRange('this_month').fromMs, periodRange('this_month').toMs)
+      .find(r => r.asset.id === 'a-cr05')!.revenueAed).toBe(0);
+    // An invoiced booking is never counted twice (TP-21's BK-1008 is on INV-AN-0098).
+    expect(rows.find(r => r.asset.id === 'a-tp21')!.revenueAed).toBe(6600);
+  });
+
+  it('the six-month chart uses the same revenue as the table', () => {
+    const { fromMs, toMs } = lastMonth();
+    const cr02 = costRows(sara(), fromMs, toMs).find(r => r.asset.id === 'a-cr02')!;
+    expect(monthlySeries(asset('a-cr02'), 6)[4].revenueAed).toBe(cr02.revenueAed);
+  });
+});
