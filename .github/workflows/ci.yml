@@ -82,3 +82,43 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Agent D: visual regression (tests/e2e/visual.spec.ts), report-only until
+  # agent J records the baselines and makes it a required check. Missing
+  # baselines are written, not failed, and uploaded: J can take the runner's
+  # Linux captures as the first baselines. A diff against a committed baseline
+  # is reported in the step log and the artifact but doesn't fail the job yet.
+  visual:
+    name: Visual regression (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium and its system libraries
+        run: npx playwright install --with-deps chromium
+
+      - name: Visual regression (VISUAL=1, desktop project sets both widths)
+        continue-on-error: true
+        env:
+          VISUAL: '1'
+        run: npx playwright test visual --project=desktop --update-snapshots=missing
+
+      - name: Upload screenshots and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression
+          path: |
+            tests/e2e/__screenshots__/
+            playwright-report/
+            test-results/
+          retention-days: 14

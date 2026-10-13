@@ -18,6 +18,10 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
+      // Screens under app/** are covered by the Playwright suite, not by unit
+      // tests. Leaving them out of the denominator lets Wave 2 render a screen in
+      // a unit test without the whole of app/ counting against the 85% floor.
+      exclude: ['app/**'],
       thresholds: { lines: 85 },
     },
   },
