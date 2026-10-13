@@ -202,7 +202,7 @@
     "list_tab": "القائمة",
     "map_tab": "الخريطة",
     "kpi": {
-      "engine_hours_today": "ساعات المحرك اليوم (ECU)",
+      "engine_hours_today": "ساعات المحرك اليوم",
       "fuel_used_today": "الوقود المستهلك اليوم",
       "open_alerts": "التنبيهات المفتوحة",
       "litres_short": "{value} ل"

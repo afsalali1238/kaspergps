@@ -541,12 +541,12 @@ export default function MapPage() {
             active={statusFilter === 'offline'}
             onClick={() => setStatusFilter(statusFilter === 'offline' ? 'all' : 'offline')}
           />
-          <KpiCell label={t('fleet.kpi.engine_hours_today', 'Engine hours today')} value={kpis.engineHoursToday === null ? null : formatHours(kpis.engineHoursToday)} source={hoursSourceWord} />
+          <KpiCell label={t('map.kpi.engine_hours_today', 'Engine hours today')} value={kpis.engineHoursToday === null ? null : formatHours(kpis.engineHoursToday)} source={hoursSourceWord} />
           {kpis.fuelUsedTodayL !== null && (
-            <KpiCell label={t('fleet.kpi.fuel_used_today', 'Fuel used today')} value={`${formatNumber(kpis.fuelUsedTodayL)} L`} source={kpis.fuelEstimated ? 'Estimated' : 'ECU'} />
+            <KpiCell label={t('map.kpi.fuel_used_today', 'Fuel used today')} value={`${formatNumber(kpis.fuelUsedTodayL)} L`} source={kpis.fuelEstimated ? 'Estimated' : 'ECU'} />
           )}
           <KpiCell
-            label={t('fleet.kpi.open_alerts', 'Open alerts')}
+            label={t('map.kpi.open_alerts', 'Open alerts')}
             value={formatNumber(kpis.alertsCritical + kpis.alertsWarning)}
             tone={kpis.alertsCritical > 0 ? 'bad' : kpis.alertsWarning > 0 ? 'warn' : 'neutral'}
             context={t('fleet.kpi.alert_split', '{critical} critical · {warning} warning', { critical: kpis.alertsCritical, warning: kpis.alertsWarning })}
@@ -735,7 +735,7 @@ export default function MapPage() {
 
           <div
             className={clsx(
-              'relative grid gap-3 lg:h-[max(520px,calc(100dvh-var(--demo-bar-h,0px)-19rem))]',
+              'relative isolate grid gap-3 lg:h-[max(520px,calc(100dvh-var(--demo-bar-h,0px)-19rem))]',
               tilesFailed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)]',
               !tilesFailed && (panel && isDesktop ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'),
             )}
@@ -756,7 +756,7 @@ export default function MapPage() {
                   </Button>
                 </div>
               )}
-              <div className={clsx('relative h-[60dvh] overflow-hidden rounded-lg border border-line bg-paper lg:h-full', tilesFailed && 'hidden')}>
+              <div className={clsx('relative isolate h-[60dvh] overflow-hidden rounded-lg border border-line bg-paper lg:h-full', tilesFailed && 'hidden')}>
                 <MapContainer key={mapKey} center={[25.2048, 55.2708]} zoom={10} scrollWheelZoom zoomControl={false} style={{ height: '100%', width: '100%' }}>
                   <TileLayer
                     key={tileProvider}
@@ -799,7 +799,7 @@ export default function MapPage() {
             {panel && isDesktop && (
               <aside
                 aria-label={t('fleet.panel_label', '{code} details', { code: panel.code })}
-                className="absolute inset-y-0 end-0 z-[1100] flex w-[360px] flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-pop xl:static xl:z-auto xl:w-auto xl:shadow-none"
+                className="absolute inset-y-0 end-0 z-20 flex w-[360px] flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-pop xl:static xl:z-auto xl:w-auto xl:shadow-none"
                 data-testid="asset-pane"
               >
                 <header className="flex items-start justify-between gap-2 border-b border-line px-4 py-3">

@@ -114,9 +114,7 @@ test.describe('E — desktop three panes', () => {
 });
 
 test.describe('E — phone', () => {
-  test.beforeEach(async ({ page }, info) => {
-    test.skip(info.project.name !== 'phone', 'phone layout');
-  });
+  test.skip(({ isMobile }) => !isMobile, 'phone layout');
 
   test('390 px: no sideways scroll, and a tap opens the bottom sheet', async ({ page }) => {
     for (const who of ['khalid', 'lina', 'omar'] as const) {

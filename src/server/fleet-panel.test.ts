@@ -6,7 +6,10 @@ import type { Session, User } from '@/domain/types';
 import { db, resetDb } from '@/server/db';
 import { getRelationship, historyFloor, visibleAssetIds } from '@/server/access';
 import { isKasperStaff } from '@/server/capabilities';
-import { alertSeverity, fleetEvents, fleetKpis, fleetPanelFor, rentalLineFor } from '@/server/fleet-panel';
+import { visibleAlerts } from '@/server/alerts';
+import { alertSeverity } from '@/server/alerts-screen';
+import { fleetEvents, fleetKpis, fleetPanelFor, rentalLineFor } from '@/server/fleet-panel';
+import { SEVERITY_ORDER } from '@/server/alerts-screen';
 import * as clock from '@/lib/clock';
 
 function sessionFor(id: string): Session {
@@ -125,9 +128,9 @@ describe('fleetKpis and fleetEvents', () => {
     for (const e of [...ev.alerts, ...ev.log, ...ev.fuel]) expect(ids.has(e.assetId)).toBe(true);
     expect(ev.alerts.every(e => e.status === 'open')).toBe(true);
     expect(k.alertsCritical + k.alertsWarning).toBe(ev.alerts.length);
-    // Critical rows come first.
-    const firstWarning = ev.alerts.findIndex(e => e.severity === 'warning');
-    if (firstWarning >= 0) expect(ev.alerts.slice(firstWarning).every(e => e.severity === 'warning')).toBe(true);
+    // Rows go by severity (G1's order: critical, warning, info), newest first within each.
+    const ranks = ev.alerts.map(e => SEVERITY_ORDER.indexOf(e.severity));
+    expect(ranks).toEqual([...ranks].sort((x, y) => x - y));
 
     const none = fleetKpis(khalid, []);
     expect(none).toMatchObject({ live: 0, idle: 0, offline: 0, engineHoursToday: null, fuelUsedTodayL: null, alertsCritical: 0, alertsWarning: 0 });
@@ -144,11 +147,10 @@ describe('fleetKpis and fleetEvents', () => {
     }
   });
 
-  it('offline, fuel drops and overdue service are critical; idling is not', () => {
-    expect(alertSeverity('offline')).toBe('critical');
-    expect(alertSeverity('fuel_drop')).toBe('critical');
-    expect(alertSeverity('maintenance_overdue')).toBe('critical');
-    expect(alertSeverity('maintenance_due')).toBe('warning');
-    expect(alertSeverity('overspeed')).toBe('warning');
+  it('the map uses the Alerts page severity for every row (one source, G1)', () => {
+    const khalid = sessionFor('u-khalid');
+    const all = assetsOf(khalid);
+    const views = new Map(visibleAlerts(khalid).map(a => [a.id, a]));
+    for (const e of fleetEvents(khalid, all).log) expect(e.severity, e.id).toBe(alertSeverity(views.get(e.id)!.type));
   });
 });

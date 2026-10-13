@@ -7,6 +7,7 @@ import type { AlertType, Asset, Booking, Session } from '@/domain/types';
 import { db } from '@/server/db';
 import { getRelationship, historyFloor, isAssetVisible, viewerSiteName } from '@/server/access';
 import { visibleAlerts, type AlertView } from '@/server/alerts';
+import { alertSeverity, SEVERITY_ORDER, type AlertSeverity } from '@/server/alerts-screen';
 import { computeStatus, getReadingForAsset } from '@/server/telemetry/simulator';
 import { ecuHoursAt } from '@/server/muc';
 import { planSnapshot, plansForAsset, type PlanSnapshot } from '@/server/maintenance';
@@ -15,16 +16,8 @@ import { tenantName } from '@/server/audit';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
 
-export type Severity = 'critical' | 'warning';
-
-/** Alert types that need someone now. Everything else is a warning. */
-const CRITICAL: ReadonlySet<string> = new Set([
-  'offline', 'power_cut', 'towing', 'fuel_drop', 'fault_code', 'maintenance_overdue',
-]);
-
-export function alertSeverity(type: AlertType | string): Severity {
-  return CRITICAL.has(type) ? 'critical' : 'warning';
-}
+// Severity has one owner: G1's alerts-screen.ts (critical / warning / info).
+export type { AlertSeverity as Severity } from '@/server/alerts-screen';
 
 export function tierOfAsset(asset: Asset): 1 | 2 | 3 {
   return asset.canProfile.adapter === 'ALL-CAN300' ? 3 : asset.canProfile.adapter === 'LVCAN200' ? 2 : 1;
@@ -215,6 +208,7 @@ export interface FleetKpis {
   fuelUsedTodayL: number | null;
   fuelEstimated: boolean;
   alertsCritical: number;
+  /** Warnings and info together: everything open that isn't critical. */
   alertsWarning: number;
   rentalsEndingToday: number;
 }
@@ -272,7 +266,7 @@ export interface FleetEvent {
   type?: AlertType;
   words: string;
   status: AlertView['status'] | null;
-  severity: Severity;
+  severity: AlertSeverity;
 }
 
 /** The bottom tabs' rows: open alerts, every alert as an event log, and fuel events (T2/3). */
@@ -286,7 +280,7 @@ export function fleetEvents(session: Session, assets: Asset[], nowMs: number = c
     }))
     .sort((x, y) => y.at - x.at);
   const open = all.filter(e => e.status === 'open')
-    .sort((x, y) => (x.severity === y.severity ? y.at - x.at : x.severity === 'critical' ? -1 : 1));
+    .sort((x, y) => SEVERITY_ORDER.indexOf(x.severity) - SEVERITY_ORDER.indexOf(y.severity) || y.at - x.at);
   const fuel: FleetEvent[] = [];
   for (const asset of assets) {
     if (tierOfAsset(asset) === 1 || !hasFeature(asset, 'fuel.level')) continue;
