@@ -1,6 +1,6 @@
 # Kasper GPS — Project Handoff
 
-Status: **13 Oct 2026, 19:45 Dubai.**
+Status: **13 Oct 2026, 23:30 Dubai.**
 
 | Doc | What it is |
 | --- | --- |
@@ -21,9 +21,8 @@ Status: **13 Oct 2026, 19:45 Dubai.**
 - the Alerts page;
 - the asset page header;
 - the three-pane fleet map;
-- the role-first login.
-
-**In progress:** H1 (Reports), on branch `night-h1` with no PR yet.
+- the role-first login;
+- Reports + Downloads as one screen (`/app/downloads` redirects to `/app/reports#recent`).
 
 **Not started:** F2, G2, I, H2, J1–J3. See `handoff/REMAINING.md`.
 

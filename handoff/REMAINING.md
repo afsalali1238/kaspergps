@@ -27,7 +27,7 @@ Status: **13 Oct 2026, 19:45 Dubai.**
 
 | Chunk | Scope | Status |
 | --- | --- | --- |
-| **H1** | Reports + Downloads as one screen (scorecard A6) | **branch `night-h1` on GitHub**: 6 commits, built on the owner's PC, rebased on main, **not reviewed, no PR, no CI yet** |
+| **H1** | Reports + Downloads as one screen (scorecard A6) | **merged** (#46) |
 | **F2** | Asset page: History = playback, Engine & fuel tank and drop card, Share dialog (A4) | not started |
 | **G2** | New Fuel screen and Maintenance schedule table (A7, A8) | not started |
 | **I** | Kasper console (A10) | not started |
@@ -102,20 +102,9 @@ If a check times out only in CI, read the check-run annotations: `gh api repos/a
 >
 > **Deliver:** follow "How every chunk is delivered", and put the self-check in the PR description. Reply with the PR number, the checks you ran, and anything that needs the owner.
 
-### H1: Reports + Downloads (finish and review the existing branch)
-> Chunk **H1**, `handoff/agents/H-reports-money.md` item 1, scorecard A6.
->
-> **Start from `origin/night-h1`, not from main.** It has 6 commits built on the owner's PC: report cards, the run panel, a KPI strip, a schedules tab and Recently generated. Rebase it on the latest main and review it against the spec before adding to it.
->
-> **Must hold:**
-> - One Reports screen: report cards with cadence badges, a 3-step run panel, and a "Recently generated" `Table` with `id="recent"`. Download again re-checks permission; Delete removes the run.
-> - `/app/downloads` redirects to `/app/reports#recent`, and the Downloads nav item is gone.
-> - **KPI strip:** real numbers only. "Generated this month" counts this month only. "Next scheduled" comes from `schedulesFor`, or the cell is dropped.
-> - **React:** `runDueSchedules()` runs in a `useEffect` on clock change, never in `useMemo`. The runs list refreshes after Download again and Delete.
-> - `reports.none_available` no longer mentions phases.
-> - The S30 and Downloads e2e specs move to the new location by changing locators only.
-> - The branch has a local `src/components/reports/timeHelpers.ts`. Use `src/lib/clock.ts` (time only from clock.ts) unless there's a reason; if so, explain it.
-> - Delete the branch's `reviews/H1-self-check.md` and put the self-check in the PR description.
+### H1: Reports + Downloads (merged, #46)
+> Done. The report card opens the run panel at step 2 (type already picked); the panel is a labelled modal dialog; `/app/downloads` redirects to `/app/reports#recent`.
+> **Carried to H2:** move `startOfDubaiMonthLocal` from `src/components/reports/timeHelpers.ts` into `src/lib/clock.ts` as `startOfDubaiMonth`. The current helper builds a local `Date` and calls `toISOString()`, so the month start depends on the machine's time zone. Add a unit test that passes under both `TZ=UTC` and `TZ=Asia/Dubai`.
 
 ### F2: asset page part 2
 > Chunk **F2**, `handoff/agents/F-asset-page.md` items 3–5, scorecard A4.
@@ -151,7 +140,8 @@ If a check times out only in CI, read the check-run annotations: `gh api repos/a
 > - **The rest:** restyle with `Table`, `Panel` and `Badge`.
 > - **Role rules unchanged:** Ops has no Billing, Kasper team or Audit log, and customers get "Page not found". The console is desktop only (≥ 900 px).
 
-### H2: money and Settings (after H1 is merged)
+### H2: money and Settings (H1 is merged; start now)
+> - First, the H1 carry-over above (`startOfDubaiMonth` in `clock.ts`).
 > Chunk **H2**, `handoff/agents/H-reports-money.md` items 2–5, scorecard A9, and A10 for Settings.
 >
 > **KPI strips** on Cost & ROI, Billing, Certificates and Settings.

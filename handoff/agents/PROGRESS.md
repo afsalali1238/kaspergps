@@ -12,7 +12,7 @@ One row per chunk. The builder updates its row in its PR; the supervisor marks i
 | F1 — asset header, 2×2, End-access confirm | merged | #38 |
 | G1 — Alerts | merged | #39 |
 | R — role-first login (D13) | merged | #44 |
-| H1 — Reports + Downloads | branch `night-h1` (built, not reviewed, no PR) | |
+| H1 — Reports + Downloads | merged | #46 |
 | F2 — asset page part 2 | not started | |
 | G2 — Fuel and Maintenance | not started | |
 | I — Kasper console | not started | |
