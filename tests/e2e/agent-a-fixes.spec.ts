@@ -1,4 +1,4 @@
-// Agent A / U0 bug fixes (handoff/agents/A-bug-fixes.md).
+// Agent A / U0 bug fixes (PR #29).
 //
 //   1. Billing opens on the first tab that has content, not a hard-coded tab.
 //   2. Settings → Users hides Deactivate on your own row (team.ts refuses it too;

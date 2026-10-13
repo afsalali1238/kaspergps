@@ -23,4 +23,4 @@ One script per role, five tasks each (UI-UPGRADE §11.1). Hand a script to a tes
 
 ## Report-only results (Playwright, 13 Oct 2026, `main` + D)
 
-The scripted run's numbers are in `reviews/D-self-check.md` ("Usability run"). CI logs every task as a `USABILITY {...}` line in the Playwright shard that runs it. The spec doesn't fail on a missed target yet; agent J turns the targets into assertions.
+CI logs every task as a `USABILITY {...}` line in the Playwright shard that runs it. The spec doesn't fail on a missed target yet; agent J turns the targets into assertions.

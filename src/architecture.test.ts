@@ -140,7 +140,7 @@ describe('architecture: components do not touch data modules (rule 1)', () => {
   });
 
   // Ratchet: app routes still read the in-memory seed directly. Every file here
-  // is a known deviation from rule 1 recorded in reviews/STATUS-REVIEW.md; the
+  // is a known deviation from rule 1 from the early phases; the
   // list must only shrink. (F2 moved the shell, the demo bar and the features
   // panel onto src/hooks, so no component is listed now.)
   // Remove an entry when the file moves onto the API layer — never add one.

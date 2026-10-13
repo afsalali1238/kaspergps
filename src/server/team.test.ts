@@ -120,7 +120,7 @@ describe('team — editing users', () => {
   });
 });
 
-// Agent A / U0 (handoff/agents/A-bug-fixes.md §2). Settings → Users hides the
+// Agent A / U0 (PR #29). Settings → Users hides the
 // Deactivate button on your own row; this is the API half of the same rule, and
 // it must refuse the call even when something reaches it (a stale tab, a crafted
 // request). The existing assertion lives inside the last-admin test, where the
