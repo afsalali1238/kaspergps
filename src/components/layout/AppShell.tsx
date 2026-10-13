@@ -136,6 +136,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const session = useSession();
   const currentPhase = useSwitches().phase;
   const tenantRows = useDb(s => s.tenants);
+  // G1: re-render the bell when an alert is acknowledged, so it matches the Alerts page.
+  useDb(s => s.alerts);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBellOpen, setIsBellOpen] = useState(false);

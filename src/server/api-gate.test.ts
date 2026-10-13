@@ -17,6 +17,8 @@ const PURE = new Set([
   'periodRange', 'hoursSourceFor', 'showsUtilisation', 'REPORT_TYPES', 'viewAsGroups',
   // Pure formatters: a capability id or an adapter name in, words out.
   'capabilityLabel', 'tierOf',
+  // Agent G: an alert type in, a severity out; and grouping of rows the caller already got from a gated call.
+  'alertSeverity', 'groupAlertsBySeverity',
   'actorName', 'assetCode', 'tenantName', 'useDb', 'hydrateDb', 'nextRowNumber',
   // Public by design: token-gated, no session (spec §11.14).
   'getTrackingLinkState', 'resolveTrackingLink',

@@ -16,6 +16,10 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./tests/setup.ts'],
+    // Several tests simulate days of telemetry for every seeded asset. Under v8
+    // coverage on the CI runner they pass the 5 s default (trips, consistency), so
+    // the suite allows 30 s per test. Assertions are unaffected.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       // Screens under app/** are covered by the Playwright suite, not by unit
