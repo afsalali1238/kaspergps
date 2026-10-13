@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useT } from '@/i18n';
-import { Button, Badge, Panel, Table, RowMenu, KpiStrip, KpiCell, SegmentedTabs } from '@/components/ui';
+import { Button, Badge, Panel, Table, KpiStrip, KpiCell, SegmentedTabs } from '@/components/ui';
 import { useSession, useSwitches } from '@/hooks';
-import { reportableAssets, reportRunsFor, regenerateReport, deleteReportRun, runDueSchedules, schedulesFor, can, availableReportTypes, REPORT_TYPES, type ReportTypeId } from '@/server/api';
+import { reportableAssets, reportRunsFor, regenerateReport, deleteReportRun, runDueSchedules, schedulesFor, can, availableReportTypes, type ReportTypeId } from '@/server/api';
 import { downloadPdf, downloadXlsx } from '@/lib/export';
 import * as clock from '@/lib/clock';
 import { formatNumber } from '@/lib/format';
 import { RunPanel } from '@/components/reports/RunPanel';
 import { startOfDubaiMonthLocal } from '@/components/reports/timeHelpers';
-import { BarChart3, Clock, Route, MapPin, Timer, Fuel, Gauge, AlertTriangle, Fence, Download, Plus } from 'lucide-react';
+import { BarChart3, Clock, Route, MapPin, Timer, Fuel, Gauge, AlertTriangle, Fence } from 'lucide-react';
 import clsx from 'clsx';
 
 /** Lucide icon per report type. */
@@ -52,7 +52,6 @@ export default function ReportsPage() {
   const assets = useMemo(() => (session ? reportableAssets(session) : []), [session]);
   // Include version in deps so runs re-fetch after Download/Delete/scheduler runs.
   // ponytail: version counter in deps, not a store subscription — good enough for a demo.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const runs = useMemo(() => (session ? reportRunsFor(session) : []), [session, version]);
 
   const schedules = useMemo(() => (session ? schedulesFor(session) : []), [session]);
@@ -82,6 +81,7 @@ export default function ReportsPage() {
 
   const canRunReport = session ? can(session, 'report.run') : false;
   const canSchedule = session ? can(session, 'report.schedule') : false;
+  void canSchedule; // schedules are offered through RunPanel, which re-checks report.schedule there
 
   // Tab definitions
   const tabs = useMemo(() => [
@@ -90,19 +90,21 @@ export default function ReportsPage() {
   ], [t]);
 
   const handleDownloadAgain = (runId: string) => {
-    const result = regenerateReport(session!, runId);
+    if (!session || !canRunReport) return;
+    const result = regenerateReport(session, runId);
     if (!result.ok || !result.data) {
       alert(result.error ?? t('downloads.failed', 'The report could not be rebuilt.'));
       return;
     }
     const { meta, tables, run } = result.data;
-    if (run.format === 'pdf') downloadPdf(meta, tables as any);
-    else downloadXlsx(meta, tables as any);
+    if (run.format === 'pdf') downloadPdf(meta, tables);
+    else downloadXlsx(meta, tables);
     setVersion(v => v + 1);
   };
 
   const handleDelete = (runId: string) => {
-    deleteReportRun(session!, runId);
+    if (!session) return;
+    deleteReportRun(session, runId);
     setVersion(v => v + 1);
   };
 
@@ -189,7 +191,7 @@ export default function ReportsPage() {
                     { key: 'scope', header: t('reports.col_scope', 'Scope'), render: r => r.scope },
                     { key: 'period', header: t('reports.col_period', 'Period'), render: r => `${String(r.from).slice(0, 10)} → ${String(r.to).slice(0, 10)}` },
                     { key: 'format', header: t('reports.col_format', 'Format'), render: r => <Badge variant="grey">{r.format === 'pdf' ? 'PDF' : 'Excel'}</Badge>, numeric: true },
-                    { key: 'generated', header: t('reports.col_generated', 'Generated'), render: r => clock.formatDubaiDateTime(new Date(String(r.createdAt)).getTime()), numeric: true },
+                    { key: 'generated', header: t('reports.col_generated', 'Generated'), render: r => clock.formatDubaiDateTime(clock.isoFromDubai(String(r.createdAt))), numeric: true },
                     { key: 'source', header: t('reports.col_source', 'Source'), render: r => r.scheduleId ? <Badge variant="grey">{t('reports.by_schedule', 'Schedule')}</Badge> : <span className="text-xs text-grey-500">{t('reports.by_you', 'You')}</span> },
                   ]}
                   rowMenu={r => [

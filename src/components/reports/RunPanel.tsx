@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useT } from '@/i18n';
-import { Button, Panel, RowMenu } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { useSession } from '@/hooks';
-import { reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId, viewerSiteName, availableReportTypes } from '@/server/api';
+import { reportableAssets, pastRentalLabel, runReport, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId, viewerSiteName, availableReportTypes } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { Download, Calendar, ChevronRight, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -55,7 +55,9 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
   const availableReports = useMemo(() => {
     if (!session) return [];
     const ids = scopeAssetIds.length ? scopeAssetIds : assets.map(a => a.id);
-    return availableReportTypes(session, ids, 'phase2');
+    // The demo always runs in the 'later' phase (src/store pins phase: 'later'),
+    // so this is the full type list — kept as a literal so the call stays explicit.
+    return availableReportTypes(session, ids, 'later');
   }, [session, scopeAssetIds, assets]);
 
   const effectiveFrom = useMemo(() => {
@@ -110,9 +112,9 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
     }
     const { meta, tables, run, clipNotes: notes } = result.data;
     if (format === 'pdf') {
-      import('@/lib/export').then(({ downloadPdf }) => downloadPdf(meta, tables as any));
+      import('@/lib/export').then(({ downloadPdf }) => downloadPdf(meta, tables));
     } else {
-      import('@/lib/export').then(({ downloadXlsx }) => downloadXlsx(meta, tables as any));
+      import('@/lib/export').then(({ downloadXlsx }) => downloadXlsx(meta, tables));
     }
     setClipNotes(notes);
     setMessage(`${run.fileName} — saved to Downloads.`);

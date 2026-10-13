@@ -8,7 +8,7 @@ import { anyAssetHasFeature, ownsAnyAsset, visibleAssetIds, type Capability, use
 import { SearchCommand } from '@/components/layout/SearchCommand';
 import { signOutToRoles } from '@/components/auth/sign-out';
 import { TopTabs } from '@/components/layout/TopTabs';
-import { Map as MapIcon, TriangleAlert, BarChart3, Download, Fence, BadgeCheck, CreditCard, Wrench, TrendingUp, Settings, Bell, ChevronDown, Menu, LogOut, Monitor, Users } from 'lucide-react';
+import { Map as MapIcon, TriangleAlert, BarChart3, Fence, BadgeCheck, CreditCard, Wrench, TrendingUp, Settings, Bell, ChevronDown, Menu, LogOut, Monitor, Users } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
