@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import {
-  db, append, removeWhere, touch, nextNumber, nextRowNumber, freshDbState, resetDb, DB_VERSION, DB_STORAGE_KEY, type DbRow,
+  db, append, removeWhere, touch, nextNumber, nextRowNumber, freshDbState, migrateDb, resetDb, DB_VERSION, DB_STORAGE_KEY, type DbRow,
 } from '@/server/db';
 import * as seedData from '@/server/seed/data';
 
@@ -57,7 +57,22 @@ describe('db: store behaviour', () => {
 
   it('uses the versioned storage key', () => {
     expect(DB_STORAGE_KEY).toBe('kasper.db.v1');
-    expect(DB_VERSION).toBe(1);
+    // v2 (Agent G) added alertRules; the storage key is unchanged and v1 migrates.
+    expect(DB_VERSION).toBe(2);
+  });
+
+  it('migrates a v1 store by adding an empty alertRules list and keeping the rest', () => {
+    const v1 = freshDbState() as Partial<ReturnType<typeof freshDbState>>;
+    delete v1.alertRules;
+    v1.labels = [{ id: 'lb-kept', name: 'Kept', color: 'x' } as unknown as DbRow<'labels'>];
+    const migrated = migrateDb(v1, 1);
+    expect(migrated.alertRules).toEqual([]);
+    expect(migrated.labels.map(l => l.id)).toEqual(['lb-kept']);
+  });
+
+  it('rebuilds from the seed for an unknown version', () => {
+    const migrated = migrateDb({ labels: [] }, 99);
+    expect(migrated).toEqual(freshDbState());
   });
 
   it('append adds a row and touch hands subscribers a new array', () => {
