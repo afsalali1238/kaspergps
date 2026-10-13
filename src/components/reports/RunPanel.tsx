@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useT } from '@/i18n';
 import { Button, Panel, RowMenu } from '@/components/ui';
 import { useSession } from '@/hooks';
-import { reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId, availableReportTypes } from '@/server/api';
+import { reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId, viewerSiteName, availableReportTypes } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { Download, Calendar, ChevronRight, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -74,10 +74,12 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
   const canRunReport = session ? can(session, 'report.run') : false;
   const canSchedule = session ? can(session, 'report.schedule') : false;
 
-  const siteOptions = Array.from(new Set(assets.map(a => viewerSiteId(session, a.id)).filter((id): id is string => Boolean(id)))).map(id => ({
-    id,
-    name: session ? (session as any).seed?.sites?.find((s: any) => s.id === id)?.name ?? id : id,
-  }));
+  const siteOptions = session
+    ? Array.from(new Set(assets.map(a => viewerSiteId(session, a.id)).filter((id): id is string => Boolean(id)))).map(id => ({
+        id,
+        name: viewerSiteName(session, id) || id,
+      }))
+    : [];
 
   const toggleAsset = (id: string) => {
     if (scope === 'single_asset') {
