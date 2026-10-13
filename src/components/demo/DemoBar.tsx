@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useDb, tamperWithMuc, runDueSchedules, clockPresets } from '@/server/api';
@@ -10,10 +11,11 @@ import { useSession, useSwitches, useNow, useClockOffsetMs, useWalkthrough, useW
 import { stripLocale } from '@/i18n';
 import { WalkthroughCard } from '@/components/demo/WalkthroughCard';
 import { SCENARIOS, startScenario, type Scenario } from '@/components/demo/scenarios';
-import { ViewAsMenu } from '@/components/demo/ViewAsMenu';
+import { signOutToRoles } from '@/components/auth/sign-out';
+import { personaForUser } from '@/config/personas';
 import { FeaturesPanel } from './FeaturesPanel';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
-import { Clock, ListChecks, Play, Wrench } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Clock, ListChecks, Play, Wrench } from 'lucide-react';
 import { OPEN_DEMO_CLOCK_EVENT } from './open-clock';
 
 /** One shape for every demo-bar button (B3: restyled with the tokens). */
@@ -81,6 +83,8 @@ export function DemoBar() {
     window.addEventListener(OPEN_DEMO_CLOCK_EVENT, open);
     return () => window.removeEventListener(OPEN_DEMO_CLOCK_EVENT, open);
   }, []);
+  // Chunk R: Scenarios and Tools live under More; the bar keeps the clock, sales view, features and the role.
+  const [moreOpen, setMoreOpen] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [resetArmed, setResetArmed] = useState(false);
@@ -151,19 +155,26 @@ export function DemoBar() {
     />
   ) : null;
 
+  // Chunk R: the role picker (home page) has no demo bar: its own header carries the DEMO tag.
+  if (pathname === '' || pathname === '/') return null;
+
   if (publicPage && !pillExpanded) {
     return (
       <>
         {walkthroughCard}
-        <button
-          type="button"
-          onClick={() => setPillExpanded(true)}
-          aria-label="Show the demo bar"
-          className="demo-bar fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
-        >
-          <span className="demo-tag text-[9px]">DEMO</span>
-          <span className="text-[11px]">Prototype</span>
-        </button>
+        <div className="fixed top-2 right-2 z-50 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPillExpanded(true)}
+            aria-label="Show the demo bar"
+            className="demo-bar flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
+          >
+            <span className="demo-tag text-[9px]">DEMO</span>
+            <span className="text-[11px]">Prototype</span>
+          </button>
+          {/* Demo only: back to the role picker (chunk R). */}
+          <Link href="/" className="rounded-full border border-demo-line bg-demo-surface px-2.5 py-1 text-[11px] text-paper shadow-md">← Back to roles</Link>
+        </div>
       </>
     );
   }
@@ -173,7 +184,27 @@ export function DemoBar() {
       {/* DEMO tag */}
       <span className="demo-tag flex-shrink-0 text-[9px] hidden sm:inline">DEMO</span>
 
-      <ViewAsMenu />
+      {/* Chunk R: the role chip replaces View as. Switch role does what Log out does. */}
+      {session && (
+        <div className="flex-shrink-0 flex items-center gap-1.5 min-w-0">
+          <span
+            data-testid="role-chip"
+            title={personaForUser(session.userId)?.title ?? 'Scenario user'}
+            className="hidden sm:inline-flex items-center h-7 px-2 rounded-md bg-demo-surface-2 text-paper text-xs border border-demo-line whitespace-nowrap truncate max-w-[240px]"
+          >
+            {personaForUser(session.userId)?.title ?? 'Scenario user'}
+          </span>
+          <button
+            type="button"
+            aria-label="Switch role"
+            onClick={() => signOutToRoles(path => router.replace(path))}
+            className={clsx(DEMO_BTN, 'text-xs text-paper')}
+          >
+            <span className="hidden sm:inline">Switch role</span>
+            <ArrowLeftRight size={13} aria-hidden className="sm:hidden shrink-0 text-paper/70" />
+          </button>
+        </div>
+      )}
 
       {/* Clock */}
       <div className="flex-shrink-0 relative">
@@ -253,22 +284,33 @@ export function DemoBar() {
       {/* Features panel */}
       {featuresOpen && <FeaturesPanel onClose={() => setFeaturesOpen(false)} />}
 
-      {/* Scenarios dropdown */}
+      {/* More: Scenarios and Tools (chunk R) */}
       <div className="flex-shrink-0 relative">
         <button
-          onClick={() => setScenariosOpen(!scenariosOpen)}
-          aria-label="Scenarios"
+          onClick={() => setMoreOpen(!moreOpen)}
+          aria-label="More"
+          aria-expanded={moreOpen}
           className={clsx(DEMO_BTN, 'text-xs text-paper')}
         >
-          <Play size={13} aria-hidden className="shrink-0 text-paper/70" />
-          <span className="hidden sm:inline">Scenarios</span>
+          More
+          <ChevronDown size={12} aria-hidden className="shrink-0 text-paper/70" />
         </button>
-        {scenariosOpen && (
-          <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-demo-line">
-              <div className="text-[10px] text-paper/50 font-mono">Guided walkthroughs</div>
-            </div>
-            <div className="max-h-[min(70vh,640px)] overflow-y-auto p-2 space-y-0.5">
+        {moreOpen && (
+          <div className="absolute top-full right-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <button
+              type="button"
+              aria-label="Scenarios"
+              aria-expanded={scenariosOpen}
+              onClick={() => setScenariosOpen(!scenariosOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-paper/90 hover:bg-white/5 border-b border-demo-line"
+            >
+              <span className="flex items-center gap-2"><Play size={13} aria-hidden className="text-paper/70" />Scenarios</span>
+              <ChevronDown size={12} aria-hidden className={clsx('text-paper/60 transition-transform', scenariosOpen && 'rotate-180')} />
+            </button>
+            {scenariosOpen && (
+              <div className="border-b border-demo-line">
+                <div className="px-3 pt-2 pb-1 text-[10px] text-paper/50 font-mono">Guided walkthroughs</div>
+                <div className="max-h-[min(50vh,480px)] overflow-y-auto p-2 space-y-0.5">
               {orderedScenarios.map(s => {
                 const who = s.user ? dbSnapshot.users.find(u => u.id === s.user) : null;
                 const notForUser = s.user !== null && s.user !== session?.userId;
@@ -302,26 +344,23 @@ export function DemoBar() {
                 );
               })}
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Tools dropdown */}
-      <div className="flex-shrink-0 relative">
-        <button
-          onClick={() => setToolsOpen(!toolsOpen)}
-          aria-label="Tools"
-          className={clsx(DEMO_BTN, 'text-xs text-paper')}
-        >
-          <Wrench size={13} aria-hidden className="shrink-0 text-paper/70" />
-          <span className="hidden sm:inline">Tools</span>
-        </button>
-        {toolsOpen && (
-          <div className="absolute top-full right-0 mt-1 w-60 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-demo-line">
-              <div className="text-[10px] text-paper/50 font-mono">Developer tools</div>
-            </div>
-            <div className="max-h-60 overflow-y-auto p-2 space-y-0.5">
+              </div>
+            )}
+            <button
+              type="button"
+              aria-label="Tools"
+              aria-expanded={toolsOpen}
+              onClick={() => setToolsOpen(!toolsOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-paper/90 hover:bg-white/5"
+            >
+              <span className="flex items-center gap-2"><Wrench size={13} aria-hidden className="text-paper/70" />Tools</span>
+              <ChevronDown size={12} aria-hidden className={clsx('text-paper/60 transition-transform', toolsOpen && 'rotate-180')} />
+            </button>
+            {toolsOpen && (
+              <div>
+                <div className="px-3 pt-2 pb-1 text-[10px] text-paper/50 font-mono">Developer tools</div>
+                <div className="max-h-60 overflow-y-auto p-2 space-y-0.5">
               {toolsItems().map(tool => (
                 <button
                   key={tool.label}
@@ -347,7 +386,7 @@ export function DemoBar() {
                     resetDemoState();
                     setResetArmed(false);
                     setToolsOpen(false);
-                    router.replace('/sign-in');
+                    router.replace('/');
                   }}
                   className={
                     resetArmed
@@ -404,6 +443,9 @@ export function DemoBar() {
                 </button>
               </div>
             </div>
+
+              </div>
+            )}
           </div>
         )}
       </div>

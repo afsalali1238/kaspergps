@@ -39,7 +39,7 @@ test.describe('F1: one persisted db', () => {
     await expect(page.getByText(TENANT).first()).toBeVisible();
 
     await resetDemoData(page);
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page).toHaveURL(/\/$|\/dev\/sign-in/);
 
     await signIn(page, USERS.sara);
     await page.goto('/console/tenants');
@@ -62,7 +62,7 @@ test.describe('F1: one persisted db', () => {
     const exportPath = await file.path();
 
     await resetDemoData(page);
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page).toHaveURL(/\/$|\/dev\/sign-in/);
     await signIn(page, USERS.sara);
     await page.goto('/console/tenants');
     await expect(page.getByText(TENANT)).toHaveCount(0);

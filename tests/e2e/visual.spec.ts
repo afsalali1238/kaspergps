@@ -16,7 +16,7 @@ import { goTo, settle, signIn, stubTiles, USERS } from './helpers';
 const WIDTHS = [1440, 390] as const;
 
 const SCREENS: { name: string; email: string; path: string }[] = [
-  { name: 'sign-in', email: '', path: '/sign-in' },
+  { name: 'sign-in', email: '', path: '/dev/sign-in' },
   { name: 'owner-map', email: USERS.khalid, path: '/app' },
   { name: 'owner-asset-ex04', email: USERS.khalid, path: '/app/assets/a-ex04' },
   { name: 'owner-alerts', email: USERS.khalid, path: '/app/alerts' },

@@ -44,7 +44,7 @@ export const SCENARIOS: Scenario[] = [
   { id: 19, label: 'Lina · Settings — invite a user', user: 'u-lina', path: '/app/settings' },
   { id: 20, label: 'Phase → Day one — hide every Phase 2 screen', user: null, path: '/app', setup: () => storeActions.setDemoSwitches({ phase: 'day_one' }) },
   { id: 21, label: 'Omar · Sales view on — locked Tier 3 cards', user: 'u-omar', path: '/app/assets/a-fb12', setup: () => storeActions.setDemoSwitches({ salesView: true }) },
-  { id: 22, label: 'Karim · Deactivated account — sign-in refuses', user: 'u-karim', path: '/sign-in' },
+  { id: 22, label: 'Karim · Deactivated account — sign-in refuses', user: 'u-karim', path: '/dev/sign-in' },
   { id: 23, label: 'John · Business Bay + JVC Villas', user: 'u-john', path: '/app' },
   { id: 24, label: 'Khalid · Label EX-04 and WL-03 "Project Alpha"', user: 'u-khalid', path: '/app/assets/a-ex04' },
   { id: 25, label: 'Fatima · Geofences — Palm Crescent works', user: 'u-fatima', path: '/app/geofences', setup: () => storeActions.setClockOffsetMs(dubaiYesterdayAt(19) - clock.getAnchor()) },
@@ -85,15 +85,15 @@ function jumpToPreset(label: string): void {
 /**
  * Start a scenario: put the demo into the Later phase (so every screen exists),
  * drop the sales view, apply the scenario's own setup, switch user and land on
- * the starting screen. A user the sign-in refuses (deactivated) signs out
- * instead, so the scenario shows the refusal on the sign-in page.
+ * the starting screen. A user the sign-in refuses (deactivated) keeps the current
+ * session, so the scenario lands on the sign-in page and shows the refusal there.
  */
 export function startScenario(scenario: Scenario, go: (path: string) => void): void {
   storeActions.setDemoSwitches({ phase: 'later', salesView: false });
   scenario.setup?.();
   if (scenario.user) {
     const result = signInAs(scenario.user);
-    storeActions.setSession(result.success && result.data ? result.data.session : null);
+    if (result.success && result.data) storeActions.setSession(result.data.session);
   }
   go(scenario.fb12Public ? (fb12PublicPath() ?? scenario.path) : scenario.path);
 }

@@ -17,7 +17,7 @@ import { goTo, settle, signIn, stubTiles, USERS } from './helpers';
 type Counts = Record<string, { impact: string; nodes: number }>;
 
 const A11Y_SCREENS: { name: string; email: string; path: string }[] = [
-  { name: 'sign-in', email: '', path: '/sign-in' },
+  { name: 'sign-in', email: '', path: '/dev/sign-in' },
   { name: 'map', email: USERS.khalid, path: '/app' },
   { name: 'alerts', email: USERS.khalid, path: '/app/alerts' },
   { name: 'reports', email: USERS.khalid, path: '/app/reports' },

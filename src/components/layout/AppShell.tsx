@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { anyAssetHasFeature, ownsAnyAsset, visibleAssetIds, type Capability, useDb, bellNotifications, bellUnreadCount, markAllRead, markNotificationRead, bellAlerts, can } from '@/server/api';
 import { SearchCommand } from '@/components/layout/SearchCommand';
+import { signOutToRoles } from '@/components/auth/sign-out';
 import { TopTabs } from '@/components/layout/TopTabs';
 import { Map as MapIcon, TriangleAlert, BarChart3, Download, Fence, BadgeCheck, CreditCard, Wrench, TrendingUp, Settings, Bell, ChevronDown, Menu, LogOut, Monitor, Users } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
@@ -360,11 +361,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     )}
 
-                    {/* Sign out */}
-                    <Link href="/sign-in" className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red hover:bg-paper-2 transition-colors">
+                    {/* Log out (chunk R): clears the session and returns to the role picker. */}
+                    <button
+                      type="button"
+                      onClick={() => signOutToRoles(path => router.replace(path))}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red hover:bg-paper-2 transition-colors"
+                    >
                       <LogOut size={14} aria-hidden />
-                      {t('shell.sign_out', 'Sign out')}
-                    </Link>
+                      {t('shell.sign_out', 'Log out')}
+                    </button>
                   </div>
                 </div>
               )}

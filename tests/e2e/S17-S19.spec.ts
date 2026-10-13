@@ -48,7 +48,7 @@ test.describe('S19 — Lina invites a user', () => {
     await expect(page.getByText(/Invited|invited/).first()).toBeVisible();
   });
 
-  test('an invited user appears in the View as dropdown afterwards', async ({ page }) => {
+  test('an invited user appears in the Settings user list afterwards', async ({ page }) => {
     await demo(page, { email: USERS.lina, on: '/app/settings' });
     await page.getByRole('button', { name: 'Invite user' }).click();
     // The field's accessible name is its <label> ("Name"); "Full name" is only
@@ -57,9 +57,8 @@ test.describe('S19 — Lina invites a user', () => {
     await page.getByLabel('Email', { exact: true }).fill('huda@marina.ae');
     await page.getByRole('group', { name: 'Sites' }).getByRole('checkbox').first().check();
     await page.getByRole('button', { name: 'Send invite' }).click();
-    await page.getByRole('button', { name: 'View as' }).click();
-    // The row is a menu button; the name also appears in the table and the notice.
-    await expect(page.getByRole('button', { name: /Huda Test/ })).toBeVisible();
+    // Chunk R removed View as: the invited user is listed in Settings, with its status.
+    await expect(page.getByText('Huda Test').first()).toBeVisible();
     await goTo(page, '/app');
   });
 });

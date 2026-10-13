@@ -210,8 +210,8 @@ const TASKS: Task[] = [
     },
   },
   {
-    // ⌘K/Ctrl+K is taken by the demo bar's View as (ViewAsMenu.tsx), so the
-    // product search opens from its button: one click instead of zero.
+    // ⌘K/Ctrl+K is still undecided (owner finding §7.2), so the product search
+    // opens from its button: one click instead of zero.
     id: 'M5', role: 'Site User', title: 'Use search (⌘K) to jump to an asset', targetClicks: 0, targetSeconds: 15,
     start: page => signInAsRole(page, 'siteUser'),
     run: async (page, c) => {

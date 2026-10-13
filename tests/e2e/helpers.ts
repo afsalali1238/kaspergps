@@ -1,4 +1,5 @@
-// Shared e2e helpers. Sign in by email — every account accepts any password.
+// Shared e2e helpers. Sign in by email on /dev/sign-in (prototype only) or pick a role
+// on the home page (chunk R). Every account accepts any password.
 //
 // Every spec starts by pinning the demo context (who you are, what the clock
 // says, which phase) so the assertions below are about the product, not about
@@ -17,7 +18,7 @@ export const USERS = {
   mark: 'mark@gulflift.ae',      // Gulf Lift Site User
 } as const;
 
-/** Names as they appear in the demo bar's View as dropdown. */
+/** Full names of the seeded users (the demo bar shows the role chip, not the person). */
 export const NAMES = {
   sara: 'Sara Haddad',
   ravi: 'Ravi Menon',
@@ -52,10 +53,10 @@ export function setTilesDown(page: Page, down: boolean): void {
   tilesDownFor.set(page, down);
 }
 
-/** Sign in and wait for the user's home screen. */
+/** Sign in by email on the developer sign-in page and wait for the user's home screen. */
 export async function signIn(page: Page, email: string): Promise<void> {
   await stubTiles(page);
-  await page.goto('/sign-in');
+  await page.goto('/dev/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('demo');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -69,12 +70,35 @@ export async function goTo(page: Page, path: string): Promise<void> {
   await expect(page.locator('.demo-bar')).toBeVisible();
 }
 
-/** Switch demo user through the View as dropdown (keeps in-memory demo state). */
+/**
+ * Switch to another seeded user by name (chunk R: View as is gone). Signs in again
+ * through /dev/sign-in; the demo data survives, because it lives in local storage.
+ */
 export async function viewAs(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'View as' }).click();
-  await page.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
-  await page.waitForURL(/\/(app|console)(\/|$)/);
+  const key = (Object.keys(NAMES) as (keyof typeof NAMES)[]).find(k => NAMES[k] === name || NAMES[k].startsWith(name));
+  if (!key) throw new Error(`viewAs: no seeded user named ${name}`);
+  await signIn(page, USERS[key]);
   await expect(page.locator('.demo-bar')).toBeVisible();
+}
+
+/** Open the demo bar's More menu (Scenarios and Tools live under it, chunk R). */
+export async function openDemoMore(page: Page): Promise<void> {
+  const more = page.locator('.demo-bar').getByRole('button', { name: 'More', exact: true });
+  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+}
+
+/** Pick a role on the home page (chunk R): the card's data-persona id from src/config/personas.ts. */
+export async function pickRole(page: Page, personaId: string): Promise<void> {
+  await stubTiles(page);
+  await page.goto('/');
+  await page.locator(`[data-persona="${personaId}"]`).click();
+  await page.waitForURL(/\/(app|console)(\/|$)/);
+}
+
+/** Log out from the demo bar (Switch role) and land on the role picker. */
+export async function switchRole(page: Page): Promise<void> {
+  await page.locator('.demo-bar').getByRole('button', { name: 'Switch role', exact: true }).click();
+  await page.waitForURL(/\/$/);
 }
 
 /** Jump the simulated clock using one of the Clock menu's presets. */
@@ -96,7 +120,8 @@ export async function setSalesView(page: Page, on: boolean): Promise<void> {
 
 /** Start one of the S1–S50 guided walkthroughs from the Scenarios menu. */
 export async function startScenario(page: Page, id: number): Promise<void> {
-  await page.getByRole('button', { name: 'Scenarios' }).click();
+  await openDemoMore(page);
+  await page.locator('.demo-bar').getByRole('button', { name: 'Scenarios', exact: true }).click();
   await expect(page.getByText('Guided walkthroughs')).toBeVisible();
   await page.locator('.demo-bar button').filter({ hasText: new RegExp(`^S${id}(?![0-9])`) }).first().click();
   await expect(page.getByText('Guided walkthroughs')).toHaveCount(0);
@@ -109,7 +134,8 @@ export async function startScenario(page: Page, id: number): Promise<void> {
 
 /** Open the demo bar's Tools dropdown. */
 export async function openTools(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^Tools$/ }).click();
+  await openDemoMore(page);
+  await page.locator('.demo-bar').getByRole('button', { name: 'Tools', exact: true }).click();
   await expect(page.getByText('Developer tools')).toBeVisible();
 }
 
