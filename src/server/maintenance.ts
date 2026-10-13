@@ -13,7 +13,7 @@ import { db, append, touch, nextNumber } from '@/server/db';
 import { recordAuditForSession } from '@/server/audit';
 import { fail, ok, type OpResult } from '@/server/result';
 import { visibleAssetIds } from '@/server/access';
-import { BEHAVIOUR_HOURS_PER_DAY, ecuHoursAt } from '@/server/muc';
+import { ecuHoursAt, engineHoursBetween } from '@/server/muc';
 import { hoursSourceLabel, tierForAsset } from '@/domain/features';
 import * as clock from '@/lib/clock';
 import { can } from '@/server/capabilities';
@@ -55,8 +55,8 @@ export function odometerKmAt(asset: Asset, atMs: number): number {
 export function estimatedHoursAt(asset: Asset, atMs: number): number {
   const sum = asset.code.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const base = 400 + (sum * 97) % 6000;
-  const days = Math.max(0, (atMs - createdAtMs(asset)) / 86400000);
-  return Math.round((base + days * BEHAVIOUR_HOURS_PER_DAY[asset.behaviour]) * 10) / 10;
+  // The same day-by-day hours as the ECU model (C2), counted from when the asset was added.
+  return Math.round((base + engineHoursBetween(asset, createdAtMs(asset), atMs)) * 10) / 10;
 }
 
 export type MeterUnit = 'h' | 'km' | 'days';

@@ -6,6 +6,7 @@ import {
   saveCostProfile, setDieselPrice,
 } from './cost';
 import { db } from '@/server/db';
+import { ecuHoursAt } from '@/server/muc';
 import * as clock from '@/lib/clock';
 import type { Session } from '@/domain/types';
 
@@ -61,10 +62,14 @@ describe('cost — the fleet view', () => {
     const { fromMs, toMs } = lastMonth();
     const ex04 = costRows(khalid(), fromMs, toMs).find(r => r.asset.id === 'a-ex04')!;
     expect(ex04.revenueAed).toBe(83250);           // Sep rental invoices
-    expect(ex04.engineHours).toBe(270);            // 30 days × 9 h, ECU
-    expect(ex04.fuelAed).toBe(13176);              // 270 h × 16 L/h × 3.05
-    expect(ex04.idleHours).toBe(48.6);             // 18 % of the engine hours (modelled)
-    expect(ex04.utilisationPct).toBe(90);          // 270 h ÷ (30 × 10 h shift)
+    // C2: the ECU meter's September hours, which now vary day to day (Fridays mostly off).
+    expect(ex04.engineHours).toBe(Math.round((ecuHoursAt(asset('a-ex04'), toMs) - ecuHoursAt(asset('a-ex04'), fromMs)) * 10) / 10);
+    expect(ex04.engineHours).toBe(237.4);
+    expect(ex04.fuelAed).toBe(Math.round(ex04.engineHours * 16 * 3.05 * 100) / 100); // h × 16 L/h × 3.05
+    expect(ex04.idleHours).toBe(40);               // EX-04's idle share (18 % ± 20 % by machine, modelled)
+    expect(ex04.idleHours! / ex04.engineHours).toBeGreaterThan(0.18 * 0.8);
+    expect(ex04.idleHours! / ex04.engineHours).toBeLessThan(0.18 * 1.2);
+    expect(ex04.utilisationPct).toBe(Math.round((ex04.engineHours / (30 * 10)) * 1000) / 10); // h ÷ (30 × 10 h shift)
     expect(ex04.maintenanceAed).toBe(0);
     expect(ex04.lines.find(l => l.key === 'fuel')!.basis).toBe('ECU (ALL-CAN300)');
     expect(ex04.lines.find(l => l.key === 'revenue')!.basis).toBe('From invoices');

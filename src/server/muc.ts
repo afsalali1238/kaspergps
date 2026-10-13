@@ -59,7 +59,7 @@ export function getReplacementMuc(muc: Muc): Muc | null {
 // time, anchored to a deterministic per-asset baseline so it never jumps.
 
 /** ECU engine hours at a moment in time (simulated, monotonic per asset). */
-export { ecuHoursAt, BEHAVIOUR_HOURS_PER_DAY } from '@/server/telemetry/ecu';
+export { ecuHoursAt, engineHoursBetween, BEHAVIOUR_HOURS_PER_DAY } from '@/server/telemetry/ecu';
 
 export interface EcuDayBucket {
   date: string;
