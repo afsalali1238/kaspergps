@@ -10,7 +10,7 @@ Status as of **13 Oct 2026, 12:30 Dubai**. This replaces the 12 Oct handoff (sti
 
 ## 1. Where things stand
 
-Production: `main` = `811979a`, deployed to kaspergps.vercel.app. CI is green on main.
+Production: `main` = `811979a`, deployed to kaspergps.vercel.app. **CI on main now fails the coverage step**: one slow test (`consistency.test.ts` fuel check) exceeds 5 s on the runner. PR #40 gives it a 30 s timeout with its assertions unchanged; merge #40 first.
 
 | Step | What | State | PR |
 | --- | --- | --- | --- |

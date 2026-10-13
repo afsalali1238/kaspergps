@@ -26,6 +26,7 @@ git checkout main && git reset --hard origin/main
 ```
 
 **0.2 Merge the green PRs, in this order:**
+0. **#40 (these docs)** first. It also fixes a CI break on main: `consistency.test.ts`'s fuel check times out (5 s) under coverage on the CI runner since about 08:00 UTC on 13 Oct, so every PR's "Typecheck, lint and unit tests" job fails until #40 is in. Rebase #37, #38 and #39 after it.
 1. **#37 D**, then **#39 G1**. Rebase each on main before merging, because both edit `PROGRESS.md`; keep both rows.
 2. **#38 F1** after them. F1 has a self-check; also check that its screenshots exist. F1 and E both edit `app/app/assets/[id]/page.tsx` and `tests/e2e/S1-S3.spec.ts`, so merge F1 before E and rebase E onto it.
 
