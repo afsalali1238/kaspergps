@@ -1,4 +1,14 @@
-# Handoff: the remaining work (13 Oct 2026, 12:30 Dubai)
+# Handoff: the remaining work
+
+> **Status at 13 Oct 14:30 Dubai.**
+> - **Merged:** #40 (docs + CI timeout fix) and #37 (D).
+> - **Open and stacked, merge in this order once CI is green:**
+>   1. **#39 G1**: also fixes an aria bug D's a11y gate found, and sets a 30 s global `testTimeout` in `vitest.config.ts`.
+>   2. **#38 F1**.
+>   3. **#41 E**: the fleet map; uses G1's `alertSeverity`; `reviews/E-self-check.md`.
+> - Each PR's diff shrinks to its own chunk once the one below it is merged.
+> - Step 0 below is done apart from those three merges and syncing the owner's local clone.
+> - **Next:** the paste-ready prompts in **"Builder prompts"** at the end. F2, G2, H1 and I can start in parallel as soon as #41 is merged.
 
 For whoever builds next (a model, an agent or the hourly scheduled task) and for the supervisor who reviews and merges. Read first:
 1. `BUILD_PROMPT.md` §0a (owner decisions D1–D12);
@@ -207,3 +217,186 @@ J1 → J2 → J3   (after every Wave 2 PR is merged)
 > Then run: typecheck, lint, build, unit tests in UTC and Asia/Dubai, and the e2e specs your chunk touches. Capture screenshots at 1440 and 390 px and look at them. Write `reviews/<chunk>-self-check.md` and update `handoff/agents/PROGRESS.md`. Push and open a PR. Don't merge your own PR.
 >
 > Never weaken a test, widen access, invent a number, or reintroduce a left sidebar or phase labels.
+
+
+---
+
+## Builder prompts (paste one per session; each runs on its own branch)
+
+Every prompt assumes the session can push to `afsalali1238/kaspergps` and has `gh` (GraphQL may be blocked: use `gh api` REST). Start each one only after #39, #38 and #41 are merged.
+
+### Common header (put this before every chunk prompt)
+> You're building one chunk of Kasper GPS in `afsalali1238/kaspergps` (Next.js 16).
+>
+> **Read first:**
+> 1. `AGENTS.md`. This Next.js has breaking changes; read `node_modules/next/dist/docs/` before writing Next code.
+> 2. `BUILD_PROMPT.md` §0a (owner decisions).
+> 3. `handoff/REMAINING.md`: your chunk's section and the merge gate.
+> 4. `handoff/UI-UPGRADE.md`.
+> 5. `HANDOFF.md` §5 (rules).
+>
+> **Branch:** `git fetch origin '+refs/heads/*:refs/remotes/origin/*'`, then `git checkout -b night-<chunk> origin/main`, then `npm ci`.
+>
+> **Build rules:**
+> - Stay within your file ownership (`handoff/agents/README.md`).
+> - Use the B2 components in `src/components/ui/` and `src/lib/format.ts` for every number.
+> - Add Arabic for every new string (`public/locales/ar.json`, your namespace).
+>
+> **Never:**
+> - weaken or delete an assertion;
+> - widen access;
+> - invent a number;
+> - add raw hex;
+> - add `role ===` outside `capabilities.ts`, `capability-reasons.ts` and `seed/`;
+> - call `Date.now()` (time comes from `clock.ts`);
+> - import the server other than through `@/server/api`;
+> - reintroduce a sidebar or phase labels.
+>
+> Negative nav checks call `openMore()` first.
+>
+> **Verify:**
+> - typecheck, lint and build;
+> - `TZ=UTC npm test` and `TZ=Asia/Dubai npm test`;
+> - `next start` on :3000, then the e2e specs your chunk touches plus `a11y.spec.ts` and `no-raw-floats.spec.ts`.
+>
+> **Deliver:**
+> - Capture screenshots at 1440 and 390 px into `reviews/screenshots/<CHUNK>/` and look at them.
+> - Write `reviews/<CHUNK>-self-check.md`, with PASS/FAIL against `handoff/BUILDER.md` §5 and the scorecard rows moved, with evidence.
+> - Update your row in `handoff/agents/PROGRESS.md`.
+> - Push, then open a PR titled `<CHUNK>: …`. Don't merge it yourself. Reply with the PR number, the checks you ran and anything that needs the owner.
+
+### F2: asset page part 2
+> Chunk **F2**, agent file `handoff/agents/F-asset-page.md` items 3–5; scorecard A4 to ≥ 9.
+>
+> **History = playback:** a trip list, the route with coloured segments, a scrubber with the J6 event pins, and a timeline of **state changes only** (moving, idle, ignition off, gap). The readings table goes behind "Show readings".
+>
+> The owner's local draft of `src/components/history/HistoryPanel.tsx` is a starting point at most. It adds one row per reading, de-dupes on labels that contain the speed, calls `rows.indexOf` in a loop and hard-codes English. Don't copy those.
+>
+> **Engine & fuel:** a tank bar at the top, and a fuel-drop card (shaded window, litres lost, engine off, a link to the alert).
+>
+> **Share tracking link dialog:** a phone-frame preview beside the link actions. Keep `?panel=share` opening it; the map panel links there.
+>
+> Map `PLAYBACK_EVENT_COLORS` / `PLAYBACK_STATE_COLORS` onto status tokens.
+>
+> **Renters:** nothing before `historyFloor`.
+>
+> **Specs to keep green:** `playback-motion`, `j6-proof`, `f1-asset-header`, S1–S12, S23–S30.
+
+### G2: Fuel screen and Maintenance
+> Chunk **G2**, agent file `handoff/agents/G-alerts-fuel-maintenance.md` items 2–3; scorecard A7 and A8 to ≥ 9.
+>
+> **New `/app/fuel`:**
+> - per-asset fuel cards: tank bar, today's use with source, 7-day trend, status;
+> - a theft/drop card with the drop shaded; refuel ▲ and drop ▼ markers.
+> - Add a **Fuel** nav item in `src/components/layout/AppShell.tsx`, after Reports, with `featureKey: 'fuel.level'` (owner decision D5: only fleets with a level gauge see it). Update the TopTabs order tests and `j5-nav-widths` if needed.
+> - Reuse `fuelWeekFor`, `fuelToday` and `fleetPanelFor(...).fuel`.
+> - **Renters:** respect `historyFloor`; `src/server/fleet-panel.test.ts` is the pattern.
+>
+> **Maintenance:**
+> - a KPI strip;
+> - a schedule `Table` (asset, plan, current, due, remaining, approximate date, state) with a Board toggle.
+> - Numbers come from `planSnapshot`. Extend `src/server/consistency.test.ts` so Maintenance, alerts and the asset page agree.
+>
+> **Role tests:** Omar (no Fuel tab), Lina (renter: no owner maintenance), Mark (one site).
+
+### H1: Reports + Downloads, one screen
+> Chunk **H1**, agent file `handoff/agents/H-reports-money.md` item 1; scorecard A6 to ≥ 9. Owner decision D10.
+>
+> **One Reports screen:**
+> - report cards with cadence badges;
+> - a 3-step run panel (what, scope, period and format);
+> - a "Recently generated" `Table` with `id="recent"`, where Download again re-checks permission and Delete removes the run;
+> - a KPI strip of real numbers only. "Generated this month" filters by month. "Next scheduled" comes from `schedulesFor`, or the cell is dropped.
+>
+> **Routing:** `/app/downloads` redirects to `/app/reports#recent` in `next.config.ts`, and the Downloads nav item is removed.
+>
+> **The owner's local draft is a starting point at most.** It has:
+> - a stale `runs` memo;
+> - `runDueSchedules()` inside `useMemo` (move it to a `useEffect` on clock change);
+> - a wrong month count;
+> - 7 headers for 6 cells;
+> - hard-coded English.
+>
+> **Also:** fix `reports.none_available` (phases are gone). Move the S30 and Downloads e2e specs to the new location by changing locators only.
+
+### H2: money and Settings (after H1 merges)
+> Chunk **H2**, agent file `handoff/agents/H-reports-money.md` items 2–5; scorecard A9, and A10 for Settings.
+>
+> **KPI strips** on Cost & ROI, Billing, Certificates and Settings.
+>
+> **Cost & ROI:**
+> - real revenue, cost and margin with sources;
+> - a part-month margin shows "n/a — part month" below 7 booked days (suggested; record it under Decisions).
+>
+> **Billing:** an invoice `Table` with status badges and a `RowMenu` (Record payment, Download PDF). It opens on the first tab with content.
+>
+> **Certificates:**
+> - a `Table` with View plus a `RowMenu` (Void, Reissue, Verify link);
+> - **fix `lastMonthPeriod()`**: it parses en-AE dates as month/day and shows May at the October anchor;
+> - make booking periods issue for the right booking, not `bookings[0]`;
+> - reseed the September MUCs (EX-04, WL-03) from `ecuHoursAt`;
+> - remove the duplicated "Voided" in the detail modal (`voided_at` key).
+>
+> **Settings:** dense tables, Deactivate/Reactivate behind `ConfirmDialog`, no self-deactivate.
+>
+> **Usability task O5** (certify September for EX-04) must pass.
+
+### I: Kasper console
+> Chunk **I**, agent file `handoff/agents/I-console.md`; scorecard A10 to ≥ 9.
+>
+> **Overview:** a KPI strip (tenants, assets, trackers in stock and fitted, active bookings, open requests) and tables. Fix the yellow-on-white "Manage →" links (≈1.6:1 contrast).
+>
+> **Assets, Trackers, CAN adapters:** `Table` with `CopyButton` on IMEI and SIM, plus a `RowMenu`.
+>
+> **The rest:** restyle with `Table`, `Panel` and `Badge`.
+>
+> **Role rules unchanged:** Ops has no Billing, Kasper team or Audit log, and customers get "Page not found". Negative checks call `openMore()` first.
+>
+> The console is desktop only (≥ 900 px).
+
+### J1: phone and Arabic (after every Wave 2 PR is merged)
+> Chunk **J1**, agent file `handoff/agents/J-phone-arabic-final.md` items 1–2; scorecard A11 and A12 to ≥ 9.
+>
+> **Every route at 390 × 844:**
+> - no sideways scroll;
+> - KPI strips scroll inside themselves;
+> - panels become bottom sheets;
+> - primary actions are full-width;
+> - tap targets are ≥ 40 px.
+>
+> **Arabic:**
+> - every key is in `ar.json`, and asset types are translated;
+> - the three panes mirror, and truncation lands at the logical end;
+> - numbers stay LTR;
+> - alert descriptions get translated through their word templates (today they stay English in Arabic).
+
+### J2: demo tools
+> Chunk **J2**, agent file `handoff/agents/J-phone-arabic-final.md` item 3; scorecard A15.
+>
+> Add "Start session as …", "Report a problem" and "Trigger alert".
+>
+> **⌘K** opens product search (owner suggestion); View as moves to Ctrl+Shift+K. Update the demo-bar tests and `docs/demo-script.md`.
+
+### J3: strict gates and the final pass
+> Chunk **J3**, agent file `handoff/agents/J-phone-arabic-final.md` items 4–7; every scorecard row.
+>
+> - Make D's a11y and visual jobs strict.
+> - Run the usability kit and record clicks and time per task.
+> - Write `reviews/U8-scorecard.md`. Every row must be ≥ 9; otherwise list the gaps and stop.
+> - Remove fleetx: `grep -rniE "dozr|KSP-0|fleetx" app src tests public` must print nothing.
+> - Update `docs/demo-script.md` and `docs/test-matrix.md`: no Phase switch, S20/S41 retired, FB-12 at +30 min.
+> - Rewrite `HANDOFF.md` for the final state.
+
+### Supervisor prompt (one session that reviews and merges)
+> You supervise the Kasper GPS build in `afsalali1238/kaspergps`. Every hour:
+> 1. List open PRs with `gh api 'repos/afsalali1238/kaspergps/pulls?state=open'`.
+> 2. For each PR, check the merge gate in `handoff/REMAINING.md`:
+>    - all 4 CI jobs green on the head (`gh api repos/afsalali1238/kaspergps/commits/<sha>/check-runs`);
+>    - the self-check is present and its screenshots looked at;
+>    - no removed `expect` lines;
+>    - no access widened;
+>    - `PROGRESS.md` updated.
+> 3. If a PR passes, rebase it on main if needed, merge it with `gh api -X PUT …/pulls/<n>/merge -f merge_method=merge`, and tick it in issue #30.
+> 4. If it fails, comment exactly what's wrong on the PR and on #30.
+> 5. Merge H1 before H2, and J only after every Wave 2 PR is merged.
+> 6. If a check times out only in CI, read the check-run annotations (`gh api …/check-runs/<id>/annotations`); the logs are blocked in the sandbox.
