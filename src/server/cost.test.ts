@@ -211,3 +211,17 @@ describe('cost — last month varies (UI-UPGRADE §9.1, C2)', () => {
     expect(monthlySeries(asset('a-cr02'), 6)[4].revenueAed).toBe(cr02.revenueAed);
   });
 });
+
+describe('cost — booked revenue stays with the owner (C2 roles)', () => {
+  it('Mark sees nothing; Lina (a renter) and Fatima (owns no hired-out plant) never see the owners\u2019 hire revenue', () => {
+    const { fromMs, toMs } = lastMonth();
+    expect(costRows(mark(), fromMs, toMs)).toEqual([]);
+    for (const id of ['u-lina', 'u-fatima']) {
+      const s = sessionFor(id);
+      const rows = costRows(s, fromMs, toMs);
+      // Only assets their own company owns, and none of the hired-in machines.
+      expect(rows.every(r => r.asset.ownerTenantId === s.tenantId)).toBe(true);
+      expect(rows.some(r => ['a-cr02', 'a-ex11', 'a-ex04', 'a-wl03'].includes(r.asset.id))).toBe(false);
+    }
+  });
+});
