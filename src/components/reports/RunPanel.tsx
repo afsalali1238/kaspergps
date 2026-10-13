@@ -18,13 +18,15 @@ type ScopeType = 'single_asset' | 'multiple_assets' | 'site' | 'label';
 interface RunPanelProps {
   onClose: () => void;
   onRunComplete: () => void;
+  /** The report type chosen from the cards above, so the panel starts pre-selected. */
+  initialReport?: ReportTypeId | null;
 }
 
-export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
+export function RunPanel({ onClose, onRunComplete, initialReport }: RunPanelProps) {
   const t = useT();
   const session = useSession();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(initialReport ?? null);
   const [scope, setScope] = useState<ScopeType>('multiple_assets');
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [siteId, setSiteId] = useState<string>('');
@@ -153,9 +155,9 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
   };
 
   const steps: { id: 1 | 2 | 3; label: string; icon: React.ReactNode }[] = [
-    { id: 1, label: t('reports_panel.step1', 'What'), icon: <Calendar size={16} /> },
-    { id: 2, label: t('reports_panel.step2', 'Scope'), icon: <Download size={16} /> },
-    { id: 3, label: t('reports_panel.step3', 'Period & Format'), icon: <ChevronRight size={16} /> },
+    { id: 1, label: t('reports_page.reports_panel.step1', 'What'), icon: <Calendar size={16} /> },
+    { id: 2, label: t('reports_page.reports_panel.step2', 'Scope'), icon: <Download size={16} /> },
+    { id: 3, label: t('reports_page.reports_panel.step3', 'Period & Format'), icon: <ChevronRight size={16} /> },
   ];
 
   return (
@@ -182,8 +184,8 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
         <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
           {step === 1 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-ink">{t('reports_panel.step1', 'What')}</h3>
-              <p className="text-sm text-grey-500">{t('reports_panel.step1_hint', 'Choose the report type you want to generate.')}</p>
+              <h3 className="text-lg font-semibold text-ink">{t('reports_page.reports_panel.step1', 'What')}</h3>
+              <p className="text-sm text-grey-500">{t('reports_page.reports_panel.step1_hint', 'Choose the report type you want to generate.')}</p>
               <div className="grid gap-2">
                 {availableReports.map(report => (
                   <button
@@ -208,15 +210,15 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
                 )}
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="secondary" onClick={goNext} disabled={!selectedReport}>{t('common.next', 'Next')}</Button>
+                <Button variant="secondary" onClick={goNext} disabled={!selectedReport}>{t('reports_page.common.next', 'Next')}</Button>
               </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-ink">{t('reports_panel.step2', 'Scope')}</h3>
-              <p className="text-sm text-grey-500">{t('reports_panel.step2_hint', 'Choose which assets or sites this report covers.')}</p>
+              <h3 className="text-lg font-semibold text-ink">{t('reports_page.reports_panel.step2', 'Scope')}</h3>
+              <p className="text-sm text-grey-500">{t('reports_page.reports_panel.step2_hint', 'Choose which assets or sites this report covers.')}</p>
               <div className="flex flex-wrap gap-2">
                 {(['single_asset', 'multiple_assets', 'site', ...(labelOptions.length > 0 ? ['label' as const] : [])] as ScopeType[]).map(s => (
                   <button
@@ -284,15 +286,15 @@ export function RunPanel({ onClose, onRunComplete }: RunPanelProps) {
 
               <div className="flex justify-between gap-2 pt-2">
                 <Button variant="secondary" onClick={goBack}>{t('common.back', 'Back')}</Button>
-                <Button onClick={goNext} disabled={scopeAssetIds.length === 0}>{t('common.next', 'Next')}</Button>
+                <Button onClick={goNext} disabled={scopeAssetIds.length === 0}>{t('reports_page.common.next', 'Next')}</Button>
               </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-ink">{t('reports_panel.step3', 'Period & Format')}</h3>
-              <p className="text-sm text-grey-500">{t('reports_panel.step3_hint', 'Select the date range and output format.')}</p>
+              <h3 className="text-lg font-semibold text-ink">{t('reports_page.reports_panel.step3', 'Period & Format')}</h3>
+              <p className="text-sm text-grey-500">{t('reports_page.reports_panel.step3_hint', 'Select the date range and output format.')}</p>
 
               <div className="space-y-2">
                 <div className="text-xs text-grey-500 font-medium">{t('reports.date_range', 'Date range')}</div>
