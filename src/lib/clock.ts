@@ -116,6 +116,13 @@ export function startOfDubaiDay(ms: number): number {
   return fromZonedTime(startOfDay(toZonedTime(new Date(ms), DUBAI_TZ)), DUBAI_TZ).getTime();
 }
 
+
+
+export function startOfDubaiMonth(ms: number): number {
+  const d = toZonedTime(new Date(ms), DUBAI_TZ);
+  const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+  return fromZonedTime(start, DUBAI_TZ).getTime();
+}
 export function hoursSinceDubai(ms: number): number {
   return differenceInHours(now(), ms);
 }

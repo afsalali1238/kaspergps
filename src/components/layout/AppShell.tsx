@@ -113,7 +113,6 @@ const navItems: NavItem[] = [
   { href: '/app/geofences', labelKey: 'nav.geofences', label: 'Geofences', capability: 'geofence.view', phase: 'phase2', icon: <Fence size={16} strokeWidth={1.75} /> },
   { href: '/app/certificates', labelKey: 'nav.certificates', label: 'Certificates', capability: 'muc.view', phase: 'phase2', featureKey: 'muc', icon: <BadgeCheck size={16} strokeWidth={1.75} /> },
   { href: '/app/cost', labelKey: 'nav.cost', label: 'Cost & ROI', capability: 'cost.view', phase: 'later', ownerOnly: true, icon: <TrendingUp size={16} strokeWidth={1.75} /> },
-  { href: '/app/downloads', labelKey: 'nav.downloads', label: 'Downloads', capability: 'report.run', phase: 'day_one', icon: <Download size={16} strokeWidth={1.75} /> },
 ];
 
 function formatNotificationTime(
