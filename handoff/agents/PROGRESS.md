@@ -9,13 +9,13 @@ One line per step, with its status, PR, merge commit and date. Hourly runs and t
 | C — data and simulator | **merged**: C1 (FB-12 arrives 10:30 with ETA ±5 min, plant shuffles at walking pace, `PIN_TRIP_MAX` 20; `reviews/C1-self-check.md`), C2 (engine hours vary by day, last month varies, booked-days revenue, MUC hours from the ECU meter, `consistency.test.ts`, `src/lib/format.ts`; `reviews/C2-self-check.md`) | C1: #35 · C2: #36 | see `git log --grep "#36"` | 2026-10-13 |
 | D — test tooling | **merged** (axe report mode + `reviews/a11y-baseline.md`, no-raw-floats gate, visual spec off unless `VISUAL=1` + report-only CI job, usability kit + `usability.spec.ts`, perf check, `signInAsRole`/`openAsset`/`settle`, coverage excludes `app/**`; `reviews/D-self-check.md`) | #37 | | 2026-10-13 |
 | E — fleet map | built, **not pushed**: local `night-e` (`6acc248` + `d21471b`). Needs rebase on D/F1/G1, drop its own `alertSeverity` for G1's, `reviews/E-self-check.md` (see `handoff/REMAINING.md` step 0.3) | — | | 2026-10-13 |
-| F — asset page | F1 built, PR open, CI green (header, 2×2 Overview, End-access confirm; `reviews/F1-self-check.md`). F2 not started (local draft of the History timeline parked) | F1: #38 | | 2026-10-13 |
+| F — asset page | F1 **merged** (header, 2×2 Overview, End-access confirm; `reviews/F1-self-check.md`). F2 not started (local draft of the History timeline parked) | F1: #38 | | 2026-10-13 |
 | G — alerts, fuel, maintenance | G1 (Alerts: severity groups, KPI strip, Acknowledge all, rules panel, DB v2 `alertRules`) **merged** (`reviews/G1-self-check.md`); G2 not started | G1: #39 | | 2026-10-13 |
 | H — reports and money | not started (local draft of the H1 Recently generated table parked; fix list in `handoff/REMAINING.md`) | | | |
 | I — console | not started | | | |
 | J — phone, Arabic, final | not started | | | |
 
-Next: **Step 0 in `handoff/REMAINING.md`** (D and G1 merged; merge F1, then push and PR E), then F2, G2, H1 → H2, I in parallel; J1 → J2 → J3 last.
+Next: **Step 0 in `handoff/REMAINING.md`** (D, G1 and F1 merged; push and PR E), then F2, G2, H1 → H2, I in parallel; J1 → J2 → J3 last.
 
 ## Notes for the next steps
 - **D → everyone:** new e2e gates: `a11y.spec.ts` fails on a **new critical** axe violation versus `reviews/a11y-baseline.md` (lower counts there when you fix one, never raise them); `no-raw-floats.spec.ts` fails on any `\d+\.\d{4,}` on 23 main screens. Helpers: `signInAsRole(page, 'owner'|'renter'|'siteUser'|'kasperOps'|'kasperAdmin')`, `openAsset(page, 'a-ex04')`, `settle(page)` (use instead of `networkidle`, which hangs on polling screens). `usability.spec.ts` logs `USABILITY {…}` per task (report-only); keep its paths working when you redesign a screen, or update the path in the same PR.
