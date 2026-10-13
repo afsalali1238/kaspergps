@@ -5,7 +5,7 @@
 //   Line 1  CODE  Name  [status] [tier] [Rented]
 //   Line 2  make model · year · plate
 //   Line 3  viewer's site · owner · Inside: <geofence> | Outside all geofences
-//   Line 4  Last updated 09:59 (1 min ago)   — device and received time on hover
+//   Line 4  Last updated 09:59 (1 min ago)   — the tracker's own and received times on hover
 //
 // Actions: one primary (Share tracking link for owners, Run report otherwise),
 // secondary Edit / Run report, and End access now as an outlined danger button
@@ -65,7 +65,12 @@ export function AssetHeader({
         <div className="text-sm text-text-secondary">{makeLine}</div>
         {placeParts.length > 0 && (
           <div className="text-sm text-text-secondary" data-testid="asset-place">
-            {placeParts.join(' · ')}
+            {placeParts.map((part, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && ' · '}
+                <span>{part}</span>
+              </React.Fragment>
+            ))}
           </div>
         )}
         <div

@@ -81,12 +81,12 @@ test.describe('F1: End access now asks first', () => {
     await expect(page.getByText('On hire', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'End access now' }).click();
-    await dialog.getByLabel('Reason').fill('too short');
+    await dialog.getByPlaceholder('Reason (at least 10 characters)').fill('too short');
     await dialog.getByRole('button', { name: 'End Marina Builders access now' }).click();
     await expect(dialog.getByRole('alert')).toHaveText('Give a reason of at least 10 characters.');
     await expect(dialog).toBeVisible();
 
-    await dialog.getByLabel('Reason').fill('Payment overdue for two weeks');
+    await dialog.getByPlaceholder('Reason (at least 10 characters)').fill('Payment overdue for two weeks');
     await dialog.getByRole('button', { name: 'End Marina Builders access now' }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByRole('status').filter({ hasText: /Marina Builders/ })).toBeVisible();
@@ -115,11 +115,12 @@ test.describe('F1: Overview', () => {
     expect(text.match(RAW_FLOAT), 'no raw floats on the asset Overview').toBeNull();
   });
 
-  test('a Tier 1 truck keeps one Power tile, reading Not measured with the tracker battery under it', async ({ page }) => {
+  test('a Tier 1 truck keeps one Power tile: vehicle voltage, with the tracker battery under it', async ({ page }) => {
     await openAsset(page, USERS.omar, 'a-fb12');
     const power = page.getByTestId('tile-power');
-    await expect(power).toContainText('Not measured');
+    await expect(power).toContainText(/^Power\d+\.\dV/);
     await expect(power).toContainText(/Tracker battery \d+\.\d V/);
+    await expect(page.getByText('Tracker battery', { exact: true })).toHaveCount(0);
     await expect(page.locator('[data-testid^="tile-"]').filter({ hasText: /^Power/ })).toHaveCount(1);
   });
 

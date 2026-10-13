@@ -44,7 +44,7 @@ export function AssetOverviewGrid({ map, primary, more }: { map: React.ReactNode
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-5">
-        <div className="h-[220px] overflow-hidden rounded-lg border border-line bg-paper lg:col-span-3 lg:h-auto lg:min-h-[220px]">
+        <div className="isolate h-[220px] overflow-hidden rounded-lg border border-line bg-paper lg:col-span-3 lg:h-auto lg:min-h-[220px]">
           {map}
         </div>
         <div data-testid="metric-grid" className="grid grid-cols-2 content-start gap-2 lg:col-span-2">

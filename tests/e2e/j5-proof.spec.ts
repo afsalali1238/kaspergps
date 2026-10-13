@@ -22,7 +22,7 @@ const TILE_HOST = /tile\.openstreetmap\.org/;
 type Shot = {
   name: string;
   email: string;
-  /** Tab to open on an asset detail page (exact button name). */
+  /** Tab to open on an asset detail page (exact tab name). */
   tab?: string;
   /** Open the demo bar's Features panel after the page settles. */
   features?: boolean;
@@ -81,7 +81,7 @@ for (const shot of SHOTS) {
       await expect(page.getByText("This page couldn't load")).toHaveCount(0);
 
       if (shot.tab) {
-        await page.getByRole('button', { name: shot.tab, exact: true }).first().click();
+        await page.getByRole('tab', { name: shot.tab, exact: true }).first().click();
         await expect(page.getByTestId('engine-tiles')).toBeVisible();
       }
       if (shot.features) {
