@@ -19,6 +19,7 @@ import {
   type HistoryPeriod,
   type CanColumn,
 } from '@/domain/history';
+import { COLORS } from '@/config/colors';
 
 export interface HistoryPanelProps {
   supported: ParamKey[];
@@ -186,9 +187,9 @@ export function HistoryPanel({ supported, nowMs, floorMs, readingsFor, onPlay }:
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
             {lines.map((line, i) => (
-              <Polyline key={`h-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: '#1d4ed8', weight: 3 }} />
+              <Polyline key={`h-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: COLORS.track, weight: 3 }} />
             ))}
-            {last && <CircleMarker center={[last.lat, last.lng]} radius={6} pathOptions={{ color: '#1d4ed8' }} />}
+            {last && <CircleMarker center={[last.lat, last.lng]} radius={6} pathOptions={{ color: COLORS.track }} />}
           </MapContainer>
         </div>
       )}

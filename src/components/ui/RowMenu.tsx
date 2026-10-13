@@ -16,6 +16,7 @@
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import clsx from 'clsx';
+import { MoreHorizontal } from 'lucide-react';
 import { useT } from '@/i18n';
 import { focusRing } from './tones';
 
@@ -108,11 +109,7 @@ export function RowMenu({ items, label, align = 'end', className = '' }: RowMenu
           focusRing
         )}
       >
-        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="3" cy="8" r="1.5" />
-          <circle cx="8" cy="8" r="1.5" />
-          <circle cx="13" cy="8" r="1.5" />
-        </svg>
+        <MoreHorizontal size={16} aria-hidden="true" />
       </button>
       {open && (
         <div

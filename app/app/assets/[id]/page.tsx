@@ -20,6 +20,7 @@ import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
+import { COLORS, MAP_STATUS_COLORS } from '@/config/colors';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,17 +31,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const STATUS_COLORS: Record<string, string> = {
-  live: '#1F9A6D',
-  idle: '#B89000',
-  stale: '#9A9CA1',
-  offline: '#D64545',
-  unknown: '#9A9CA1',
-  no_tracker: '#9A9CA1',
-};
 
 function createMarkerIcon(status: string) {
-  const color = STATUS_COLORS[status] ?? '#9A9CA1';
+  const color = MAP_STATUS_COLORS[status] ?? COLORS.muted;
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
       <div style="position: relative; width: 24px; height: 36px;">
@@ -653,8 +646,8 @@ export default function AssetDetailPage() {
         <div
           className={
             trackerToast.kind === 'ok'
-              ? 'bg-green/10 border border-green/30 text-green text-sm px-4 py-2 rounded-lg'
-              : 'bg-red/10 border border-red/30 text-red text-sm px-4 py-2 rounded-lg'
+              ? 'bg-green/10 border border-green/30 text-ok-ink text-sm px-4 py-2 rounded-lg'
+              : 'bg-red/10 border border-red/30 text-bad-ink text-sm px-4 py-2 rounded-lg'
           }
         >
           {trackerToast.text}
@@ -702,7 +695,7 @@ export default function AssetDetailPage() {
               <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.status', 'Status')}</div>
               <div className="text-lg font-semibold text-ink mt-1 capitalize">{t(`common.status.${status}`, status)}</div>
               {status === 'offline' && (
-                <div className="text-xs text-red mt-1">
+                <div className="text-xs text-bad-ink mt-1">
                   {t('asset_detail.overview.offline_since', 'Offline since {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
                 </div>
               )}

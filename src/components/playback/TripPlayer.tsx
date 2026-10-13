@@ -28,6 +28,7 @@ import {
   type PlaybackState,
   type Span,
 } from '@/domain/playback';
+import { COLORS, PLAYBACK_EVENT_COLORS, PLAYBACK_STATE_COLORS } from '@/config/colors';
 
 export interface TripPlayerProps {
   assetLabel: string;
@@ -40,18 +41,7 @@ export interface TripPlayerProps {
   onClose: () => void;
 }
 
-const PIN_COLOUR: Record<PinKind, string> = {
-  trip_start: '#0ca678',
-  trip_stop: '#495057',
-  harsh: '#e8590c',
-  overspeed: '#e03131',
-  fuel_drop: '#7048e8',
-  refuel: '#2b8a3e',
-  power_cut: '#c2255c',
-  towing: '#a61e4d',
-  geofence_enter: '#1971c2',
-  geofence_exit: '#1971c2',
-};
+const PIN_COLOUR: Record<PinKind, string> = PLAYBACK_EVENT_COLORS;
 
 /** The pins' words, in the order they are explained under the scrubber. */
 const PIN_WORDS: { kind: PinKind; word: string }[] = [
@@ -65,11 +55,7 @@ const PIN_WORDS: { kind: PinKind; word: string }[] = [
   { kind: 'geofence_enter', word: 'Geofence' },
 ];
 
-const STATE_COLOUR: Record<Exclude<PlaybackState, 'no_data'>, string> = {
-  moving: '#2f9e44',
-  stationary_on: '#f59f00',
-  off: '#adb5bd',
-};
+const STATE_COLOUR: Record<Exclude<PlaybackState, 'no_data'>, string> = PLAYBACK_STATE_COLORS;
 
 const STATE_WORDS: Record<PlaybackState, string> = {
   moving: 'Moving',
@@ -81,7 +67,7 @@ const STATE_WORDS: Record<PlaybackState, string> = {
 function arrowIcon(heading: number): L.DivIcon {
   return L.divIcon({
     className: 'trip-player-arrow',
-    html: `<div style="transform:rotate(${Math.round(heading)}deg);font-size:18px;line-height:18px;color:#1d4ed8">▲</div>`,
+    html: `<div style="transform:rotate(${Math.round(heading)}deg);font-size:18px;line-height:18px;color:${COLORS.track}">▲</div>`,
     iconSize: [18, 18],
     iconAnchor: [9, 9],
   });
@@ -115,7 +101,7 @@ function SpanTrack({ spans, fromMs, toMs }: { spans: Span[]; fromMs: number; toM
           s.state === 'no_data'
             ? {
                 backgroundImage:
-                  'repeating-linear-gradient(45deg, #ced4da 0 3px, transparent 3px 6px)',
+                  `repeating-linear-gradient(45deg, ${COLORS.hatch} 0 3px, transparent 3px 6px)`,
               }
             : { backgroundColor: STATE_COLOUR[s.state] };
         return (
@@ -344,10 +330,10 @@ export function TripPlayer({ assetLabel, tier, readings, fromMs, toMs, pins = []
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
             {faintTrack.map((line, i) => (
-              <Polyline key={`f-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: '#495057', weight: 2, opacity: 0.25 }} />
+              <Polyline key={`f-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: COLORS.trackFaded, weight: 2, opacity: 0.25 }} />
             ))}
             {trail.map((line, i) => (
-              <Polyline key={`t-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: '#1d4ed8', weight: 4 }} />
+              <Polyline key={`t-${i}`} positions={line.map(p => [p.lat, p.lng])} pathOptions={{ color: COLORS.track, weight: 4 }} />
             ))}
             {pins
               .filter(p => p.lat !== undefined && p.lng !== undefined)

@@ -18,6 +18,7 @@ import 'leaflet/dist/leaflet.css';
 import { useDb, getTrackingLinkState, resolveTrackingLink, hydrateDb } from '@/server/api';
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
+import { COLORS } from '@/config/colors';
 
 const REFRESH_MS = 30_000;
 const INACTIVE = 'This tracking link is no longer active.';
@@ -30,7 +31,7 @@ function formatTime(ts: string | number): string {
 /** The one marker this page may draw: a solid dot with a white ring (spec 11.6). */
 const liveMarkerIcon = L.divIcon({
   html:
-    '<div style="width:20px;height:20px;border-radius:50%;background:#1F9A6D;border:3px solid #ffffff;box-shadow:0 1px 6px rgba(0,0,0,0.35)"></div>',
+    '<div style="width:20px;height:20px;border-radius:50%;background:'+COLORS.live+';border:3px solid '+COLORS.surface+';box-shadow:0 1px 6px rgba(0,0,0,0.35)"></div>',
   className: 'tracking-marker',
   iconSize: [20, 20],
   iconAnchor: [10, 10],
@@ -107,8 +108,8 @@ export default function TrackingPage() {
       <header className="bg-ink text-white px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-yellow">
-            <rect width="24" height="24" rx="5" fill="#141518" />
-            <text x="0" y="18" fontSize="14" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
+            <rect width="24" height="24" rx="5" className="fill-ink" />
+            <text x="0" y="18" fontSize="14" fontFamily="monospace" className="fill-yellow" fontWeight="700">K</text>
           </svg>
           <span className="text-sm font-semibold">Kasper GPS</span>
         </div>

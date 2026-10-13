@@ -4,9 +4,12 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import { LayoutDashboard, Building2, UserPlus, Truck, Radio, Cable, CalendarDays, Inbox, CreditCard, Users, Upload, ScrollText, Menu } from 'lucide-react';
 
 import { type Capability, can, hasRole } from '@/server/api';
 import { useSession } from '@/hooks';
+import { TopTabs } from '@/components/layout/TopTabs';
+import { LivePill } from '@/components/layout/AppShell';
 
 interface NavItem {
   href: string;
@@ -15,79 +18,79 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-// Spec 11.9: the left nav shows only what the role can view.
+// Spec 11.9: the nav shows only what the role can view. Top tabs, no sidebar (UI-UPGRADE.md §5.1).
 const navItems: NavItem[] = [
   {
     href: '/console',
     label: 'Overview',
     cap: 'console.tenants.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 15h14L8 1zm0 5l3 3-3 3M8 8V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    icon: <LayoutDashboard size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/tenants',
     label: 'Tenants',
     cap: 'console.tenants.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M5 5h6M5 8h6M5 11h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Building2 size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/onboarding',
     label: 'Onboard a company',
     cap: 'console.tenants.manage',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" /></svg>,
+    icon: <UserPlus size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/assets',
     label: 'Assets',
     cap: 'console.tenants.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h6l3 3v9.5a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm0 2v2h6v2H3V4zm-1 3h8v8h2V6H2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Truck size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/trackers',
     label: 'Trackers',
     cap: 'console.trackers.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="6" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" /><path d="M4 12h8M8 12v3M4 4h2M4 6h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Radio size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/adapters',
     label: 'CAN adapters',
     cap: 'console.adapters.manage',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" /><path d="M4 12v2M12 12v2M5 7h2M9 7h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Cable size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/bookings',
     label: 'Bookings',
     cap: 'console.bookings.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M4 7h8M8 5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <CalendarDays size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/requests',
     label: 'Requests',
     cap: 'console.trackers.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 3h12v8H6l-4 3V3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><path d="M5 6h6M5 8h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Inbox size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/billing',
     label: 'Billing',
     cap: 'console.billing.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M1 6.5h14M4 10h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <CreditCard size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/team',
     label: 'Kasper team',
     cap: 'console.staff.manage',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.5" /><path d="M2 14c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M11 7.5a2 2 0 100-4M14 14c0-1.8-1.1-3.3-2.7-3.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <Users size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/import',
     label: 'Import',
     cap: 'console.import',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    icon: <Upload size={16} strokeWidth={1.75} />,
   },
   {
     href: '/console/audit',
     label: 'Audit log',
     cap: 'console.audit.view',
-    icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" /><path d="M5.5 8h5M5.5 10.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    icon: <ScrollText size={16} strokeWidth={1.75} />,
   },
 ];
 
@@ -118,42 +121,46 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <p className="text-sm text-grey-500">Open the console on a computer.</p>
       </div>
 
-      <div className="hidden min-[900px]:flex h-screen bg-bg">
-        {/* Left nav */}
-        <nav className="w-56 bg-surface border-r border-line flex-shrink-0 overflow-y-auto">
-          <div className="p-4 border-b border-line">
-            <Link href="/console" className="flex items-center gap-2">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="5" fill="#141518" />
-                <text x="0" y="18" fontSize="16" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
-              </svg>
-              <span className="text-sm font-semibold text-ink">Kasper Console</span>
-            </Link>
+      <div className="hidden min-[900px]:flex flex-col h-screen bg-bg">
+        <header className="bg-surface border-b border-line ps-5 pe-4 h-14 flex items-center gap-5 shrink-0 shadow-panel">
+          <Link href="/console" className="flex items-center gap-2 shrink-0">
+            <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden>
+              <rect width="22" height="22" rx="5" className="fill-ink" />
+              <text x="11" y="16" textAnchor="middle" direction="ltr" fontSize="14" fontFamily="var(--font-mono)" className="fill-yellow" fontWeight="700">K</text>
+            </svg>
+            <span className="text-section text-ink">Kasper Console</span>
+          </Link>
+          <div className="flex-1 min-w-0 self-stretch flex">
+            <TopTabs
+              label="Console pages"
+              moreLabel="More"
+              tabs={visibleNav.map(item => ({
+                href: item.href,
+                label: item.label,
+                icon: item.icon,
+                active: item.href === '/console' ? pathname === '/console' : pathname === item.href || pathname.startsWith(item.href + '/'),
+              }))}
+            />
+            {/* 900–1023 px: the tabs need 1024 px, so the pages sit in a menu. */}
+            <details className="lg:hidden relative">
+              <summary className="list-none cursor-pointer h-14 flex items-center gap-2 text-sm font-medium text-grey-700"><Menu size={16} aria-hidden /> Menu</summary>
+              <div className="absolute start-0 top-full z-50 min-w-52 bg-surface border border-line rounded-b-lg shadow-pop py-1">
+                {visibleNav.map(item => (
+                  <Link key={item.href} href={item.href} className={clsx('flex items-center gap-2.5 px-3 py-2 text-sm', pathname === item.href ? 'text-ink bg-yellow/10' : 'text-grey-700 hover:bg-paper-2')}>
+                    {item.icon}{item.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
           </div>
-          <div className="p-2">
-            {visibleNav.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
-                  pathname === item.href
-                    ? 'bg-yellow/10 text-ink border-l-2 border-yellow -ml-[1px]'
-                    : 'text-grey-700 hover:bg-paper-2 hover:text-ink'
-                )}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
+          <LivePill />
+          <div className="text-xs text-grey-500 shrink-0 text-end leading-tight">
+            <div className="text-ink font-medium">{session.user.name}</div>
+            {hasRole(session, 'kasper_admin') ? 'Kasper Admin' : 'Kasper Ops'}
           </div>
-          <div className="p-4 text-[11px] text-grey-500 border-t border-line">
-            Signed in as {session.user.name} · {hasRole(session, 'kasper_admin') ? 'Kasper Admin' : 'Kasper Ops'}
-          </div>
-        </nav>
+        </header>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto">
           {children}
         </main>
       </div>

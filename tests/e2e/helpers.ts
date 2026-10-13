@@ -4,7 +4,7 @@
 // says, which phase) so the assertions below are about the product, not about
 // whatever the previous test left behind.
 
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export const USERS = {
   sara: 'sara@kasper.ae',        // Kasper Admin
@@ -161,4 +161,23 @@ export async function expectText(page: Page, text: string | RegExp): Promise<voi
 /** Assert the page does not show this copy at all. */
 export async function expectNoText(page: Page, text: string | RegExp): Promise<void> {
   await expect(page.getByText(text)).toHaveCount(0);
+}
+
+/**
+ * A page link in the top navigation (owner decision, 13 Oct: top tabs, no sidebar).
+ * Narrow desktops keep later tabs under "More"; this opens it when the tab is there.
+ */
+export async function navLink(page: Page, label: string): Promise<Locator> {
+  const nav = page.getByTestId('top-nav');
+  const inBar = nav.getByRole('link', { name: label, exact: true }).first();
+  if (await inBar.isVisible()) return inBar;
+  const more = nav.getByRole('button', { name: 'More' });
+  if ((await more.count()) && (await more.isVisible()) && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  return nav.getByRole('group', { name: 'More' }).getByRole('link', { name: label, exact: true });
+}
+
+/** Open the top navigation's "More" menu if this width has one, so every allowed tab is on screen. */
+export async function openMore(page: Page): Promise<void> {
+  const more = page.getByTestId('top-nav').getByRole('button', { name: 'More' });
+  if ((await more.count()) && (await more.isVisible()) && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
 }

@@ -13,6 +13,12 @@ import { SCENARIOS, startScenario, type Scenario } from '@/components/demo/scena
 import { ViewAsMenu } from '@/components/demo/ViewAsMenu';
 import { FeaturesPanel } from './FeaturesPanel';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
+import { Clock, ListChecks, Play, Wrench } from 'lucide-react';
+import { OPEN_DEMO_CLOCK_EVENT } from './open-clock';
+
+/** One shape for every demo-bar button (B3: restyled with the tokens). */
+const DEMO_BTN =
+  'inline-flex items-center gap-1 sm:gap-1.5 flex-shrink-0 h-7 bg-demo-surface px-1.5 sm:px-2 rounded-md hover:bg-demo-surface-2 transition-colors border border-demo-line whitespace-nowrap focus-visible:outline-2 focus-visible:outline-yellow';
 
 // ── Tools ──────────────────────────────────────────────────────────────────────
 
@@ -66,6 +72,15 @@ export function DemoBar() {
   }, [publicPage, pillExpanded]);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
+  // The LIVE pill in the app bar opens this clock (B3).
+  useEffect(() => {
+    const open = () => {
+      setPillExpanded(true);
+      setClockOpen(true);
+    };
+    window.addEventListener(OPEN_DEMO_CLOCK_EVENT, open);
+    return () => window.removeEventListener(OPEN_DEMO_CLOCK_EVENT, open);
+  }, []);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [resetArmed, setResetArmed] = useState(false);
@@ -165,13 +180,15 @@ export function DemoBar() {
         <button
           onClick={() => setClockOpen(!clockOpen)}
           aria-label="Clock"
-          className="flex-shrink-0 bg-[#1a1b20] text-paper text-[10px] font-mono px-2 py-1 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          aria-expanded={clockOpen}
+          className={clsx(DEMO_BTN, 'font-mono text-[11px] text-paper')}
         >
+          <Clock size={13} aria-hidden className="hidden sm:block shrink-0 text-paper/70" />
           {currentTimeStr}<span className="hidden sm:inline"> · {currentDateStr}</span>
         </button>
         {clockOpen && (
-          <div className="absolute top-full right-0 mt-1 w-72 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-[#2a2c30]">
+          <div className="absolute top-full right-0 mt-1 w-72 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <div className="p-2 border-b border-demo-line">
               <div className="text-[10px] text-paper/50 font-mono">Simulated clock · Dubai</div>
               <div className="text-sm text-paper mt-0.5">{currentDateStr} · {currentTimeStr}</div>
               {clockOffset !== 0 && (
@@ -180,7 +197,7 @@ export function DemoBar() {
                 </div>
               )}
             </div>
-            <div className="p-2 flex flex-wrap gap-1 border-b border-[#2a2c30]">
+            <div className="p-2 flex flex-wrap gap-1 border-b border-demo-line">
               <ClockButton label="−1 d" onClick={() => shiftBy(-86400000)} />
               <ClockButton label="−1 h" onClick={() => shiftBy(-3600000)} />
               <ClockButton label="+1 h" onClick={() => shiftBy(3600000)} />
@@ -198,7 +215,7 @@ export function DemoBar() {
                     className="w-full text-left px-2 py-1 text-[11px] text-paper/80 hover:bg-white/5 rounded transition-colors flex items-center justify-between gap-2"
                   >
                     <span className="truncate">{preset.label}</span>
-                    <span className="text-paper/40 font-mono flex-shrink-0">{preset.hint}</span>
+                    <span className="text-paper/60 font-mono flex-shrink-0">{preset.hint}</span>
                   </button>
                 ))}
               </div>
@@ -215,10 +232,8 @@ export function DemoBar() {
         aria-label={`Sales view: ${switches.salesView ? 'ON' : 'OFF'}`}
         onClick={() => storeActions.setDemoSwitches({ salesView: !switches.salesView })}
         className={clsx(
-          'flex-shrink-0 px-2 py-1 text-[10px] font-mono rounded-lg border transition-colors',
-          switches.salesView
-            ? 'bg-[#1a1b20] text-paper border-[#2a2c30]'
-            : 'bg-[#1a1b20] text-paper/60 border-[#2a2c30] hover:text-paper'
+          DEMO_BTN, 'font-mono text-[11px]',
+          switches.salesView ? 'text-paper' : 'text-paper/70 hover:text-paper'
         )}
       >
         <span className="hidden sm:inline">Sales view: {switches.salesView ? 'ON' : 'OFF'}</span>
@@ -229,11 +244,9 @@ export function DemoBar() {
       <button
         onClick={() => setFeaturesOpen(!featuresOpen)}
         aria-label="Features"
-        className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+        className={clsx(DEMO_BTN, 'text-xs text-paper')}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
-          <path d="M1.5 2.5l1 1 1.5-1.5M1.5 6.5l1 1 1.5-1.5M5.5 3h3.5M5.5 7h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <ListChecks size={13} aria-hidden className="shrink-0 text-paper/70" />
         <span className="hidden sm:inline">Features</span>
       </button>
 
@@ -245,16 +258,14 @@ export function DemoBar() {
         <button
           onClick={() => setScenariosOpen(!scenariosOpen)}
           aria-label="Scenarios"
-          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className={clsx(DEMO_BTN, 'text-xs text-paper')}
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
-            <path d="M3 2l5 3-5 3V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-          </svg>
+          <Play size={13} aria-hidden className="shrink-0 text-paper/70" />
           <span className="hidden sm:inline">Scenarios</span>
         </button>
         {scenariosOpen && (
-          <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-[#2a2c30]">
+          <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <div className="p-2 border-b border-demo-line">
               <div className="text-[10px] text-paper/50 font-mono">Guided walkthroughs</div>
             </div>
             <div className="max-h-[min(70vh,640px)] overflow-y-auto p-2 space-y-0.5">
@@ -279,7 +290,7 @@ export function DemoBar() {
                       {s.label}
                       {/* One line under the title, so at least 10 scenarios fit the menu (J5.6).
                           A scenario for someone else switches to them in the same click. */}
-                      <span className={`block text-[10px] ${notForUser ? 'text-yellow/70' : 'text-paper/40'}`}>
+                      <span className={`block text-[10px] ${notForUser ? 'text-yellow/70' : 'text-paper/60'}`}>
                         {who
                           ? notForUser
                             ? `runs as ${who.name} — click to switch to ${who.name.split(' ')[0]}`
@@ -300,16 +311,14 @@ export function DemoBar() {
         <button
           onClick={() => setToolsOpen(!toolsOpen)}
           aria-label="Tools"
-          className="inline-flex items-center gap-1 flex-shrink-0 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors border border-[#2a2c30] whitespace-nowrap"
+          className={clsx(DEMO_BTN, 'text-xs text-paper')}
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-paper/60">
-            <path d="M3 2l5 5-5 5M3 6l4 4M2 3a1 1 0 100 2 1 1 0 000-2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Wrench size={13} aria-hidden className="shrink-0 text-paper/70" />
           <span className="hidden sm:inline">Tools</span>
         </button>
         {toolsOpen && (
-          <div className="absolute top-full right-0 mt-1 w-60 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-            <div className="p-2 border-b border-[#2a2c30]">
+          <div className="absolute top-full right-0 mt-1 w-60 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
+            <div className="p-2 border-b border-demo-line">
               <div className="text-[10px] text-paper/50 font-mono">Developer tools</div>
             </div>
             <div className="max-h-60 overflow-y-auto p-2 space-y-0.5">
@@ -326,7 +335,7 @@ export function DemoBar() {
                   <span className="text-paper/50 ml-2">{tool.desc}</span>
                 </button>
               ))}
-              <div className="border-t border-[#2a2c30] pt-1 mt-1">
+              <div className="border-t border-demo-line pt-1 mt-1">
                 <button
                   onClick={() => {
                     if (!resetArmed) {
@@ -403,7 +412,7 @@ export function DemoBar() {
       <LanguageToggle variant="demo" />
 
       {/* Prototype label */}
-      <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ms-auto hidden lg:inline">
+      <span className="flex-shrink-0 text-[9px] text-paper/60 font-mono ms-auto hidden lg:inline">
         Prototype · dummy data
       </span>
       {walkthroughCard}
@@ -418,8 +427,8 @@ function ClockButton({ label, onClick, isReset }: { label: string; onClick: () =
     <button
       onClick={onClick}
       className={clsx(
-        'px-2 py-1 text-[10px] font-mono rounded hover:bg-white/5 transition-colors border border-[#2a2c30]',
-        isReset ? 'bg-yellow/10 text-yellow border-yellow-dark/40' : 'bg-[#22242a] text-paper'
+        'px-2 py-1 text-[10px] font-mono rounded hover:bg-white/5 transition-colors border border-demo-line',
+        isReset ? 'bg-yellow/10 text-yellow border-yellow-dark/40' : 'bg-demo-surface-2 text-paper'
       )}
     >
       {label}

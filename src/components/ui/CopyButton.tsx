@@ -11,6 +11,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
+import { Check, Copy } from 'lucide-react';
 import { useT } from '@/i18n';
 import { focusRing } from './tones';
 
@@ -70,14 +71,9 @@ export function CopyButton({ value, label, showText = false, className = '' }: C
       data-state={state}
     >
       {state === 'copied' ? (
-        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M3 7.5l2.5 2.5L11 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Check size={14} aria-hidden="true" />
       ) : (
-        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="4.5" y="4.5" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-          <path d="M9.5 4.5V3.5a1 1 0 00-1-1h-5a1 1 0 00-1 1v5a1 1 0 001 1h1" stroke="currentColor" strokeWidth="1.3" />
-        </svg>
+        <Copy size={14} aria-hidden="true" />
       )}
       {showText && <span>{word}</span>}
     </button>

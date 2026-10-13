@@ -33,7 +33,7 @@
    Keep the existing exports working, so screens that aren't redesigned yet still compile.
 6. **Icons.** Add `lucide-react` and replace the nav SVGs in `AppShell` using the §4 mapping. Alerts and Maintenance are currently the same triangle.
 7. **Shell: top navigation, no left sidebar** (owner decision, 13 Oct; spec `UI-UPGRADE.md` §5.1).
-   - One top bar: logo + company, up to 6 page tabs (icon + label, accent underline when active), "More ▾" for the rest, ⌘K search, LIVE clock pill, bell, and user menu (Settings lives there).
+   - One top bar: logo + company, page tabs (icon + label, accent underline when active; 4/6/7 by width), "More ▾" for the rest, search, LIVE clock pill (≥1760 px), bell, a Settings gear, and the user menu. (⌘K stays with View as.)
    - The same for the console layout.
    - Remove the left sidebar. Keep every nav gating rule and test (update locators only).
    - Below 1024 px: "Menu ▾". Phones: the existing menu sheet.

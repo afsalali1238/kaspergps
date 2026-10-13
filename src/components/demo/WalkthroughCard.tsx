@@ -56,7 +56,7 @@ function Ring({ selector }: { selector: string }) {
         left: rect.left - 4,
         width: rect.width + 8,
         height: rect.height + 8,
-        outline: '3px solid #FFC400',
+        outline: '3px solid var(--Kasper-yellow)',
         boxShadow: '0 0 0 6px rgba(255, 196, 0, 0.25)',
       }}
     />
@@ -104,17 +104,17 @@ export function WalkthroughCard({ scenario, walkthrough, onSetStep, onFinish, on
       {steps[stepIndex]?.highlight && <Ring selector={steps[stepIndex].highlight!} />}
 
       <div
-        className="demo-tour fixed bottom-14 right-4 z-[130] w-80 bg-[#1a1b20] text-paper border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
+        className="demo-tour fixed bottom-14 right-4 z-[130] w-80 bg-demo-surface text-paper border border-demo-line rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
         data-testid="walkthrough-card"
       >
-        <div className="px-3 py-2 border-b border-[#2a2c30] flex items-center justify-between">
+        <div className="px-3 py-2 border-b border-demo-line flex items-center justify-between">
           <div>
             <div className="text-[10px] text-paper/50 font-mono">Walkthrough · S{scenario.id}</div>
             <div className="text-xs text-paper/90">{scenario.label}</div>
           </div>
           <button
             onClick={finish}
-            className="text-[10px] text-paper/60 hover:text-paper border border-[#2a2c30] rounded px-1.5 py-0.5"
+            className="text-[10px] text-paper/60 hover:text-paper border border-demo-line rounded px-1.5 py-0.5"
           >
             End tour
           </button>
@@ -146,15 +146,15 @@ export function WalkthroughCard({ scenario, walkthrough, onSetStep, onFinish, on
           })}
         </div>
 
-        <div className="px-3 py-2 border-t border-[#2a2c30] flex items-center justify-between">
+        <div className="px-3 py-2 border-t border-demo-line flex items-center justify-between">
           <button
             onClick={() => setStep(stepIndex - 1)}
             disabled={stepIndex === 0}
-            className="text-[10px] text-paper/60 hover:text-paper disabled:opacity-30 border border-[#2a2c30] rounded px-2 py-1"
+            className="text-[10px] text-paper/60 hover:text-paper disabled:opacity-30 border border-demo-line rounded px-2 py-1"
           >
             ← Back
           </button>
-          <span className="text-[10px] text-paper/40">
+          <span className="text-[10px] text-paper/60">
             {stepIndex + 1} / {steps.length}
           </span>
           {last ? (

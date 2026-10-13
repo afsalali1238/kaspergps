@@ -25,7 +25,7 @@ function roleShort(role: string): string {
 const TONE: Record<'warn' | 'info' | 'muted', string> = {
   warn: 'text-red/90 border-red/40',
   info: 'text-blue-300 border-blue-400/40',
-  muted: 'text-paper/50 border-[#2a2c30]',
+  muted: 'text-paper/50 border-demo-line',
 };
 
 export function ViewAsMenu() {
@@ -94,7 +94,7 @@ export function ViewAsMenu() {
       <button
         onClick={() => setOpen(!open)}
         aria-label="View as"
-        className="flex items-center gap-1.5 bg-[#1a1b20] text-paper text-xs px-2 py-1.5 rounded-lg hover:bg-[#22242a] transition-colors whitespace-nowrap border border-[#2a2c30]"
+        className="flex items-center gap-1.5 h-7 bg-demo-surface text-paper text-xs px-2 rounded-md hover:bg-demo-surface-2 transition-colors whitespace-nowrap border border-demo-line focus-visible:outline-2 focus-visible:outline-yellow"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-paper/60">
           <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -109,13 +109,13 @@ export function ViewAsMenu() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-          <div className="p-2 border-b border-[#2a2c30]">
+        <div className="absolute top-full left-0 mt-1 w-80 max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(var(--demo-bar-h)+4px)] max-sm:w-auto max-sm:mt-0 bg-demo-surface border border-demo-line rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50">
+          <div className="p-2 border-b border-demo-line">
             <select
               value={role}
               onChange={e => setRole(e.target.value as ViewAsRoleFilter)}
               aria-label="Role"
-              className="w-full mb-2 px-2.5 py-1.5 text-xs bg-[#22242a] text-paper border border-[#2a2c30] rounded-lg focus:outline-none focus:border-yellow"
+              className="w-full mb-2 px-2.5 py-1.5 text-xs bg-demo-surface-2 text-paper border border-demo-line rounded-lg focus:outline-none focus:border-yellow"
             >
               <option value="all">All roles</option>
               <option value="kasper_admin">Kasper admin</option>
@@ -129,7 +129,7 @@ export function ViewAsMenu() {
               onChange={e => setQuery(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              className="w-full px-2.5 py-1.5 text-xs bg-[#22242a] text-paper border border-[#2a2c30] rounded-lg focus:outline-none focus:border-yellow placeholder:text-paper/40"
+              className="w-full px-2.5 py-1.5 text-xs bg-demo-surface-2 text-paper border border-demo-line rounded-lg focus:outline-none focus:border-yellow placeholder:text-paper/60"
               autoFocus
             />
             {notice && (
@@ -144,7 +144,7 @@ export function ViewAsMenu() {
 
           <div className="max-h-80 overflow-y-auto">
             {groups.map(group => (
-              <div key={group.key} className="border-b border-[#2a2c30]">
+              <div key={group.key} className="border-b border-demo-line">
                 <div className="px-3 py-1.5 text-[10px] text-paper/50 font-mono uppercase tracking-wider">{group.name}</div>
                 {group.rows.map(row => (
                   <button
@@ -175,7 +175,7 @@ export function ViewAsMenu() {
             {groups.length === 0 && (
               <p className="px-3 py-3 text-xs text-paper/50">No user matches “{query}”.</p>
             )}
-            <div className="p-1 border-t border-[#2a2c30]">
+            <div className="p-1 border-t border-demo-line">
               <button onClick={outsideHirer} className="w-full text-left px-3 py-1.5 text-xs text-paper/80 hover:bg-white/5 rounded">
                 Outside hirer (tracking link)
               </button>

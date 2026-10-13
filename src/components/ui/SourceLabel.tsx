@@ -13,10 +13,10 @@ interface SourceLabelProps {
 }
 
 const sourceStyles: Record<string, string> = {
-  'ECU': 'bg-green/10 text-green border-green/20',
+  'ECU': 'bg-green/10 text-ok-ink border-green/20',
   'ECU · partial': 'bg-amber/10 text-amber-dark border-amber/20',
   'Estimated': 'bg-paper border-line text-grey-500',
-  'ECU (ALL-CAN300)': 'bg-green/10 text-green border-green/20',
+  'ECU (ALL-CAN300)': 'bg-green/10 text-ok-ink border-green/20',
   'GPS distance': 'bg-paper border-line text-grey-500',
   'From invoices': 'bg-paper border-line text-grey-500',
   'From service log': 'bg-paper border-line text-grey-500',

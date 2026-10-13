@@ -141,8 +141,8 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-yellow">
-            <rect width="24" height="24" rx="5" fill="#141518" />
-            <text x="0" y="18" fontSize="12" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
+            <rect width="24" height="24" rx="5" className="fill-ink" />
+            <text x="0" y="18" fontSize="12" fontFamily="monospace" className="fill-yellow" fontWeight="700">K</text>
           </svg>
           <span className="text-sm font-semibold text-ink">Kasper GPS</span>
         </div>

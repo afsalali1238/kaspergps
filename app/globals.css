@@ -13,8 +13,8 @@
   --line: #E8E8E3;
   --grey-700: #5B5F66;
   /* Secondary text. Was #9A9CA1 (about 2.6:1 on the page background, below WCAG AA);
-     now passes AA (about 4.6:1). Pure decoration uses --muted. */
-  --grey-500: #6B6F76;
+     now passes AA (about 4.7:1 on the page background; B3 nudged it from #6B6F76, which axe measured at 4.45:1). Pure decoration uses --muted. */
+  --grey-500: #676B72;
   --muted: #9A9CA1;
   --red: #D64545;
   --green: #1F9A6D;
@@ -34,9 +34,9 @@
   --border: #E8E8E3;
   --text: #141518;
   --text-secondary: #5B5F66;
-  --text-muted: #6B6F76;
+  --text-muted: #676B72;
 
-  /* Status tints (9%), from the fleetx reference */
+  /* Status tints (9%) */
   --ok-tint: rgba(31, 154, 109, .09);
   --warn-tint: rgba(230, 175, 0, .09);
   --bad-tint: rgba(214, 69, 69, .09);
@@ -47,6 +47,10 @@
   --shadow-sm: 0 1px 3px rgba(20, 21, 24, .08), 0 1px 2px rgba(20, 21, 24, .04);
   --shadow-md: 0 4px 12px rgba(20, 21, 24, .1), 0 2px 4px rgba(20, 21, 24, .06);
   --demo-bar-bg: #141518;
+  /* Demo bar surfaces (dark, presenter-only chrome). */
+  --demo-surface: #1A1B20;
+  --demo-surface-2: #22242A;
+  --demo-line: #2A2C30;
 
   /* Tone inks (B2): text on the 9% tints. The base status colours are too light
      for small text (green 3.2:1, red 3.9:1, amber 1.9:1 on their tints), so
@@ -95,6 +99,9 @@
   --shadow-panel: var(--shadow-sm);
   --shadow-pop: var(--shadow-md);
   --color-demo-bar-bg: var(--demo-bar-bg);
+  --color-demo-surface: var(--demo-surface);
+  --color-demo-surface-2: var(--demo-surface-2);
+  --color-demo-line: var(--demo-line);
 
   /* Semantic tone names used by src/components/ui (B2). */
   --color-accent: var(--Kasper-yellow);
@@ -173,7 +180,7 @@ body[data-demo-collapsed='true'] {
 
 .demo-bar {
   background: var(--demo-bar-bg);
-  color: #F1F1EC;
+  color: var(--paper);
   font-family: var(--font-body);
 }
 
@@ -221,17 +228,21 @@ body[data-demo-collapsed='true'] {
   unicode-bidi: isolate;
 }
 
-/* Numbers, times, plates and asset codes stay on the Latin grid in Arabic. */
-[dir="rtl"] .font-mono {
-  direction: ltr;
-  unicode-bidi: isolate;
-  display: inline-block;
-}
+/* Numbers, times, plates and asset codes stay on the Latin grid in Arabic.
+   In @layer base so a utility (hidden, flex, …) on the same element still wins;
+   unlayered, this display used to beat `hidden` and showed hidden mono text in Arabic. */
+@layer base {
+  [dir="rtl"] .font-mono {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline-block;
+  }
 
-/* Arrows that point "forward" in English point the other way in Arabic. */
-[dir="rtl"] .arrow-forward {
-  transform: scaleX(-1);
-  display: inline-block;
+  /* Arrows that point "forward" in English point the other way in Arabic. */
+  [dir="rtl"] .arrow-forward {
+    transform: scaleX(-1);
+    display: inline-block;
+  }
 }
 
 /* ── Type scale (UI upgrade §4) ───────────────────────────────────────────────

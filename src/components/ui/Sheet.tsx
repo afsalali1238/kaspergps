@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback } from 'react';
 import clsx from 'clsx';
+import { X } from 'lucide-react';
 
 interface SheetProps {
   open: boolean;
@@ -86,9 +87,7 @@ export function Sheet({
                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-paper-2 text-grey-500 hover:text-ink transition-colors"
                 aria-label="Close"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <X size={14} aria-hidden="true" />
               </button>
             )}
           </div>

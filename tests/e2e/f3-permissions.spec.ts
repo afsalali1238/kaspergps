@@ -10,7 +10,7 @@
 //     Audit log, Kasper Ops does not (console.audit.view is Kasper Admin only).
 
 import { expect, test } from '@playwright/test';
-import { goTo, signIn, USERS } from './helpers';
+import { goTo, navLink, openMore, signIn, USERS } from './helpers';
 
 test.describe('F3: asset actions follow the permission matrix', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop asset page layout');
@@ -48,12 +48,13 @@ test.describe('F3: console nav follows the console capabilities', () => {
   test('Kasper Admin sees the Audit log in the console nav', async ({ page }) => {
     await signIn(page, USERS.sara);
     await expect(page.getByRole('link', { name: 'Tenants' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Audit log' }).first()).toBeVisible();
+    await expect(await navLink(page, 'Audit log')).toBeVisible();
   });
 
   test('Kasper Ops does not see the Audit log', async ({ page }) => {
     await signIn(page, USERS.ravi);
     await expect(page.getByRole('link', { name: 'Tenants' }).first()).toBeVisible();
+    await openMore(page); // every allowed tab on screen, so "none" means none
     await expect(page.getByRole('link', { name: 'Audit log' })).toHaveCount(0);
   });
 });

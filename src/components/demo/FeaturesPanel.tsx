@@ -91,7 +91,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
   if (!session) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" data-testid="features-panel">
-        <div className="bg-[#1a1b20] border border-[#2a2c30] rounded-xl shadow-2xl shadow-black/50 p-6 max-w-md w-full mx-4">
+        <div className="bg-demo-surface border border-demo-line rounded-xl shadow-2xl shadow-black/50 p-6 max-w-md w-full mx-4">
           <h2 className="text-sm font-medium text-paper mb-3">Features</h2>
           <p className="text-xs text-paper/50">Sign in to see your capabilities and features.</p>
         </div>
@@ -105,9 +105,9 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-end z-[60]" data-testid="features-panel">
-      <div className="bg-[#1a1b20] border-l border-[#2a2c30] shadow-2xl shadow-black/50 w-full max-w-sm h-full overflow-y-auto">
+      <div className="bg-demo-surface border-l border-demo-line shadow-2xl shadow-black/50 w-full max-w-sm h-full overflow-y-auto">
         {/* Header: who, company, role, sites, and what the role is for */}
-        <div className="sticky top-0 bg-[#1a1b20] border-b border-[#2a2c30] px-4 py-3 flex items-center justify-between">
+        <div className="sticky top-0 bg-demo-surface border-b border-demo-line px-4 py-3 flex items-center justify-between">
           <h2 className="text-sm font-medium text-paper">Features</h2>
           <button
             onClick={() => onClose?.()}
@@ -120,7 +120,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
           </button>
         </div>
 
-        <div className="px-4 py-3 border-b border-[#2a2c30] bg-[#22242a]" data-testid="features-identity">
+        <div className="px-4 py-3 border-b border-demo-line bg-demo-surface-2" data-testid="features-identity">
           <div className="text-xs text-paper font-medium">{user.name}</div>
           <div className="text-xs text-paper/60 mt-0.5">
             {ROLE_WORDS[user.role]} · {company}
@@ -131,7 +131,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
 
         {/* The asset the reviewer was looking at, when there is one */}
         {asset && (
-          <div className="px-4 py-2.5 border-b border-[#2a2c30]">
+          <div className="px-4 py-2.5 border-b border-demo-line">
             <div className="text-[10px] text-paper/50 font-mono uppercase tracking-wider mb-1">Selected asset</div>
             <div className="text-xs text-paper">{asset.code} · {asset.name}</div>
             <div className="text-[10px] text-paper/50 mt-0.5">
@@ -145,10 +145,10 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
         )}
 
         {/* Every capability, grouped, with the scope and the reason for every ✕ */}
-        <div className="px-4 py-3 border-b border-[#2a2c30]" data-testid="features-capabilities">
+        <div className="px-4 py-3 border-b border-demo-line" data-testid="features-capabilities">
           <div className="flex items-baseline justify-between mb-2">
             <div className="text-[10px] text-paper/50 font-mono uppercase tracking-wider">Capabilities</div>
-            <span className="text-[10px] font-mono text-paper/40">{heldHere} of {capabilities.length}</span>
+            <span className="text-[10px] font-mono text-paper/60">{heldHere} of {capabilities.length}</span>
           </div>
           <div className="space-y-3">
             {CAPABILITY_GROUPS.map(group => {
@@ -159,7 +159,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
                 <div key={group.id}>
                   <div className="text-[11px] text-paper/70 mb-1">
                     {group.label}
-                    <span className="text-paper/40 font-mono"> · {groupHeld}/{rows.length}</span>
+                    <span className="text-paper/60 font-mono"> · {groupHeld}/{rows.length}</span>
                   </div>
                   <div className="space-y-1">
                     {rows.map(row => (
@@ -180,7 +180,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
         </div>
 
         {/* Hardware in the current view, then every §6.3 feature against it */}
-        <div className="px-4 py-3 border-b border-[#2a2c30]" data-testid="features-hardware">
+        <div className="px-4 py-3 border-b border-demo-line" data-testid="features-hardware">
           <div className="text-[10px] text-paper/50 font-mono uppercase tracking-wider mb-2">Hardware in your view</div>
           <div className="text-xs text-paper/80 mb-2" data-testid="features-tiers">{hardware?.sentence}</div>
           <div className="text-[11px] text-paper/50 mb-3 leading-snug">
@@ -222,7 +222,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
                 { label: 'Active tracking links', value: rightNow.activeLinks },
                 { label: 'Open alerts', value: rightNow.openAlerts },
               ].map(item => (
-                <div key={item.label} className="bg-[#22242a] border border-[#2a2c30] rounded-lg px-2.5 py-2">
+                <div key={item.label} className="bg-demo-surface-2 border border-demo-line rounded-lg px-2.5 py-2">
                   <div className="text-sm text-paper font-mono">{item.value}</div>
                   <div className="text-[10px] text-paper/50 mt-0.5 leading-snug">{item.label}</div>
                 </div>
@@ -231,7 +231,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
           </div>
         )}
 
-        <div className="px-4 py-3 border-t border-[#2a2c30] bg-[#22242a] text-[10px] text-paper/40 font-mono">
+        <div className="px-4 py-3 border-t border-demo-line bg-demo-surface-2 text-[10px] text-paper/60 font-mono">
           Phase and Show hidden are gone: the demo shows everything, always.
         </div>
       </div>

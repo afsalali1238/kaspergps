@@ -31,7 +31,7 @@ export function LanguageToggle({ variant }: { variant: 'demo' | 'menu' }) {
         type="button"
         aria-label="Language"
         onClick={onClick}
-        className="flex-shrink-0 px-2 py-1 text-[10px] font-mono rounded-lg border border-[#2a2c30] bg-[#1a1b20] text-paper hover:text-yellow hover:border-yellow-dark/40 transition-colors whitespace-nowrap"
+        className="inline-flex items-center flex-shrink-0 h-7 px-2 text-[11px] font-mono rounded-md border border-demo-line bg-demo-surface text-paper hover:text-yellow hover:border-yellow-dark/40 transition-colors whitespace-nowrap"
       >
         {locale === 'ar' ? 'EN' : 'عربي'}
       </button>
