@@ -18,7 +18,7 @@ import { OPEN_DEMO_CLOCK_EVENT } from './open-clock';
 
 /** One shape for every demo-bar button (B3: restyled with the tokens). */
 const DEMO_BTN =
-  'inline-flex items-center gap-1.5 flex-shrink-0 h-7 bg-demo-surface px-2 rounded-md hover:bg-demo-surface-2 transition-colors border border-demo-line whitespace-nowrap focus-visible:outline-2 focus-visible:outline-yellow';
+  'inline-flex items-center gap-1 sm:gap-1.5 flex-shrink-0 h-7 bg-demo-surface px-1.5 sm:px-2 rounded-md hover:bg-demo-surface-2 transition-colors border border-demo-line whitespace-nowrap focus-visible:outline-2 focus-visible:outline-yellow';
 
 // ── Tools ──────────────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ export function DemoBar() {
           aria-expanded={clockOpen}
           className={clsx(DEMO_BTN, 'font-mono text-[11px] text-paper')}
         >
-          <Clock size={13} aria-hidden className="shrink-0 text-paper/70" />
+          <Clock size={13} aria-hidden className="hidden sm:block shrink-0 text-paper/70" />
           {currentTimeStr}<span className="hidden sm:inline"> · {currentDateStr}</span>
         </button>
         {clockOpen && (
@@ -215,7 +215,7 @@ export function DemoBar() {
                     className="w-full text-left px-2 py-1 text-[11px] text-paper/80 hover:bg-white/5 rounded transition-colors flex items-center justify-between gap-2"
                   >
                     <span className="truncate">{preset.label}</span>
-                    <span className="text-paper/40 font-mono flex-shrink-0">{preset.hint}</span>
+                    <span className="text-paper/60 font-mono flex-shrink-0">{preset.hint}</span>
                   </button>
                 ))}
               </div>
@@ -290,7 +290,7 @@ export function DemoBar() {
                       {s.label}
                       {/* One line under the title, so at least 10 scenarios fit the menu (J5.6).
                           A scenario for someone else switches to them in the same click. */}
-                      <span className={`block text-[10px] ${notForUser ? 'text-yellow/70' : 'text-paper/40'}`}>
+                      <span className={`block text-[10px] ${notForUser ? 'text-yellow/70' : 'text-paper/60'}`}>
                         {who
                           ? notForUser
                             ? `runs as ${who.name} — click to switch to ${who.name.split(' ')[0]}`
@@ -412,7 +412,7 @@ export function DemoBar() {
       <LanguageToggle variant="demo" />
 
       {/* Prototype label */}
-      <span className="flex-shrink-0 text-[9px] text-paper/40 font-mono ms-auto hidden lg:inline">
+      <span className="flex-shrink-0 text-[9px] text-paper/60 font-mono ms-auto hidden lg:inline">
         Prototype · dummy data
       </span>
       {walkthroughCard}

@@ -646,8 +646,8 @@ export default function AssetDetailPage() {
         <div
           className={
             trackerToast.kind === 'ok'
-              ? 'bg-green/10 border border-green/30 text-green text-sm px-4 py-2 rounded-lg'
-              : 'bg-red/10 border border-red/30 text-red text-sm px-4 py-2 rounded-lg'
+              ? 'bg-green/10 border border-green/30 text-ok-ink text-sm px-4 py-2 rounded-lg'
+              : 'bg-red/10 border border-red/30 text-bad-ink text-sm px-4 py-2 rounded-lg'
           }
         >
           {trackerToast.text}
@@ -695,7 +695,7 @@ export default function AssetDetailPage() {
               <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.status', 'Status')}</div>
               <div className="text-lg font-semibold text-ink mt-1 capitalize">{t(`common.status.${status}`, status)}</div>
               {status === 'offline' && (
-                <div className="text-xs text-red mt-1">
+                <div className="text-xs text-bad-ink mt-1">
                   {t('asset_detail.overview.offline_since', 'Offline since {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
                 </div>
               )}

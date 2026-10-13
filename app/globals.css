@@ -13,8 +13,8 @@
   --line: #E8E8E3;
   --grey-700: #5B5F66;
   /* Secondary text. Was #9A9CA1 (about 2.6:1 on the page background, below WCAG AA);
-     now passes AA (about 4.6:1). Pure decoration uses --muted. */
-  --grey-500: #6B6F76;
+     now passes AA (about 4.7:1 on the page background; B3 nudged it from #6B6F76, which axe measured at 4.45:1). Pure decoration uses --muted. */
+  --grey-500: #676B72;
   --muted: #9A9CA1;
   --red: #D64545;
   --green: #1F9A6D;
@@ -34,7 +34,7 @@
   --border: #E8E8E3;
   --text: #141518;
   --text-secondary: #5B5F66;
-  --text-muted: #6B6F76;
+  --text-muted: #676B72;
 
   /* Status tints (9%), from the fleetx reference */
   --ok-tint: rgba(31, 154, 109, .09);

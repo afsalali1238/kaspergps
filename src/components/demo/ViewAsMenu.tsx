@@ -129,7 +129,7 @@ export function ViewAsMenu() {
               onChange={e => setQuery(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              className="w-full px-2.5 py-1.5 text-xs bg-demo-surface-2 text-paper border border-demo-line rounded-lg focus:outline-none focus:border-yellow placeholder:text-paper/40"
+              className="w-full px-2.5 py-1.5 text-xs bg-demo-surface-2 text-paper border border-demo-line rounded-lg focus:outline-none focus:border-yellow placeholder:text-paper/60"
               autoFocus
             />
             {notice && (

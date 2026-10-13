@@ -191,8 +191,8 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
                   <td className="py-1.5 text-right font-mono text-ink">{day.usedL === null ? '—' : n1(day.usedL)}</td>
                   <td className="py-1.5 pl-3">{day.usedL === null ? <span className="text-grey-500">{t('common.not_measured', 'Not measured')}</span> : <SourceLabel source={day.usedSource} inline />}</td>
                   <td className="py-1.5 text-grey-700">
-                    {day.refuel && <span className="text-green mr-2" title={t('asset_detail.engine.refuel', 'Refuel')}>▲ {t('asset_detail.engine.refuel', 'Refuel')}</span>}
-                    {day.drop && <span className="text-red" title={t('asset_detail.engine.drop', 'Fuel drop')}>▼ {t('asset_detail.engine.drop', 'Fuel drop')}</span>}
+                    {day.refuel && <span className="text-ok-ink mr-2" title={t('asset_detail.engine.refuel', 'Refuel')}>▲ {t('asset_detail.engine.refuel', 'Refuel')}</span>}
+                    {day.drop && <span className="text-bad-ink" title={t('asset_detail.engine.drop', 'Fuel drop')}>▼ {t('asset_detail.engine.drop', 'Fuel drop')}</span>}
                   </td>
                 </tr>
               ))}

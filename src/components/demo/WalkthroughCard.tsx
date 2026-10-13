@@ -154,7 +154,7 @@ export function WalkthroughCard({ scenario, walkthrough, onSetStep, onFinish, on
           >
             ← Back
           </button>
-          <span className="text-[10px] text-paper/40">
+          <span className="text-[10px] text-paper/60">
             {stepIndex + 1} / {steps.length}
           </span>
           {last ? (

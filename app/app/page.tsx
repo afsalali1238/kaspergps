@@ -412,7 +412,7 @@ export default function MapPage() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface text-xs hover:border-grey-500 hover:bg-paper-2"
             >
               <span className="text-grey-500">{t('map.kpi.open_alerts', 'Open alerts')}</span>
-              <span className="font-mono font-semibold text-red">{visibleOpenAlerts}</span>
+              <span className="font-mono font-semibold text-bad-ink">{visibleOpenAlerts}</span>
             </Link>
           )}
         </div>
@@ -672,9 +672,9 @@ export default function MapPage() {
                 >
                   <div className={clsx(
                     'min-w-8 h-8 px-1.5 rounded-lg flex items-center justify-center text-[10px] font-mono font-semibold border whitespace-nowrap',
-                    a.status === 'live' ? 'bg-live/10 text-live border-live/20' :
+                    a.status === 'live' ? 'bg-live/10 text-ok-ink border-live/20' :
                     a.status === 'idle' ? 'bg-idle/10 text-warn-ink border-idle/20' :
-                    a.status === 'offline' ? 'bg-red/10 text-red border-red/20' :
+                    a.status === 'offline' ? 'bg-red/10 text-bad-ink border-red/20' :
                     a.status === 'stale' ? 'bg-stale/10 text-stale border-stale/20' :
                     'bg-paper border-line text-grey-700'
                   )}>
@@ -710,7 +710,7 @@ export default function MapPage() {
                           </span>
                         )}
                         {a.openAlerts > 0 && (
-                          <span className="text-red">
+                          <span className="text-bad-ink">
                             {t('map.columns.open_alerts', 'Open alerts')} <span className="font-mono">{a.openAlerts}</span>
                           </span>
                         )}
@@ -721,9 +721,9 @@ export default function MapPage() {
                     <TierChip tier={a.tier} />
                     <span className={clsx(
                       'text-xs font-medium',
-                      a.status === 'live' ? 'text-live' :
+                      a.status === 'live' ? 'text-ok-ink' :
                       a.status === 'idle' ? 'text-warn-ink' :
-                      a.status === 'offline' ? 'text-red' :
+                      a.status === 'offline' ? 'text-bad-ink' :
                       a.status === 'stale' ? 'text-stale' :
                       'text-grey-500'
                     )}>

@@ -11,7 +11,7 @@ export const COLORS = {
   line: '#E8E8E3',
   line2: '#D8D8D2',
   slate: '#5B5F66',
-  secondary: '#6B6F76',
+  secondary: '#676B72',
   muted: '#9A9CA1',
   surface: '#FFFFFF',
   live: '#1F9A6D',

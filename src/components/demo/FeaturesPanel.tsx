@@ -148,7 +148,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
         <div className="px-4 py-3 border-b border-demo-line" data-testid="features-capabilities">
           <div className="flex items-baseline justify-between mb-2">
             <div className="text-[10px] text-paper/50 font-mono uppercase tracking-wider">Capabilities</div>
-            <span className="text-[10px] font-mono text-paper/40">{heldHere} of {capabilities.length}</span>
+            <span className="text-[10px] font-mono text-paper/60">{heldHere} of {capabilities.length}</span>
           </div>
           <div className="space-y-3">
             {CAPABILITY_GROUPS.map(group => {
@@ -159,7 +159,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
                 <div key={group.id}>
                   <div className="text-[11px] text-paper/70 mb-1">
                     {group.label}
-                    <span className="text-paper/40 font-mono"> · {groupHeld}/{rows.length}</span>
+                    <span className="text-paper/60 font-mono"> · {groupHeld}/{rows.length}</span>
                   </div>
                   <div className="space-y-1">
                     {rows.map(row => (
@@ -231,7 +231,7 @@ export function FeaturesPanel({ onClose }: FeaturesPanelProps) {
           </div>
         )}
 
-        <div className="px-4 py-3 border-t border-demo-line bg-demo-surface-2 text-[10px] text-paper/40 font-mono">
+        <div className="px-4 py-3 border-t border-demo-line bg-demo-surface-2 text-[10px] text-paper/60 font-mono">
           Phase and Show hidden are gone: the demo shows everything, always.
         </div>
       </div>
