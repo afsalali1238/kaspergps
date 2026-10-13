@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo } from 'react';
 import { useT } from '@/i18n';
 import { Button } from '@/components/ui';

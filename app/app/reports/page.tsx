@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useT } from '@/i18n';
 import { Button, Badge, Panel, Table, KpiStrip, KpiCell, SegmentedTabs } from '@/components/ui';
