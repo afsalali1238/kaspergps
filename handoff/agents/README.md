@@ -5,6 +5,8 @@ The UI upgrade (`handoff/UI-UPGRADE.md`, target 9/10 in every area) is split int
 - **The supervisor is Claude Opus.** It reviews every PR and merges it. No agent merges, pushes to `main`, or edits another agent's files.
 - **Owner decision (13 Oct, 00:36):** pages go in a **top navigation bar like fleetx; no left sidebar** (`UI-UPGRADE.md` §5.1; built in B3).
 
+**Remaining work, merge order and the builder prompt: `handoff/REMAINING.md` (13 Oct, 12:30).**
+
 **This folder replaces the step list in `handoff/BUILDER.md`.** `BUILDER.md` §1 (owner decisions), §4 (review loop), §5 (PR checklist) and §6 (send-back rules) still apply to every agent.
 
 ## Waves
