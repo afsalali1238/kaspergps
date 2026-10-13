@@ -151,7 +151,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     expect: 'The scrubber starts at the rental start; RPM/load appear in the readout; AdBlue reads "Not measured".',
   },
   29: {
-    do: ['Open the FB-12 public link.', 'Jump the clock +90 minutes.'],
+    do: ['Open the FB-12 public link.', 'Jump the clock +40 minutes.'],
     expect: '"Arriving about … (in … min)" becomes "Arrived" — with no route and no history.',
   },
   30: {

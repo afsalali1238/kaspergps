@@ -358,15 +358,14 @@ function pinPosition(sorted: Reading[], atMs: number): { lat: number; lng: numbe
 }
 
 /**
- * Trip boundaries get pins only in a window this short. A machine that works on one site
- * shuffles about all day, and the trip rule (correctly) calls each shuffle a trip: a
- * seven-day window of an excavator holds 66 of them, so its player would carry 132
- * identical pins that say nothing the coloured state track does not already show. In a
- * window with a few trips — a single trip played from the Trips tab (S27), or a day of a
- * truck — the boundary pins are the useful thing, so there they stay. The Trips tab list
- * itself is never filtered.
+ * Trip boundaries get pins only in a window with this many trips or fewer. Since C1 a
+ * machine working on one site shuffles at walking pace (not a trip) and trams to the work
+ * face once a shift, so a week of an excavator is about 7 trips and a week of a truck
+ * 15 to 20: their boundary pins are useful there. A month window (30+ trips) would carry
+ * dozens of identical pins that say nothing the coloured state track does not already
+ * show, so they stay off. The Trips tab list itself is never filtered.
  */
-export const PIN_TRIP_MAX = 3;
+export const PIN_TRIP_MAX = 20;
 
 /**
  * Pins for one playback window (spec 11.15): where trips start and end (when the window

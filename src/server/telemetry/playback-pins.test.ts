@@ -101,8 +101,7 @@ describe('seeded events appear as playback pins', () => {
     for (const code of ['FB-12', 'EX-04', 'LB-05', 'TP-21', 'WT-07', 'WL-06']) {
       const trips = groupTrips(getReadingsForAsset(assetOf(code), from, ANCHOR_MS));
       expect(trips.length, `${code} drives in the week`).toBeGreaterThan(0);
-      // A week of an excavator is 60+ shuffles: no boundary pins (see PIN_TRIP_MAX).
-      // A day is a few trips: the pins are there, one pair per trip.
+      // A day is a few trips: the pins are there, one pair per trip (see PIN_TRIP_MAX).
       const day = groupTrips(getReadingsForAsset(assetOf(code), ANCHOR_MS - DAY, ANCHOR_MS));
       const dayPins = pins(code, ANCHOR_MS - DAY, ANCHOR_MS);
       const startPins = dayPins.filter(p => p.kind === 'trip_start');
@@ -123,7 +122,7 @@ describe('seeded events appear as playback pins', () => {
   it('a month of readings still builds pins (the History tab can ask for a long window)', () => {
     const from = ANCHOR_MS - MONTH;
     const all = pins('EX-04', from, ANCHOR_MS);
-    // Hundreds of site shuffles: no trip-boundary pins at this density, but the events
+    // A month is 30+ trips: no trip-boundary pins at this density, but the events
     // that matter (refuels, drops, harsh, over-speed) are still there.
     expect(all.filter(p => p.kind === 'trip_start')).toEqual([]);
     expect(all.filter(p => p.kind === 'refuel').length).toBeGreaterThan(5);
