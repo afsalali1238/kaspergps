@@ -47,7 +47,7 @@ test.describe('G1 — Alerts for Khalid (Tenant Admin, owner)', () => {
     // Rules panel: Tenant Admin, labelled as a prototype.
     const rules = page.getByTestId('alert-rules-panel');
     await expect(page.getByText('Prototype — no messages are sent')).toBeVisible();
-    await expect(rules.getByLabel('Offline')).toHaveValue('instant');
+    await expect(rules.getByRole('combobox', { name: 'Offline' })).toHaveValue('instant');
 
     // The asset code is a link to the asset page.
     await page.getByTestId('alert-group-critical').getByRole('link', { name: 'EX-07' }).click();
@@ -88,11 +88,11 @@ test.describe('G1 — Alerts for Khalid (Tenant Admin, owner)', () => {
 
   test('a rule change is saved for the company and survives a reload', async ({ page }) => {
     await demo(page, { email: USERS.khalid, on: '/app/alerts' });
-    const offline = page.getByTestId('alert-rules-panel').getByLabel('Offline');
+    const offline = page.getByTestId('alert-rules-panel').getByRole('combobox', { name: 'Offline' });
     await offline.selectOption('digest');
     await expect(page.getByText('Saved. Prototype: no messages are sent.')).toBeVisible();
     await page.reload();
-    await expect(page.getByTestId('alert-rules-panel').getByLabel('Offline')).toHaveValue('digest');
+    await expect(page.getByTestId('alert-rules-panel').getByRole('combobox', { name: 'Offline' })).toHaveValue('digest');
   });
 });
 

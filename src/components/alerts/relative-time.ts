@@ -1,5 +1,5 @@
 // "12 min ago" for an alert row; the exact Dubai time goes in the hover title.
-// `now` comes from the caller (clock.now()), never Date.now().
+// `now` comes from the caller (clock.now()), never the machine clock.
 
 type T = (key: string, fallback: string, vars?: Record<string, string | number>) => string;
 
