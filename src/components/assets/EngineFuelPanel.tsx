@@ -20,6 +20,7 @@ import { ecuHoursAt, fuelWeekFor, hoursSourceFor, last7DaysIgnition, tierOf, typ
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import type { Asset, ParamKey, Reading } from '@/domain/types';
+import { COLORS } from '@/config/colors';
 
 /** Plain words for the diagnostic trouble codes the seed produces (spec §11.3). */
 const DTC_WORDS: Record<string, string> = {
@@ -136,12 +137,12 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
               {/* left: 0, not a negative margin: a negative one shifts the Y axis (and its
                   "100%" labels) outside the SVG, where it is clipped to "0%". */}
               <LineChart data={week.days} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke="#E8E8E3" strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9A9CA1" />
+                <CartesianGrid stroke={COLORS.line} strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke={COLORS.muted} />
                 <YAxis
                   domain={[0, 100]}
                   tick={{ fontSize: 10 }}
-                  stroke="#9A9CA1"
+                  stroke={COLORS.muted}
                   width={42}
                   tickFormatter={(value: number) => `${value}%`}
                 />
@@ -150,19 +151,19 @@ export function EngineFuelPanel({ asset, reading }: { asset: Asset; reading: Rea
                   type="monotone"
                   dataKey="levelPct"
                   name={t('asset_detail.engine.fuel_level', 'Fuel level')}
-                  stroke="#141518"
+                  stroke={COLORS.ink}
                   strokeWidth={2}
                   dot={false}
                   connectNulls
                   isAnimationActive={false}
                 />
                 {week.days.filter(d => d.refuel && d.levelPct !== null).map(d => (
-                  <ReferenceDot key={`up-${d.key}`} x={d.date} y={d.levelPct as number} r={4} fill="#1F9A6D" stroke="none"
-                    label={{ value: '▲', position: 'top', fontSize: 10, fill: '#1F9A6D' }} />
+                  <ReferenceDot key={`up-${d.key}`} x={d.date} y={d.levelPct as number} r={4} fill={COLORS.ok} stroke="none"
+                    label={{ value: '▲', position: 'top', fontSize: 10, fill: COLORS.ok }} />
                 ))}
                 {week.days.filter(d => d.drop && d.levelPct !== null).map(d => (
-                  <ReferenceDot key={`down-${d.key}`} x={d.date} y={d.levelPct as number} r={4} fill="#D64545" stroke="none"
-                    label={{ value: '▼', position: 'bottom', fontSize: 10, fill: '#D64545' }} />
+                  <ReferenceDot key={`down-${d.key}`} x={d.date} y={d.levelPct as number} r={4} fill={COLORS.bad} stroke="none"
+                    label={{ value: '▼', position: 'bottom', fontSize: 10, fill: COLORS.bad }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>

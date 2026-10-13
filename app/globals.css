@@ -47,6 +47,10 @@
   --shadow-sm: 0 1px 3px rgba(20, 21, 24, .08), 0 1px 2px rgba(20, 21, 24, .04);
   --shadow-md: 0 4px 12px rgba(20, 21, 24, .1), 0 2px 4px rgba(20, 21, 24, .06);
   --demo-bar-bg: #141518;
+  /* Demo bar surfaces (dark, presenter-only chrome). */
+  --demo-surface: #1A1B20;
+  --demo-surface-2: #22242A;
+  --demo-line: #2A2C30;
 
   /* Tone inks (B2): text on the 9% tints. The base status colours are too light
      for small text (green 3.2:1, red 3.9:1, amber 1.9:1 on their tints), so
@@ -95,6 +99,9 @@
   --shadow-panel: var(--shadow-sm);
   --shadow-pop: var(--shadow-md);
   --color-demo-bar-bg: var(--demo-bar-bg);
+  --color-demo-surface: var(--demo-surface);
+  --color-demo-surface-2: var(--demo-surface-2);
+  --color-demo-line: var(--demo-line);
 
   /* Semantic tone names used by src/components/ui (B2). */
   --color-accent: var(--Kasper-yellow);
@@ -173,7 +180,7 @@ body[data-demo-collapsed='true'] {
 
 .demo-bar {
   background: var(--demo-bar-bg);
-  color: #F1F1EC;
+  color: var(--paper);
   font-family: var(--font-body);
 }
 

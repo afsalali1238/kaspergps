@@ -9,6 +9,7 @@ import { LayoutDashboard, Building2, UserPlus, Truck, Radio, Cable, CalendarDays
 import { type Capability, can, hasRole } from '@/server/api';
 import { useSession } from '@/hooks';
 import { TopTabs } from '@/components/layout/TopTabs';
+import { LivePill } from '@/components/layout/AppShell';
 
 interface NavItem {
   href: string;
@@ -152,6 +153,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               </div>
             </details>
           </div>
+          <LivePill />
           <div className="text-xs text-grey-500 shrink-0 text-end leading-tight">
             <div className="text-ink font-medium">{session.user.name}</div>
             {hasRole(session, 'kasper_admin') ? 'Kasper Admin' : 'Kasper Ops'}

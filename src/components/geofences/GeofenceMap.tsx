@@ -11,6 +11,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
+import { COLORS } from '@/config/colors';
 
 export type ShapeValue =
   | { type: 'circle'; center: { lat: number; lng: number }; radiusM: number }
@@ -45,9 +46,9 @@ function readLayer(layer: L.Layer): ShapeValue | null {
 
 function makeLayer(shape: ShapeValue): L.Circle | L.Polygon {
   if (shape.type === 'circle') {
-    return L.circle([shape.center.lat, shape.center.lng], { radius: shape.radiusM, color: '#D4A000', weight: 2, fillOpacity: 0.12 });
+    return L.circle([shape.center.lat, shape.center.lng], { radius: shape.radiusM, color: COLORS.geofenceDraw, weight: 2, fillOpacity: 0.12 });
   }
-  return L.polygon(shape.points.map(p => [p.lat, p.lng] as [number, number]), { color: '#D4A000', weight: 2, fillOpacity: 0.12 });
+  return L.polygon(shape.points.map(p => [p.lat, p.lng] as [number, number]), { color: COLORS.geofenceDraw, weight: 2, fillOpacity: 0.12 });
 }
 
 /** The one shape being created or edited, drawn on the map with geoman's tools. */
@@ -75,7 +76,7 @@ function DrawingLayer({ shape, onChange }: { shape: ShapeValue | null; onChange:
       editMode: true,
       removalMode: true,
     });
-    map.pm.setPathOptions({ color: '#D4A000', fillColor: '#D4A000' });
+    map.pm.setPathOptions({ color: COLORS.geofenceDraw, fillColor: COLORS.geofenceDraw });
     const onCreate = (event: L.LeafletEvent) => {
       const e = event as unknown as { shape: string; layer: L.Layer };
       const next = readLayer(e.layer);

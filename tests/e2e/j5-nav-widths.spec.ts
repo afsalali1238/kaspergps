@@ -84,3 +84,17 @@ test('Arabic at 1440 px: hidden mono text stays hidden', async ({ page }, testIn
   await expect(page.getByTestId('top-nav')).toBeVisible();
   await expect(page.getByTestId('live-pill')).toBeHidden();
 });
+
+// B3 part 2: the LIVE pill (from 1760 px) opens the demo clock.
+for (const key of ['khalid', 'sara'] as const) {
+  test(`${key} at 1760 px: the LIVE pill opens the demo clock`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'width is set in this spec');
+    await page.setViewportSize({ width: 1760, height: 900 });
+    await demo(page, { email: USERS[key], on: key === 'sara' ? '/console' : '/app' });
+    const pill = page.getByTestId('live-pill');
+    await expect(pill).toBeVisible();
+    await expect(page.getByText('Simulated clock · Dubai')).toHaveCount(0);
+    await pill.click();
+    await expect(page.getByText('Simulated clock · Dubai')).toBeVisible();
+  });
+}

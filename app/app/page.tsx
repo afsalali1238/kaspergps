@@ -24,6 +24,7 @@ import type { Asset, Label, LatLng } from '@/domain/types';
 import { useT, useHref, useLocale } from '@/i18n';
 import { translate, type Locale } from '@/i18n/dictionary';
 import { useSession, useSwitches, useNow } from '@/hooks';
+import { COLORS, MAP_STATUS_COLORS, geofenceColor } from '@/config/colors';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,22 +35,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Status marker colors
-const STATUS_COLORS: Record<string, string> = {
-  live: '#1F9A6D',
-  idle: '#B89000',
-  stale: '#9A9CA1',
-  offline: '#D64545',
-  unknown: '#9A9CA1',
-  no_tracker: '#9A9CA1',
-};
 
 function createMarkerIcon(status: string, isRented: boolean) {
-  const color = STATUS_COLORS[status] ?? '#9A9CA1';
+  const color = MAP_STATUS_COLORS[status] ?? COLORS.muted;
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
       <div style="position: relative; width: 24px; height: 36px;">
-        <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);${isRented ? ' outline: 2px solid #FFC400; outline-offset: 2px;' : ''}"></div>
+        <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);${isRented ? ' outline: 2px solid ${COLORS.accent}; outline-offset: 2px;' : ''}"></div>
         <div style="position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${color};"></div>
       </div>
     </svg>
@@ -298,7 +290,7 @@ export default function MapPage() {
       .map(g => ({
         id: g.id,
         name: g.name,
-        colour: g.kind === 'restricted' ? '#D64545' : g.kind === 'site' ? '#1F9A6D' : '#B89000',
+        colour: geofenceColor(g.kind),
         shape: g.shape === 'circle'
           ? { type: 'circle' as const, center: g.center!, radiusM: g.radiusM ?? 0 }
           : { type: 'polygon' as const, points: g.points! },
@@ -312,14 +304,14 @@ export default function MapPage() {
     lng: a.lng,
     icon: createMarkerIcon(a.status, a.isRentedIn),
     popupHtml: `<div style="text-align:left;min-width:160px">
-      <div style="font-size:14px;font-weight:600;color:#141518">${escapeHtml(a.code)} <span style="font-size:12px;font-weight:400;color:#6b6e75">— ${escapeHtml(a.name)}</span></div>
-      <div style="font-size:12px;color:#3b3d44;margin-top:4px">${escapeHtml(t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status))}</div>
-      <div style="font-size:12px;color:#6b6e75;margin-top:2px">${escapeHtml(a.lastUpdated)}</div>
+      <div style="font-size:14px;font-weight:600;color:${COLORS.ink}">${escapeHtml(a.code)} <span style="font-size:12px;font-weight:400;color:${COLORS.secondary}">— ${escapeHtml(a.name)}</span></div>
+      <div style="font-size:12px;color:${COLORS.slate};margin-top:4px">${escapeHtml(t(`common.status.${a.status}`, STATUS_LABELS[a.status as StatusKey] ?? a.status))}</div>
+      <div style="font-size:12px;color:${COLORS.secondary};margin-top:2px">${escapeHtml(a.lastUpdated)}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-        <span style="font-size:11px;color:#6b6e75">T${a.tier}</span>
-        <a href="${escapeHtml(href(`/app/assets/${a.id}`))}" style="font-size:12px;color:#b89000;font-weight:500">${escapeHtml(t('map.open', 'Open'))} →</a>
+        <span style="font-size:11px;color:${COLORS.secondary}">T${a.tier}</span>
+        <a href="${escapeHtml(href(`/app/assets/${a.id}`))}" style="font-size:12px;color:${COLORS.warnInk};font-weight:500">${escapeHtml(t('map.open', 'Open'))} →</a>
       </div>
-      ${a.isRentedIn ? `<div style="font-size:12px;color:#b89000;font-weight:500;margin-top:4px">${escapeHtml(t('common.status.rented', 'Rented'))}</div>` : ''}
+      ${a.isRentedIn ? `<div style="font-size:12px;color:${COLORS.warnInk};font-weight:500;margin-top:4px">${escapeHtml(t('common.status.rented', 'Rented'))}</div>` : ''}
     </div>`,
   })), [visibleAssets, t, href]);
 
@@ -681,7 +673,7 @@ export default function MapPage() {
                   <div className={clsx(
                     'min-w-8 h-8 px-1.5 rounded-lg flex items-center justify-center text-[10px] font-mono font-semibold border whitespace-nowrap',
                     a.status === 'live' ? 'bg-live/10 text-live border-live/20' :
-                    a.status === 'idle' ? 'bg-idle/10 text-[#B89000] border-idle/20' :
+                    a.status === 'idle' ? 'bg-idle/10 text-warn-ink border-idle/20' :
                     a.status === 'offline' ? 'bg-red/10 text-red border-red/20' :
                     a.status === 'stale' ? 'bg-stale/10 text-stale border-stale/20' :
                     'bg-paper border-line text-grey-700'
@@ -730,7 +722,7 @@ export default function MapPage() {
                     <span className={clsx(
                       'text-xs font-medium',
                       a.status === 'live' ? 'text-live' :
-                      a.status === 'idle' ? 'text-[#B89000]' :
+                      a.status === 'idle' ? 'text-warn-ink' :
                       a.status === 'offline' ? 'text-red' :
                       a.status === 'stale' ? 'text-stale' :
                       'text-grey-500'

@@ -50,8 +50,8 @@ export default function SignInPage() {
       <header className="bg-ink text-paper flex items-center justify-between px-5 py-3">
         <div className="flex items-center gap-2">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <rect width="20" height="20" rx="4" fill="#FFC400" />
-            <text x="0" y="15" fontSize="13" fontFamily="monospace" fill="#141518" fontWeight="700">K</text>
+            <rect width="20" height="20" rx="4" className="fill-yellow" />
+            <text x="0" y="15" fontSize="13" fontFamily="monospace" className="fill-ink" fontWeight="700">K</text>
           </svg>
           <span className="text-sm font-semibold text-paper">Kasper</span>
         </div>
@@ -66,8 +66,8 @@ export default function SignInPage() {
           {/* Logo */}
           <div className="flex items-center gap-2 mb-8 justify-center">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="6" fill="#141518" />
-              <text x="0" y="24" fontSize="20" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
+              <rect width="32" height="32" rx="6" className="fill-ink" />
+              <text x="0" y="24" fontSize="20" fontFamily="monospace" className="fill-yellow" fontWeight="700">K</text>
             </svg>
             <span className="text-lg font-semibold text-ink">Kasper GPS</span>
           </div>

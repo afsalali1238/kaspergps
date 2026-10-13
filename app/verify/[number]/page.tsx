@@ -100,8 +100,8 @@ export default function VerifyMucPage() {
       <div className="w-full max-w-sm bg-surface border border-line rounded-xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-yellow">
-            <rect width="24" height="24" rx="5" fill="#141518" />
-            <text x="0" y="18" fontSize="14" fontFamily="monospace" fill="#FFC400" fontWeight="700">K</text>
+            <rect width="24" height="24" rx="5" className="fill-ink" />
+            <text x="0" y="18" fontSize="14" fontFamily="monospace" className="fill-yellow" fontWeight="700">K</text>
           </svg>
           <span className="text-sm font-semibold text-ink">Kasper GPS</span>
         </div>

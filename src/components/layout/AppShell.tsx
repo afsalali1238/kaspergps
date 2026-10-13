@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui';
 import * as clock from '@/lib/clock';
 import { useT, useHref, stripLocale } from '@/i18n';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
+import { openDemoClock } from '@/components/demo/open-clock';
 import { useSession, useSwitches, useNow } from '@/hooks';
 import type { Session } from '@/domain/types';
 
@@ -445,15 +446,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** LIVE pill: the demo clock's Dubai time, so the presenter always sees "now". */
-function LivePill() {
+/** LIVE pill: the demo clock's Dubai time, so the presenter always sees "now".
+ *  Clicking it opens the demo clock in the demo bar. Shared with the console bar. */
+export function LivePill() {
   const t = useT();
   const now = useNow();
   return (
-    <span className="hidden min-[1760px]:inline-flex items-center gap-1.5 h-7 rounded-full bg-paper-2 border border-line px-2.5 font-mono text-[11px] text-ink me-1" data-testid="live-pill">
+    <button
+      type="button"
+      onClick={openDemoClock}
+      title={t('shell.live_open_clock', 'Open the demo clock')}
+      aria-label={`${t('shell.live', 'LIVE')} ${clock.formatDubaiTime(now)}. ${t('shell.live_open_clock', 'Open the demo clock')}`}
+      className="hidden min-[1760px]:inline-flex items-center gap-1.5 h-7 rounded-full bg-paper-2 border border-line px-2.5 font-mono text-[11px] text-ink me-1 hover:border-line-2 hover:bg-surface transition-colors focus-visible:outline-2 focus-visible:outline-ink"
+      data-testid="live-pill"
+    >
       <span className="w-1.5 h-1.5 rounded-full bg-live" aria-hidden />
       {t('shell.live', 'LIVE')} {clock.formatDubaiTime(now)}
-    </span>
+    </button>
   );
 }
 

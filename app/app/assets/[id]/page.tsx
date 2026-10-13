@@ -20,6 +20,7 @@ import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
 import { useT, useHref } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
+import { COLORS, MAP_STATUS_COLORS } from '@/config/colors';
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,17 +31,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const STATUS_COLORS: Record<string, string> = {
-  live: '#1F9A6D',
-  idle: '#B89000',
-  stale: '#9A9CA1',
-  offline: '#D64545',
-  unknown: '#9A9CA1',
-  no_tracker: '#9A9CA1',
-};
 
 function createMarkerIcon(status: string) {
-  const color = STATUS_COLORS[status] ?? '#9A9CA1';
+  const color = MAP_STATUS_COLORS[status] ?? COLORS.muted;
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
       <div style="position: relative; width: 24px; height: 36px;">

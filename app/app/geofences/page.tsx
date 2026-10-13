@@ -12,6 +12,7 @@ import { GeofenceEditor, type ShapeValue, type OverlayFence } from '@/components
 import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
+import { geofenceColor } from '@/config/colors';
 
 function kindLabel(kind: string, t: (k: string, f: string) => string): string {
   switch (kind) {
@@ -61,7 +62,7 @@ export default function GeofencesPage() {
     .map(g => ({
       id: g.id,
       name: g.name,
-      colour: g.kind === 'restricted' ? '#D64545' : g.kind === 'site' ? '#1F9A6D' : '#B89000',
+      colour: geofenceColor(g.kind),
       shape: g.shape === 'circle'
         ? { type: 'circle' as const, center: g.center!, radiusM: g.radiusM ?? 0 }
         : { type: 'polygon' as const, points: g.points! },
