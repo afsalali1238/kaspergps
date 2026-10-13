@@ -4,7 +4,7 @@
 // Desktop only: the walkthrough card and the Scenarios menu are laid out for wide screens.
 
 import { expect, test } from '@playwright/test';
-import { demo, expectNoText, USERS } from './helpers';
+import { demo, expectNoText, openDemoMore, USERS } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 0) < 900, 'the walkthrough card is laid out for desktop');
@@ -18,7 +18,8 @@ for (let id = 1; id <= 50; id++) {
   if (REMOVED.has(id)) continue;
   test(`S${id} runs from the Scenarios menu to Finish`, async ({ page }) => {
     await demo(page, { email: USERS.sara });
-    await page.getByRole('button', { name: 'Scenarios' }).click();
+    await openDemoMore(page);
+    await page.locator('.demo-bar').getByRole('button', { name: 'Scenarios', exact: true }).click();
     await page.locator('.demo-bar button').filter({ hasText: new RegExp(`^S${id}(?![0-9])`) }).first().click();
 
     const card = page.getByTestId('walkthrough-card');

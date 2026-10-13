@@ -2,7 +2,7 @@
 
 // Global search / command palette (spec §11.3 Search, S40): searches the
 // assets the user can see (code, name, site, plate, IMEI) and the app's pages.
-// Opens from the top-bar button. Ctrl/Cmd + K is View as's (spec §10.1).
+// Opens from the top-bar button. Ctrl/Cmd + K is not bound yet (owner finding §7.2).
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -46,7 +46,7 @@ export function SearchCommand({ session }: SearchCommandProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Escape closes the palette. Ctrl/Cmd + K is bound only by View as.
+  // Escape closes the palette.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);

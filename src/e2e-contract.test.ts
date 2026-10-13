@@ -117,10 +117,9 @@ describe('e2e contract: the surfaces the suite leans on exist', () => {
   });
 
   it('keeps the demo-bar affordances the helpers click', () => {
-    // The bar composes ViewAsMenu, which renders the "View as" trigger.
-    const demoBar = ['src/components/demo/DemoBar.tsx', 'src/components/demo/ViewAsMenu.tsx']
-      .map(f => readFileSync(join(ROOT, f), 'utf8')).join('\n');
-    for (const trigger of ['View as', 'Clock', 'Scenarios', 'Tools', 'demo-bar']) {
+    // Chunk R: the role chip and Switch role replace View as; Scenarios and Tools sit under More.
+    const demoBar = readFileSync(join(ROOT, 'src/components/demo/DemoBar.tsx'), 'utf8');
+    for (const trigger of ['Switch role', 'role-chip', 'Clock', 'More', 'Scenarios', 'Tools', 'demo-bar']) {
       expect(demoBar, `DemoBar lost its "${trigger}"`).toContain(trigger);
     }
   });

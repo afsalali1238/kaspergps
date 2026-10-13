@@ -1,7 +1,7 @@
 // H4.7 proof: no screen scrolls sideways at phone width (390 px). The demo bar
 // and the app shell must fit; a wide table scrolls inside its own box instead.
 import { expect, test } from '@playwright/test';
-import { demo, stubTiles, USERS } from './helpers';
+import { demo, openDemoMore, stubTiles, USERS } from './helpers';
 
 const SCREENS: { email: string; path: string }[] = [
   { email: USERS.omar, path: '/app' },
@@ -41,7 +41,7 @@ test('the demo bar fits a 390 px phone in one row: every control is on screen', 
   await demo(page, { email: USERS.omar, on: '/app' });
   const barHeight = await page.locator('.demo-bar').first().evaluate(el => (el as HTMLElement).offsetHeight);
   expect(barHeight, 'the demo bar is a single row').toBeLessThanOrEqual(44);
-  for (const name of ['View as', 'Clock', 'Features', 'Scenarios', 'Tools']) {
+  for (const name of ['Clock', 'Features', 'More']) {
     const control = page.locator('.demo-bar').getByRole('button', { name, exact: true }).first();
     await expect(control, `${name} is in the demo bar`).toBeVisible();
     const box = await control.boundingBox();
@@ -74,7 +74,8 @@ test('the Scenarios menu opens inside a 390 px screen and shows at least 10 scen
   test.skip((page.viewportSize()?.width ?? 0) > 500, 'phone layout only');
   await page.setViewportSize({ width: 390, height: 844 });
   await demo(page, { email: USERS.omar, on: '/app' });
-  await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
+  await openDemoMore(page);
+  await page.locator('.demo-bar').getByRole('button', { name: 'Scenarios', exact: true }).click();
   const menu = page.getByText('Guided walkthroughs').locator('xpath=../..');
   const box = (await menu.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);

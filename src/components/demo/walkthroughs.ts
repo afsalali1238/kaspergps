@@ -106,7 +106,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     doneWhen: { 0: 'created' },
   },
   19: {
-    do: ['Open Settings and invite a user.', 'View as the new user.'],
+    do: ['Open Settings and invite a user.', 'Sign in as the new user on /dev/sign-in.'],
     expect: 'The new user sees only their site.',
   },
   20: {
@@ -120,7 +120,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     highlights: { 0: '.demo-bar' },
   },
   22: {
-    do: ['View as Karim (deactivated) and try to sign in.'],
+    do: ['Sign in as Karim on /dev/sign-in and see the refusal.'],
     expect: 'The deactivated message.',
   },
   23: {
@@ -129,7 +129,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     highlights: { 0: 'a[href="/app"]', 1: 'a[href="/app/reports"]' },
   },
   24: {
-    do: ['Label EX-04 and WL-03 "Project Alpha" and filter by the label.', 'View as Lina.'],
+    do: ['Label EX-04 and WL-03 "Project Alpha" and filter by the label.', 'Sign in as Lina on /dev/sign-in.'],
     expect: 'The filter shows 3 assets; Lina\'s EX-04 shows no labels and her filter has no Emirates labels.',
   },
   25: {
@@ -177,7 +177,7 @@ const DEFS: Record<number, WalkthroughDef> = {
   },
   34: {
     do: ['Open Billing → Received and invoice INV-EE-0412.', 'Open its MUC and Pay (simulated).'],
-    expect: 'Hours on the invoice equal the MUC billable hours (plus the minimum top-up line); it shows Paid, also seen from View as Khalid.',
+    expect: 'Hours on the invoice equal the MUC billable hours (plus the minimum top-up line); it shows Paid, also seen by signing in as Khalid.',
     doneWhen: { 1: 'Paid' },
   },
   35: {
@@ -189,7 +189,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     expect: 'GPS statements per tenant by tier; Gulf Lift unpaid; Ravi (Ops) has no Billing at all.',
   },
   37: {
-    do: ['Open Maintenance.', 'Log a service on BD-02.', 'View as Priya.'],
+    do: ['Open Maintenance.', 'Log a service on BD-02.', 'Sign in as Priya on /dev/sign-in.'],
     expect: 'EX-04 Due soon (ECU) and BD-02 Overdue while on hire to Gulf Lift; after logging, BD-02 is Ok. Priya sees no maintenance on BD-02.',
     highlights: { 0: 'a[href="/app/maintenance"]' },
     doneWhen: { 1: 'Ok' },
@@ -214,7 +214,7 @@ const DEFS: Record<number, WalkthroughDef> = {
     highlights: { 0: '.demo-bar' },
   },
   42: {
-    do: ['Onboard "Sharjah Plant Hire" (vendor) with 2 sites, admin Noura Khalid and 3 pasted CSV assets.', 'Register 3 new IMEIs — one on purpose with a bad check digit, then fix it.', 'Fit 1 ALL-CAN300 from stock and Create.', 'View as Noura.'],
+    do: ['Onboard "Sharjah Plant Hire" (vendor) with 2 sites, admin Noura Khalid and 3 pasted CSV assets.', 'Register 3 new IMEIs — one on purpose with a bad check digit, then fix it.', 'Fit 1 ALL-CAN300 from stock and Create.', 'Sign in as Noura on /dev/sign-in.'],
     expect: 'Noura sees her 3 assets (Unknown → Live within minutes of simulated time); the CAN-fitted one is Tier 3 with Engine & fuel; the others show no CAN features.',
     doneWhen: { 3: 'assets' },
   },
@@ -247,11 +247,11 @@ const DEFS: Record<number, WalkthroughDef> = {
     expect: 'EX-15 shows "No tracker" with "Request a tracker"; retiring EX-07 is refused because a booking starts tomorrow.',
   },
   49: {
-    do: ['Settings → Sites → add "Al Furjan Villas".', 'Invite a Site User there and View as them.'],
+    do: ['Settings → Sites → add "Al Furjan Villas".', 'Invite a Site User there and sign in as them on /dev/sign-in.'],
     expect: 'An empty map with "No assets yet"; once Ravi books an asset to that site, it appears.',
   },
   50: {
-    do: ['Console → Team → add an Ops user and View as them.', 'Then try to remove the last Kasper Admin.'],
+    do: ['Console → Team → add an Ops user and sign in as them on /dev/sign-in.', 'Then try to remove the last Kasper Admin.'],
     expect: 'The new Ops user works in the console; removing the last Kasper Admin is refused.',
     doneWhen: { 0: 'added' },
   },

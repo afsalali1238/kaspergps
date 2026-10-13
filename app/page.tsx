@@ -1,34 +1,12 @@
-'use client';
+import type { Metadata } from 'next';
+import { RolePicker } from '@/components/auth/RolePicker';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useSession } from '@/hooks';
+export const metadata: Metadata = {
+  title: 'Choose a role · Kasper GPS',
+};
 
+// The home page is the role picker (chunk R). It never redirects: a signed-in
+// visitor can still pick another role, and "Log out" returns here.
 export default function RootPage() {
-  const router = useRouter();
-  const session = useSession();
-
-  useEffect(() => {
-    if (session) {
-      if (session.isKasper) {
-        router.replace('/console');
-      } else {
-        router.replace('/app');
-      }
-    } else {
-      router.replace('/sign-in');
-    }
-  }, [router, session]);
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-bg">
-      <div className="flex flex-col items-center gap-3">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect width="40" height="40" rx="8" className="fill-ink" />
-          <text x="0" y="28" fontSize="22" fontFamily="monospace" className="fill-yellow" fontWeight="700">K</text>
-        </svg>
-        <span className="text-sm text-grey-500 font-mono">Kasper GPS</span>
-      </div>
-    </div>
-  );
+  return <RolePicker />;
 }

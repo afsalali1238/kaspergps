@@ -3,6 +3,7 @@
 // line — nothing else, noindex.
 
 import { expect, test } from '@playwright/test';
+import { demo, openDemoMore, USERS } from './helpers';
 
 const SEALED = 'MUC-2026-09-EX-04-01';
 const VOIDED = 'MUC-2026-09-WL-03-01';
@@ -30,14 +31,15 @@ test.describe('certificate verification', () => {
   });
 
   test('tampering in the demo bar makes the next verify red', async ({ page }) => {
-    await page.goto('/app');
+    await demo(page, { email: USERS.sara, on: '/console' });
     const dialogMessages: string[] = [];
     page.on('dialog', async dialog => {
       dialogMessages.push(dialog.message());
       await dialog.accept();
     });
 
-    await page.getByRole('button', { name: 'Tools' }).click();
+    await openDemoMore(page);
+    await page.locator('.demo-bar').getByRole('button', { name: 'Tools', exact: true }).click();
     await page.getByRole('button', { name: /Tamper with a stored certificate/ }).click();
 
     // The tool navigates client-side so the tampered payload survives.

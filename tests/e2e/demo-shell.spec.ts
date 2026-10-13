@@ -90,7 +90,7 @@ test.describe('demo bar tools', () => {
     await expect(page.getByRole('button', { name: /Click again — this clears every demo change/ })).toBeVisible();
     await page.getByRole('button', { name: /Click again/ }).click();
     // Reset signs out and lands on sign-in.
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page).toHaveURL(/\/$|\/dev\/sign-in/);
     // Signing back in works from a clean seed.
     await signIn(page, USERS.sara);
     await expect(page.getByRole('heading', { name: 'Kasper Console' })).toBeVisible();

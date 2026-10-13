@@ -14,6 +14,7 @@ One line per step, with its status, PR, merge commit and date. Hourly runs and t
 | H — reports and money | not started (local draft of the H1 Recently generated table parked; fix list in `handoff/REMAINING.md`) | | | |
 | R — role-first entry (owner, 13 Oct) | not started (`handoff/ROLE-LOGIN.md`) | | | |
 | I — console | not started | | | |
+| R — role-first entry | built, PR open (home page is the role picker with 8 persona cards + hirer link; Log out returns to `/`; `/dev/sign-in` holds the email form; demo bar: role chip + Switch role, Scenarios and Tools under More; `reviews/R-self-check.md`) | R: see PR | | 2026-10-13 |
 | J — phone, Arabic, final | not started | | | |
 
 Next: **Step 0 in `handoff/REMAINING.md`** (D, G1 and F1 merged; push and PR E), then F2, G2, H1 → H2, I in parallel; J1 → J2 → J3 last.

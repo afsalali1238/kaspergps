@@ -30,7 +30,7 @@ test.describe('S10 — Fatima: access that ended early', () => {
   test('the scenario menu lands S10 on her map', async ({ page }) => {
     await demo(page, { email: USERS.fatima });
     await startScenario(page, 10);
-    await expect(page.getByText('Fatima Noor · Tenant')).toBeVisible();
+    await expect(page.locator('.demo-bar [data-testid="role-chip"]')).toHaveText('Client · rents only');
   });
 });
 

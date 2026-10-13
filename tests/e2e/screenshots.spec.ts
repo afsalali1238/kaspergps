@@ -43,7 +43,7 @@ const SHOTS: Shot[] = [
   { user: 'hirer', email: '', on: '/t/k7Qm2Xc9TpLw4ZaN8rVb3Ye5', screen: 'tracking' },
   { user: 'auditor', email: '', on: '/verify/MUC-2026-09-EX-04-01', screen: 'verify' },
   // Sign-in (no account) and the Arabic map: RTL chrome, Latin digits for codes and times
-  { user: 'anon', email: '', on: '/sign-in', screen: 'sign-in' },
+  { user: 'anon', email: '', on: '/dev/sign-in', screen: 'sign-in' },
   { user: 'omar', email: USERS.omar, on: '/ar/app', screen: 'ar-map' },
 ];
 

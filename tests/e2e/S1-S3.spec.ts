@@ -36,7 +36,7 @@ test.describe('S1 — Omar: a no-CAN fleet stays Tier 1', () => {
     await demo(page, { email: USERS.omar });
     await startScenario(page, 1);
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByText('Omar Saleh · Tenant')).toBeVisible();
+    await expect(page.locator('.demo-bar [data-testid="role-chip"]')).toHaveText('Fleet owner · Tier 1');
   });
 });
 

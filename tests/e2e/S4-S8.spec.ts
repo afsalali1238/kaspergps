@@ -58,9 +58,9 @@ test.describe('S6 — Lina: EX-07 appears when its rental starts', () => {
 
 test.describe('S7 — Ahmed: a single-site user gets a narrow map', () => {
   test('sees Dubai Hills kit and no site filter', async ({ page }) => {
-    await demo(page, { email: USERS.omar });
-    await page.getByRole('button', { name: 'View as' }).click();
-    await page.getByRole('button', { name: /^Ahmed / }).first().click();
+    // Ahmed is not one of the eight role cards; he signs in from the developer page.
+    await demo(page, { email: 'ahmed@marina.ae' });
+    await expect(page.locator('.demo-bar [data-testid="role-chip"]')).toHaveText('Scenario user');
     await page.waitForURL(/\/app$/);
 
     await expect(page.getByText('EX-04', { exact: true }).first()).toBeVisible();
@@ -92,8 +92,8 @@ test.describe('renter guards', () => {
   test('switching back from a renter never leaves another user’s data on screen', async ({ page }) => {
     await demo(page, { email: USERS.omar });
     await startScenario(page, 4);
-    await expect(page.getByText('Lina Aziz · Tenant')).toBeVisible();
+    await expect(page.locator('.demo-bar [data-testid="role-chip"]')).toHaveText('Renter');
     await goTo(page, '/app');
-    await expect(page.getByText('Lina Aziz · Tenant')).toBeVisible();
+    await expect(page.locator('.demo-bar [data-testid="role-chip"]')).toHaveText('Renter');
   });
 });

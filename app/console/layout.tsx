@@ -1,15 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
-import { LayoutDashboard, Building2, UserPlus, Truck, Radio, Cable, CalendarDays, Inbox, CreditCard, Users, Upload, ScrollText, Menu } from 'lucide-react';
+import { LayoutDashboard, Building2, UserPlus, Truck, Radio, Cable, CalendarDays, Inbox, CreditCard, Users, Upload, ScrollText, Menu, LogOut } from 'lucide-react';
 
 import { type Capability, can, hasRole } from '@/server/api';
 import { useSession } from '@/hooks';
 import { TopTabs } from '@/components/layout/TopTabs';
 import { LivePill } from '@/components/layout/AppShell';
+import { signOutToRoles } from '@/components/auth/sign-out';
 
 interface NavItem {
   href: string;
@@ -97,10 +98,20 @@ const navItems: NavItem[] = [
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const session = useSession();
+  const router = useRouter();
+
+  // Chunk R: with no session the console never shows; it goes to the role picker.
+  useEffect(() => {
+    if (!session) router.replace('/');
+  }, [session, router]);
+
+  if (!session) {
+    return <div className="fixed inset-0 bg-bg" aria-busy="true" />;
+  }
 
   // Spec 11.9: customers get "Page not found" on every /console route — the
   // console never renders for them, and never redirects to the app either.
-  if (!session || !session.isKasper) {
+  if (!session.isKasper) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-bg px-6 text-center">
         <div>
@@ -158,6 +169,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             <div className="text-ink font-medium">{session.user.name}</div>
             {hasRole(session, 'kasper_admin') ? 'Kasper Admin' : 'Kasper Ops'}
           </div>
+          <button
+            type="button"
+            onClick={() => signOutToRoles(path => router.replace(path))}
+            className="shrink-0 min-h-[48px] inline-flex items-center gap-1.5 px-2 text-sm text-red hover:bg-paper-2 rounded"
+          >
+            <LogOut size={14} aria-hidden />
+            Log out
+          </button>
         </header>
 
         <main className="flex-1 min-h-0 overflow-y-auto">

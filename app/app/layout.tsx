@@ -1,12 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ToastProvider } from '@/components/ui';
 import { AppShell } from '@/components/layout/AppShell';
 import { useSession } from '@/hooks';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const session = useSession();
+  const router = useRouter();
+
+  // Chunk R: with no session, the app screens never show. Back after Log out lands on the role picker.
+  useEffect(() => {
+    if (!session) router.replace('/');
+  }, [session, router]);
 
   if (!session) {
     return (
