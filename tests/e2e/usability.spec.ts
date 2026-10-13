@@ -12,7 +12,7 @@
 // ids (O1 … C4) match. Runs once, in the desktop project; the customer tasks
 // set a phone viewport themselves.
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { goTo, openMore, settle, signIn, signInAsRole, stubTiles, USERS } from './helpers';
+import { goTo, settle, signIn, signInAsRole, stubTiles, USERS } from './helpers';
 
 const TRACKING_TOKEN = 'k7Qm2Xc9TpLw4ZaN8rVb3Ye5';
 
@@ -36,6 +36,12 @@ type Task = {
   /** The happy path. Its expect() calls are the success criterion. */
   run: (page: Page, c: Clicks) => Promise<void>;
 };
+
+/** Opens the top nav's "More" menu when this width has one, counted as a click. */
+async function more(page: Page, c: Clicks): Promise<void> {
+  const btn = page.getByTestId('top-nav').getByRole('button', { name: 'More' });
+  if ((await btn.count()) && (await btn.isVisible()) && (await btn.getAttribute('aria-expanded')) !== 'true') await c.click(btn);
+}
 
 const nav = (page: Page, name: string) => page.getByTestId('top-nav').getByRole('link', { name, exact: true }).first();
 const banner = (page: Page) => page.getByRole('banner');
@@ -87,7 +93,7 @@ const TASKS: Task[] = [
     id: 'O5', role: 'Owner', title: "Issue September's certificate for EX-04", targetClicks: 4, targetSeconds: 60,
     start: page => signInAsRole(page, 'owner'),
     run: async (page, c) => {
-      await openMore(page);
+      await more(page, c);
       await c.click(nav(page, 'Certificates'));
       await c.click(page.getByRole('button', { name: 'Issue certificate' }));
       // EX-04 is the default asset. September is the BK-0981 booking period
@@ -113,12 +119,14 @@ const TASKS: Task[] = [
     },
   },
   {
-    id: 'R2', role: 'Renter', title: "Open EX-04's history and confirm it starts at the rental", targetClicks: 2, targetSeconds: 30,
+    id: 'R2', role: 'Renter', title: "Open EX-04's history and confirm it starts at the rental", targetClicks: 3, targetSeconds: 30,
     start: page => signInAsRole(page, 'renter'),
     run: async (page, c) => {
+      // BK-1001 started 4 Oct 08:00 (anchor −2 days): a 7-day window must clamp to it.
       await c.click(page.getByRole('link', { name: /^EX-04/ }).first());
       await c.click(page.getByRole('button', { name: 'History', exact: true }));
-      await expect(page.getByText(/rental|hire|from your booking|since/i).first()).toBeVisible();
+      await c.click(page.getByRole('button', { name: '7 days', exact: true }));
+      await expect(page.getByText(/^4 Oct 08:00 – /).first()).toBeVisible();
     },
   },
   {
@@ -175,7 +183,7 @@ const TASKS: Task[] = [
     id: 'M2', role: 'Site User', title: "Confirm he can't edit or deactivate anything", targetClicks: 1, targetSeconds: 30,
     start: page => signInAsRole(page, 'siteUser'),
     run: async (page, c) => {
-      await openMore(page);
+      await more(page, c);
       await expect(page.getByTestId('top-nav').getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
       await c.click(page.getByRole('link', { name: /^CR-02/ }).first());
       await expect(page.getByRole('button', { name: 'Edit asset' })).toHaveCount(0);
@@ -264,8 +272,8 @@ const TASKS: Task[] = [
   {
     id: 'K5', role: 'Kasper Ops', title: 'Confirm Billing is hidden', targetClicks: 1, targetSeconds: 15,
     start: page => signInAsRole(page, 'kasperOps'),
-    run: async page => {
-      await openMore(page);
+    run: async (page, c) => {
+      await more(page, c);
       await expect(page.getByTestId('top-nav').getByRole('link', { name: 'Billing', exact: true })).toHaveCount(0);
     },
   },
@@ -335,7 +343,7 @@ for (const task of TASKS) {
     } catch (err) {
       // First two lines of the error (what failed, and on which locator), no colour codes.
       note = String((err as Error).message ?? err)
-        .replace(/\u001b\[[0-9;]*m/g, '')
+        .replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
         .split('\n').map(l => l.trim()).filter(Boolean).slice(0, 2).join(' — ').slice(0, 240);
     }
     const result = {
