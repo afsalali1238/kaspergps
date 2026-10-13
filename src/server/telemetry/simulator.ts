@@ -257,18 +257,48 @@ function withIdleTail(segs: Segment[], home: Point, fromMs: number, toMs: number
   return [...kept, { mode: 'idle', fromMs, toMs, from: home, to: home, jitter: 0.0003, forced: 'idle' }];
 }
 
-/** FB-12 (spec §9): drives from Jebel Ali to the Al Habtoor site, arriving 90 min after the anchor. */
+/** FB-12 leaves the Jebel Ali yard this long before the anchor (owner decision, BUILDER §1). */
+export const FB12_DEPART_BEFORE_ANCHOR_MS = 5 * MIN;
+/** …and reaches the Al Habtoor site this long after it: 10:30 Dubai for the 10:00 anchor. */
+export const FB12_ARRIVE_AFTER_ANCHOR_MS = 30 * MIN;
+
+/**
+ * The road FB-12 takes: one turn, inland and then north, so the path is about 1.3 × the
+ * straight line (ETA_ROAD_FACTOR, the factor the tracking ETA assumes). Driving it in the
+ * 35 minutes above is about 32 km/h door to door: a loaded truck in morning traffic. The
+ * speed it reports and the distance it covers then agree, and so does the ETA.
+ */
+export function fb12Waypoint(home: Point, dest: Point): Point {
+  const straightKm = haversineKm(home, dest);
+  const mid = { lat: (home.lat + dest.lat) / 2, lng: (home.lng + dest.lng) / 2 };
+  // Half the minor axis of the ellipse whose points make the path 1.3 × the straight line.
+  const offsetKm = straightKm * Math.sqrt(0.65 ** 2 - 0.5 ** 2);
+  const kmPerDegLng = 111.32 * Math.cos(mid.lat * Math.PI / 180);
+  const dx = (dest.lng - home.lng) * kmPerDegLng;
+  const dy = (dest.lat - home.lat) * 110.57;
+  const n = Math.hypot(dx, dy) || 1;
+  // The perpendicular on the right of the direction of travel (south-east of the line here).
+  return { lat: mid.lat - (dx / n) * offsetKm / 110.57, lng: mid.lng + (dy / n) * offsetKm / kmPerDegLng };
+}
+
+/** FB-12 (spec §9, owner decision): drives from Jebel Ali to the Al Habtoor site, arriving 30 min after the anchor. */
 function fb12Route(asset: Asset, dayMs: number): Segment[] {
   const home = siteById(asset.homeSiteId);
   const booking = db.getState().bookings.find(b => b.assetId === asset.id && b.destination);
   if (!home || !booking?.destination) return planFor(asset, dayMs);
-  const dep = ANCHOR_MS - 5 * MIN;
-  const arrive = ANCHOR_MS + 90 * MIN;
+  const dep = ANCHOR_MS - FB12_DEPART_BEFORE_ANCHOR_MS;
+  const arrive = ANCHOR_MS + FB12_ARRIVE_AFTER_ANCHOR_MS;
   const dest: Point = { lat: booking.destination.lat, lng: booking.destination.lng };
-  const kmh = haversineKm(home.center, dest) / ((arrive - dep) / HOUR);
+  const turn = fb12Waypoint(home.center, dest);
+  const legA = haversineKm(home.center, turn);
+  const legB = haversineKm(turn, dest);
+  const kmh = (legA + legB) / ((arrive - dep) / HOUR);
+  // Both legs at the same speed: the turn comes when that share of the time has passed.
+  const atTurn = dep + Math.round((arrive - dep) * legA / (legA + legB));
   return [
     { mode: 'off', fromMs: dayMs, toMs: dep, from: home.center, to: home.center, jitter: 0.001 },
-    { mode: 'drive', fromMs: dep, toMs: arrive, from: home.center, to: dest, jitter: 0.00015, cruiseKmh: kmh, clamp: false },
+    { mode: 'drive', fromMs: dep, toMs: atTurn, from: home.center, to: turn, jitter: 0.00015, cruiseKmh: kmh, clamp: false },
+    { mode: 'drive', fromMs: atTurn, toMs: arrive, from: turn, to: dest, jitter: 0.00015, cruiseKmh: kmh, clamp: false },
     // Arrived: it stays at the hirer's site for the rest of the day, engine off.
     { mode: 'off', fromMs: arrive, toMs: dayMs + DAY, from: dest, to: dest, jitter: 0.0003 },
   ];
@@ -289,7 +319,7 @@ function fixedOffset(seg: Segment, prng: () => number): Point {
   return off;
 }
 
-/** Where a plant machine stands in 20-minute bucket `b` of a segment, drawn once per bucket within `moveRadius`. */
+/** Where a plant machine stands in hour bucket `b` of a segment, drawn once per bucket within `moveRadius`. */
 function bucketOffset(seg: Segment, b: number, prng: () => number): Point {
   if (b < 0) return { lat: 0, lng: 0 };
   let byBucket = bucketOffsets.get(seg);
@@ -306,31 +336,61 @@ function bucketOffset(seg: Segment, b: number, prng: () => number): Point {
   return off;
 }
 
-/** True while a plant machine is making its short move at the start of a 20-minute bucket. */
-function inMoveWindow(seg: Segment, t: number): boolean {
+/**
+ * Plant moves (spec §9, C1). Site shuffles happen at walking pace, under IDLE_SPEED_KMH, so
+ * working on one site never counts as a trip (before C1 an excavator logged 66 one-minute
+ * "trips" a week). Once a shift, at its start, the machine trams from where it stood to the
+ * work face at TRAM_KMH: that one is a real trip, so a plant day has at most one, plus any
+ * scripted excursion (on an excursion day the morning tram is skipped: the excursion is
+ * that day's journey, so the day still has at most two).
+ */
+export const SHUFFLE_KMH = 2;
+export const TRAM_KMH = 5;
+const MIN_MOVE_MS = 60 * 1000;
+
+interface PlantMove { start: Point; end: Point; fromMs: number; windowMs: number; speedKmh: number }
+
+/** True when a bucket starting at `bucketStartMs` is the shift-start tram (07:xx Dubai). */
+function isTramBucket(bucketStartMs: number): boolean {
+  const h = ((bucketStartMs + DUBAI_OFFSET_MS) % DAY) / HOUR;
+  return h >= 7 && h < 7 + MOVE_BUCKET_MS / HOUR;
+}
+
+/** The move a plant machine makes at the start of the bucket holding `t`. */
+function moveAt(seg: Segment, t: number, prng: () => number, tramOk: (t: number) => boolean): PlantMove {
+  const b = Math.floor((t - seg.fromMs) / MOVE_BUCKET_MS);
+  const fromMs = seg.fromMs + b * MOVE_BUCKET_MS;
+  const start = bucketOffset(seg, b - 1, prng);
+  const end = bucketOffset(seg, b, prng);
+  const km = Math.hypot(end.lat - start.lat, (end.lng - start.lng) * Math.cos(seg.from.lat * Math.PI / 180)) * 111;
+  const kmh = isTramBucket(fromMs) && tramOk(fromMs) ? TRAM_KMH : SHUFFLE_KMH;
+  const windowMs = Math.min(MOVE_BUCKET_MS / 2, Math.max(MIN_MOVE_MS, (km / kmh) * HOUR));
+  return { start, end, fromMs, windowMs, speedKmh: km / (windowMs / HOUR) };
+}
+
+/** True while a plant machine is making its move at the start of an hour bucket. */
+function inMoveWindow(seg: Segment, t: number, prng: () => number, tramOk: (t: number) => boolean): boolean {
   if (!seg.moveRadius) return false;
-  return (t - seg.fromMs) % MOVE_BUCKET_MS < MOVE_WINDOW_MS;
+  const m = moveAt(seg, t, prng, tramOk);
+  return t - m.fromMs < m.windowMs;
 }
 
 /**
  * Position offset from the site at `t`: a fixed offset for parked and generator
- * segments, and for plant a short move in each 20-minute bucket. Returns the speed of that move.
+ * segments, and for plant the move at the start of each hour bucket. Returns the speed of that move.
  */
-function placeAt(seg: Segment, t: number, prng: () => number): { dLat: number; dLng: number; speedKmh: number } {
+function placeAt(seg: Segment, t: number, prng: () => number, tramOk: (t: number) => boolean): { dLat: number; dLng: number; speedKmh: number } {
   if (!seg.moveRadius) {
     const o = fixedOffset(seg, prng);
     return { dLat: o.lat, dLng: o.lng, speedKmh: 0 };
   }
-  const b = Math.floor((t - seg.fromMs) / MOVE_BUCKET_MS);
-  const end = bucketOffset(seg, b, prng);
-  if (!inMoveWindow(seg, t)) return { dLat: end.lat, dLng: end.lng, speedKmh: 0 };
-  const start = bucketOffset(seg, b - 1, prng);
-  const frac = ((t - seg.fromMs) % MOVE_BUCKET_MS) / MOVE_WINDOW_MS;
-  const degKm = Math.hypot(end.lat - start.lat, (end.lng - start.lng) * Math.cos(seg.from.lat * Math.PI / 180)) * 111;
+  const m = moveAt(seg, t, prng, tramOk);
+  if (t - m.fromMs >= m.windowMs) return { dLat: m.end.lat, dLng: m.end.lng, speedKmh: 0 };
+  const frac = (t - m.fromMs) / m.windowMs;
   return {
-    dLat: start.lat + (end.lat - start.lat) * frac,
-    dLng: start.lng + (end.lng - start.lng) * frac,
-    speedKmh: degKm / (MOVE_WINDOW_MS / HOUR),
+    dLat: m.start.lat + (m.end.lat - m.start.lat) * frac,
+    dLng: m.start.lng + (m.end.lng - m.start.lng) * frac,
+    speedKmh: m.speedKmh,
   };
 }
 
@@ -345,6 +405,9 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
   let prev: Point | null = null;
   let t = fromMs;
   const last = Math.min(endMs, now);
+  // No shift-start tram on a day with a scripted excursion (see SHUFFLE_KMH).
+  const excursionDays = new Set(excursionLegs(asset).map(l => clock.startOfDubaiDay(l.t0)));
+  const tramOk = (at: number) => !excursionDays.has(clock.startOfDubaiDay(at));
 
   while (t < last) {
     const stay = stayAt(stays, t);
@@ -364,7 +427,7 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
         ? { mode: 'idle', speed: 0 }
         : planned?.forced === 'off' ? { mode: 'off', speed: 0 } : stayMode(asset, t, prng);
       mode = c.mode; speed = c.speed;
-      const place = placeAt(stayed, t, prng);
+      const place = placeAt(stayed, t, prng, tramOk);
       const wob = mode === 'work' && place.speedKmh > 0 ? (prng() - 0.5) * stayed.jitter * 0.01 : 0;
       lat = stayed.from.lat + place.dLat + wob;
       lng = stayed.from.lng + place.dLng + wob;
@@ -385,9 +448,9 @@ function sampleSegments(asset: Asset, trackerId: string, segs: Segment[], fromMs
         mode = seg.mode;
         if (seg.mode === 'work') {
           // Plant mostly works. A short move (spec §9) is always working, never idle.
-          mode = inMoveWindow(seg, t) ? 'work' : prng() < 0.85 ? 'work' : 'idle';
+          mode = inMoveWindow(seg, t, prng, tramOk) ? 'work' : prng() < 0.85 ? 'work' : 'idle';
         }
-        const place = placeAt(seg, t, prng);
+        const place = placeAt(seg, t, prng, tramOk);
         // GPS wobble only while moving: a stopped machine must not drift on the odometer.
         const wob = speed > 0 ? (prng() - 0.5) * jit * 0.01 : 0;
         lat = seg.from.lat + place.dLat + wob;

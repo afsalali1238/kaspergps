@@ -51,12 +51,13 @@ describe('clock moves', () => {
     expect(computeStatus(asset('TP-23'))).not.toBe('offline');
   });
 
-  it('FB-12 reaches the Al Habtoor site about 90 min after the anchor and stays there (§9)', () => {
+  // Owner decision (BUILDER §1, 13 Oct): FB-12 arrives about 30 min after the anchor, not 90.
+  it('FB-12 reaches the Al Habtoor site about 30 min after the anchor and stays there (§9)', () => {
     const dest = { lat: 25.1130, lng: 55.2000 };
     const km = (r: { lat: number; lng: number }) => Math.hypot((r.lat - dest.lat) * 111, (r.lng - dest.lng) * 101);
-    clock.setOffsetMs(30 * 60000);
+    clock.setOffsetMs(10 * 60000);
     expect(km(getReadingForAsset(asset('FB-12'))!)).toBeGreaterThan(5);
-    clock.setOffsetMs(95 * 60000);
+    clock.setOffsetMs(35 * 60000);
     expect(km(getReadingForAsset(asset('FB-12'))!)).toBeLessThan(0.5);
     clock.setOffsetMs(4 * 3600000);
     expect(km(getReadingForAsset(asset('FB-12'))!)).toBeLessThan(0.5);
