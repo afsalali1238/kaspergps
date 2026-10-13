@@ -23,7 +23,7 @@ for (const shot of [
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
 
     await demo(page, { email: shot.email, on: shot.on });
-    await page.getByRole('button', { name: shot.tab, exact: true }).first().click();
+    await page.getByRole('tab', { name: shot.tab, exact: true }).first().click();
     await expect(page.getByText("This page couldn't load")).toHaveCount(0);
     await expect(page.getByText(shot.tab, { exact: true }).first()).toBeVisible();
     await page.waitForLoadState('networkidle').catch(() => undefined);

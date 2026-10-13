@@ -43,10 +43,10 @@ for (const shot of SHOTS) {
       await expect(page.getByText("This page couldn't load")).toHaveCount(0);
 
       if (shot.fromTrips) {
-        await page.getByRole('button', { name: 'Trips' }).click();
+        await page.getByRole('tab', { name: 'Trips' }).click();
         await page.getByRole('button', { name: 'Play', exact: true }).first().click();
       } else {
-        await page.getByRole('button', { name: 'History', exact: true }).click();
+        await page.getByRole('tab', { name: 'History', exact: true }).click();
         if (shot.period) await page.getByRole('button', { name: shot.period, exact: true }).click();
         await page.getByRole('button', { name: 'Play this period' }).click();
       }

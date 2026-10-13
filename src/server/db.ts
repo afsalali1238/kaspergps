@@ -22,9 +22,11 @@ import type {
   AssetCostProfile, ReportSchedule, ReportRun, AuditEntry, Notification,
   OwnershipPeriod, GrantOverride, MaintenanceTask,
 } from '@/domain/types';
+import type { AlertRule } from '@/server/alert-rules';
 import * as seedData from '@/server/seed/data';
 
-export const DB_VERSION = 1;
+/** v2 (Agent G): adds `alertRules`. A v1 store is migrated, not discarded. */
+export const DB_VERSION = 2;
 export const DB_STORAGE_KEY = 'kasper.db.v1';
 
 /** Every mutable collection. Each one is an array so it can be exported as JSON. */
@@ -59,6 +61,8 @@ export interface DbState {
   trackerRequests: TrackerRequest[];
   notifications: Notification[];
   onboardingDrafts: typeof seedData.onboardingDrafts;
+  /** Alert notification rules per tenant (prototype; nothing is sent). */
+  alertRules: AlertRule[];
 }
 
 export type CollectionKey = {
@@ -103,7 +107,21 @@ export function freshDbState(): DbState {
     trackerRequests: copy(seedData.trackerRequests),
     notifications: copy(seedData.notifications),
     onboardingDrafts: copy(seedData.onboardingDrafts),
+    alertRules: [],
   };
+}
+
+/**
+ * Bring a stored db up to DB_VERSION. v1 → v2 only adds the empty
+ * `alertRules` list, so the demo's changes survive the upgrade. Anything else
+ * (unknown or newer versions, broken data) rebuilds from the seed.
+ */
+export function migrateDb(persisted: unknown, version: number): DbState {
+  if (version === 1 && persisted && typeof persisted === 'object') {
+    const state = persisted as Partial<DbState>;
+    return { ...freshDbState(), ...state, alertRules: Array.isArray(state.alertRules) ? state.alertRules : [] };
+  }
+  return freshDbState();
 }
 
 /** The collection names an export file must contain, in order. */
@@ -116,8 +134,8 @@ export const db = create<DbState>()(
     name: DB_STORAGE_KEY,
     version: DB_VERSION,
     storage: createJSONStorage(() => localStorage),
-    // A stored db from another version is discarded and rebuilt from the seed.
-    migrate: () => freshDbState(),
+    // v1 is migrated in place; any other version is rebuilt from the seed.
+    migrate: (persisted, version) => migrateDb(persisted, version),
     // The client rehydrates after mount (see DbProvider), so the first client
     // render matches the server HTML and there is no hydration mismatch.
     skipHydration: true,

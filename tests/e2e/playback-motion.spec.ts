@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('playback with normal motion', () => {
   test('Play runs the trip and the button becomes Pause', async ({ page }) => {
     await demo(page, { email: USERS.omar, scenario: 27 });
-    await page.getByRole('button', { name: 'Trips' }).click();
+    await page.getByRole('tab', { name: 'Trips' }).click();
     await page.getByRole('button', { name: 'Play', exact: true }).first().click();
     // The row's Play opens the player; its own toggle is the first Play on the page.
     await page.getByRole('button', { name: 'Play', exact: true }).first().click();
@@ -23,7 +23,7 @@ test.describe('playback with reduced motion', () => {
 
   test('the player starts stepped, never runs by itself, and offers Step 5 min', async ({ page }) => {
     await demo(page, { email: USERS.omar, scenario: 27 });
-    await page.getByRole('button', { name: 'Trips' }).click();
+    await page.getByRole('tab', { name: 'Trips' }).click();
     await page.getByRole('button', { name: 'Play', exact: true }).first().click();
     await expect(page.getByRole('button', { name: 'Step 5 min' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
@@ -33,7 +33,7 @@ test.describe('playback with reduced motion', () => {
 test.describe('event pins and Play this period (spec 11.3, 11.15)', () => {
   test('S27: a 7-day History period opens playback; the over-speed pin jumps to 104 km/h', async ({ page }) => {
     await demo(page, { email: USERS.omar, on: '/app/assets/a-wt07' });
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('tab', { name: 'History', exact: true }).click();
     await page.getByRole('button', { name: '7 days', exact: true }).click();
     await page.getByRole('button', { name: 'Play this period' }).click();
     const pin = page.getByRole('button', { name: /^Over speed 104 km\/h at / });
@@ -46,7 +46,7 @@ test.describe('event pins and Play this period (spec 11.3, 11.15)', () => {
     // LB-05 was dragged out of its yard at 23:40 yesterday with the ignition off (S29's
     // alert): the player has to show that pin, in words, and jump to it.
     await demo(page, { email: USERS.omar, on: '/app/assets/a-lb05' });
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('tab', { name: 'History', exact: true }).click();
     await page.getByRole('button', { name: 'Play this period' }).click();
 
     const pins = page.getByTestId('event-pins');
@@ -66,7 +66,7 @@ test.describe('event pins and Play this period (spec 11.3, 11.15)', () => {
 
   test('S28: Lina plays EX-04 inside her rental; AdBlue reads Not measured and RPM is shown', async ({ page }) => {
     await demo(page, { email: USERS.lina, on: '/app/assets/a-ex04' });
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('tab', { name: 'History', exact: true }).click();
     await page.getByRole('button', { name: 'Play this period' }).click();
     const readout = page.getByTestId('playback-readout');
     await expect(readout.locator('dt', { hasText: 'RPM' })).toBeVisible();

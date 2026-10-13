@@ -30,7 +30,7 @@ export const NAMES = {
 
 // Map tiles come from OpenStreetMap. Tests answer them locally with a blank tile,
 // so the suite never depends on the network; setTilesDown makes them fail on purpose.
-const TILE_HOST = /tile\.openstreetmap\.org/;
+const TILE_HOST = /tile\.openstreetmap\.org|basemaps\.cartocdn\.com/;
 const BLANK_TILE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',

@@ -15,8 +15,11 @@ const PURE = new Set([
   'ADAPTER_SERIAL_DUPLICATE', 'LVCAN_MODEL_ERROR', 'aed', 'invoiceStatusLabel', 'hasRole', 'isKasperStaff',
   'auditActions', 'auditEntriesToCsv', 'clockPresets', 'dubaiYesterdayAt', 'fb12PublicPath', 'presetAt',
   'periodRange', 'hoursSourceFor', 'showsUtilisation', 'REPORT_TYPES', 'viewAsGroups',
+  'tierOfAsset', // E: reads only the asset's CAN adapter (the same rule as hoursSourceFor)
   // Pure formatters: a capability id or an adapter name in, words out.
   'capabilityLabel', 'tierOf',
+  // Agent G: an alert type in, a severity out; and grouping of rows the caller already got from a gated call.
+  'alertSeverity', 'groupAlertsBySeverity',
   'actorName', 'assetCode', 'tenantName', 'useDb', 'hydrateDb', 'nextRowNumber',
   // Public by design: token-gated, no session (spec §11.14).
   'getTrackingLinkState', 'resolveTrackingLink',

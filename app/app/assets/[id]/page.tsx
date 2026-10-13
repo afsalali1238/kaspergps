@@ -2,19 +2,19 @@
 
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import clsx from 'clsx';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
-  TierChip, Badge, Button, StatusBadge, SourceLabel,
-} from '@/components/ui';
+import { Badge, Button, SegmentedTabs, SourceLabel } from '@/components/ui';
 import { historyFloor, isFeatureVisible, useDb, isAssetVisible, getRelationship, getReadingForAsset, getReadingsForAsset, computeStatus, detectTrips, visibleAlerts, acknowledgeAlert, buildEcuBreakdown, ecuHoursAt, getMucsForAsset, getMucVerifyStatus, hasOpenTrackerRequest, requestTracker, trackerRequestForAsset, activeLinksForAsset, createTrackingLink, expiryOptions, linkEndWords, pastLinksForAsset, revokeTrackingLink, endEarly, type EcuBreakdown, type MucVerifyStatus, canManageMaintenance, planSnapshot, plansForAsset, serviceHistory, can, last7DaysIgnition, todayFor, type IgnitionBreakdown, labelsOnAsset, labelsVisibleTo, addLabelToAssets, removeLabelFromAssets, assetGeofenceStatus, visibleGeofenceEvents, viewerSiteId } from '@/server/api';
 import * as clock from '@/lib/clock';
 import type { Asset, Reading, TrackingLink } from '@/domain/types';
 import { hasFeature, lockedFeatures, tierForAsset } from '@/domain/features';
 import { TripPlayer } from '@/components/playback/TripPlayer';
 import { EngineFuelPanel } from '@/components/assets/EngineFuelPanel';
+import { AssetHeader } from '@/components/assets/AssetHeader';
+import { EndAccessDialog } from '@/components/assets/EndAccessDialog';
+import { AssetOverviewGrid, measure, type TileSpec } from '@/components/assets/AssetOverviewGrid';
 import { buildPins } from '@/domain/playback';
 import { AssetLabels } from '@/components/labels/AssetLabels';
 import { HistoryPanel } from '@/components/history/HistoryPanel';
@@ -246,7 +246,8 @@ export default function AssetDetailPage() {
   const [verifyStates, setVerifyStates] = useState<Record<string, MucVerifyStatus>>({});
   const [requestNote, setRequestNote] = useState('');
   const [panel, setPanel] = useState<'share' | 'end' | 'edit' | null>(null);
-  const [endReason, setEndReason] = useState('');
+  // Deep link from the fleet map panel (Agent E): ?panel=share opens the share dialog.
+  const [deepLinkPanel] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panel') === 'share' ? 'share' : null));
   const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -386,6 +387,11 @@ export default function AssetDetailPage() {
     return () => { cancelled = true; };
   }, [mucs]);
 
+  // ?panel=share (from the fleet map panel) opens the share dialog, if this user may share.
+  React.useEffect(() => {
+    if (deepLinkPanel && session && asset && can(session, 'link.create', asset.id)) setPanel('share');
+  }, [deepLinkPanel, session, asset]);
+
   if (!session) return null;
   if (!asset) return (
     <div className="flex items-center justify-center h-[400px]">
@@ -429,66 +435,93 @@ export default function AssetDetailPage() {
   // If the open tab is hidden by a phase or tier change, fall back to Overview.
   const shownTab: TabId = visibleTabs.some(tab => tab.id === activeTab) ? activeTab : 'overview';
   const lockedCards = salesView && asset ? lockedFeatures(asset, phase) : [];
+  const fences = assetGeofenceStatus(session, asset.id);
+
+  // CAN tiles (Tier 2+). A sensor the adapter can't read says "Not available";
+  // a supported sensor with no reading yet says "Not measured".
+  const supports = (key: string) => (asset.canProfile.supported as string[]).includes(key);
+  const notAvailable = t('common.not_available', 'Not available');
+  const ecuSource = t('common.source.ecu', 'ECU');
+  const sensorTile = (key: string, sensor: string, label: string, value: number | undefined, unit: string): TileSpec => ({
+    key,
+    label,
+    value: supports(sensor) ? measure(value, 0) : null,
+    unit,
+    source: supports(sensor) ? ecuSource : undefined,
+    context: supports(sensor) ? undefined : notAvailable,
+  });
+  const canTiles: TileSpec[] = [
+    {
+      key: 'engine-hours',
+      label: t('asset_detail.overview.engine_hours', 'Engine hours'),
+      value: measure(ecuHoursAt(asset, clock.now()), 1),
+      unit: t('asset_page.unit.h', 'h'),
+      context: asset.canProfile.adapter === 'ALL-CAN300'
+        ? t('asset_detail.overview.ecu_today', 'ECU · today')
+        : t('asset_detail.overview.ecu_partial', 'ECU · partial · today'),
+    },
+    sensorTile('fuel-level', 'fuelLevel', t('asset_detail.overview.fuel_level', 'Fuel level'), reading?.fuelLevelPct, '%'),
+    sensorTile('rpm', 'rpm', t('asset_detail.overview.engine_rpm', 'Engine RPM'), reading?.rpm, t('asset_page.unit.rpm', 'rpm')),
+    sensorTile('coolant', 'coolantTemp', t('asset_detail.overview.coolant', 'Coolant'), reading?.coolantC, '°C'),
+    sensorTile('load', 'engineLoad', t('asset_detail.overview.load', 'Engine load'), reading?.engineLoadPct, '%'),
+    sensorTile('adblue', 'adBlue', t('asset_detail.overview.adblue', 'AdBlue'), reading?.adBluePct, '%'),
+    {
+      key: 'faults',
+      label: t('asset_detail.overview.faults', 'Active faults'),
+      value: hasFeature(asset, 'faults') ? String(reading?.activeDtcs?.length ?? 0) : null,
+      source: hasFeature(asset, 'faults') ? ecuSource : undefined,
+      context: hasFeature(asset, 'faults') ? t('asset_detail.engine.fault_codes', 'Fault codes') : notAvailable,
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-ink">{asset.code}</span>
-            <span className="text-sm text-grey-500">— {asset.name}</span>
-            {rel === 'renter' && <Badge variant="yellow">{t('common.status.rented', 'Rented')}</Badge>}
-          </div>
-          <div className="text-sm text-grey-500 mt-1">
-            {asset.make} {asset.model} · {asset.year} · {asset.plateOrSerial}
-          </div>
-          <div className="text-sm text-grey-500">
-            {site?.name} · {ownerTenant?.name}
-          </div>
-          {session && (() => {
-            const fences = assetGeofenceStatus(session, asset.id);
-            if (!fences) return null;
-            return (
-              <div className="text-sm text-grey-700 mt-1">
-                {fences.inside.length > 0
-                  ? t('asset_detail.geofence.inside', 'Inside: {names}', { names: fences.inside.join(', ') })
-                  : t('asset_detail.geofence.outside', 'Outside all geofences')}
-              </div>
-            );
-          })()}
-          {session && (
-            <AssetLabels
-              labels={labelsOnAsset(session, asset.id).map(l => ({ id: l.id, name: l.name }))}
-              options={labelsVisibleTo(session).map(l => ({ id: l.id, name: l.name }))}
-              canEdit={can(session, 'label.manage', asset.id)}
-              onAdd={choice => {
-                const r = addLabelToAssets(session, choice, [asset.id]);
-                return r.ok ? null : (r.error ?? 'The label could not be added.');
-              }}
-              onRemove={id => {
-                const r = removeLabelFromAssets(session, id, [asset.id]);
-                return r.ok ? null : (r.error ?? 'The label could not be removed.');
-              }}
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={status} />
-          <TierChip tier={tier} />
-        </div>
-      </div>
-
-      {/* Last updated */}
-      {/* Hover shows device time vs received time (§11.3); no visible hint text. */}
-      <div
-        className={reading ? 'text-sm text-grey-500 cursor-help w-fit' : 'text-sm text-grey-500'}
-        title={reading ? `Device time: ${clock.formatDubaiDateTime(new Date(reading.deviceTime).getTime())}\nReceived: ${clock.formatDubaiDateTime(new Date(reading.receivedAt).getTime())}` : undefined}
-      >
-        {t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
-        {reading ? ` (${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })})` : ''}
-      </div>
-
+      {/* Header (§7.1): summary lines and one primary action. */}
+      <AssetHeader
+        code={asset.code}
+        name={asset.name}
+        status={status}
+        tier={tier}
+        hireChip={rel === 'renter' ? 'rented' : currentBooking ? 'on_hire' : null}
+        makeLine={`${asset.make} ${asset.model} · ${asset.year} · ${asset.plateOrSerial}`}
+        placeParts={[
+          site?.name ?? '',
+          ownerTenant?.name ?? '',
+          fences
+            ? fences.inside.length > 0
+              ? t('asset_detail.geofence.inside', 'Inside: {names}', { names: fences.inside.join(', ') })
+              : t('asset_detail.geofence.outside', 'Outside all geofences')
+            : '',
+        ].filter(Boolean)}
+        lastUpdated={
+          t('asset_detail.last_updated', 'Last updated {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })
+          + (reading ? ` (${t('common.minutes_short', '{value} min ago', { value: Math.round(clock.minutesSinceDubai(new Date(reading.deviceTime).getTime())) })})` : '')
+        }
+        // Hover shows device time vs received time (§11.3); no visible hint text.
+        lastUpdatedTitle={reading ? `Device time: ${clock.formatDubaiDateTime(new Date(reading.deviceTime).getTime())}\nReceived: ${clock.formatDubaiDateTime(new Date(reading.receivedAt).getTime())}` : undefined}
+        labels={
+          <AssetLabels
+            labels={labelsOnAsset(session, asset.id).map(l => ({ id: l.id, name: l.name }))}
+            options={labelsVisibleTo(session).map(l => ({ id: l.id, name: l.name }))}
+            canEdit={can(session, 'label.manage', asset.id)}
+            onAdd={choice => {
+              const r = addLabelToAssets(session, choice, [asset.id]);
+              return r.ok ? null : (r.error ?? 'The label could not be added.');
+            }}
+            onRemove={id => {
+              const r = removeLabelFromAssets(session, id, [asset.id]);
+              return r.ok ? null : (r.error ?? 'The label could not be removed.');
+            }}
+          />
+        }
+        actions={{
+          share: canShare ? () => setPanel(panel === 'share' ? null : 'share') : undefined,
+          shareOpen: panel === 'share',
+          edit: canEdit ? () => setPanel(panel === 'edit' ? null : 'edit') : undefined,
+          runReportHref: canRunReport ? href('/app/reports') : undefined,
+          endAccess: canEndAccess && currentBooking ? () => setPanel('end') : undefined,
+        }}
+      />
       {/* Rental strip */}
       <div className="bg-surface border border-line rounded-lg p-4">
         {rel === 'owner' && (
@@ -549,302 +582,140 @@ export default function AssetDetailPage() {
         )}
       </div>
 
-      {/* Actions */}
-      {(canEdit || canShare || canEndAccess || canRunReport) && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {canEdit && (
-              <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'edit' ? null : 'edit')}>
-                {t('asset_detail.actions.edit_asset', 'Edit asset')}
-              </Button>
-            )}
-            {canShare && (
-              <Button variant="secondary" size="sm" onClick={() => setPanel(panel === 'share' ? null : 'share')}>
-                {t('asset_detail.actions.share_link', 'Share tracking link')}
-              </Button>
-            )}
-            {canEndAccess && currentBooking && (
-              <Button variant="danger" size="sm" onClick={() => { setPanel(panel === 'end' ? null : 'end'); setEndReason(''); }}>
-                {t('asset_detail.actions.end_access', 'End access now')}
-              </Button>
-            )}
-            {canRunReport && (
-              <a
-                className="inline-flex items-center text-xs px-2.5 py-1.5 rounded-md bg-paper-2 text-ink border border-line hover:bg-paper hover:border-grey-500 font-medium"
-                href={href('/app/reports')}
-              >
-                {t('asset_detail.actions.run_report', 'Run report')}
-              </a>
-            )}
-          </div>
-
-          {panel === 'share' && (
-            <SharePanel asset={asset} onClose={() => setPanel(null)} // Stay open: the new link and its suggested message are what the owner needs next.
-            onDone={message => { showAssetToast('ok', message); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
-          )}
-
-          {panel === 'end' && currentBooking && (
-            <div className="bg-surface border border-red/30 rounded-lg p-4">
-              <h2 className="text-sm font-medium text-ink mb-1">
-                {t('asset_detail.end_access.title', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
-              </h2>
-              <p className="text-xs text-grey-500 mb-2">
-                {t('asset_detail.end_access.body', 'The rental is cut short now: the override is saved, the job tracking links are revoked and the cut-off is audited. It is not undone by the nightly check.', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer', code: asset.code })}
-              </p>
-              <input
-                type="text"
-                value={endReason}
-                onChange={e => setEndReason(e.target.value)}
-                placeholder={t('asset_detail.end_access.reason_label', 'Reason (at least 10 characters)')}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-              />
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    const result = endEarly(session, currentBooking.id, endReason);
-                    if (result.ok) {
-                      showAssetToast('ok', result.message ?? t('asset_detail.end_access.done_short', 'Access ended.'));
-                      setPanel(null);
-                      refreshAsset();
-                    } else {
-                      showAssetToast('error', result.error ?? t('asset_detail.end_access.failed', 'Could not end access.'));
-                    }
-                  }}
-                >
-                  {t('asset_detail.end_access.confirm', 'End {company} access now', { company: seed.tenants.find(x => x.id === currentBooking.renterTenantId)?.name ?? 'the hirer' })}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setPanel(null)}>{t('common.cancel', 'Cancel')}</Button>
-              </div>
-            </div>
-          )}
-        </div>
+      {panel === 'share' && canShare && (
+        <SharePanel asset={asset} onClose={() => setPanel(null)} // Stay open: the new link and its suggested message are what the owner needs next.
+        onDone={message => { showAssetToast('ok', message); refreshAsset(); }} onError={message => showAssetToast('error', message)} />
       )}
 
-      {/* Tabs */}
-      <div className="border-b border-line">
-        <div className="flex gap-4">
-          {visibleTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'text-sm font-medium transition-colors pb-2 border-b-2',
-                shownTab === tab.id
-                  ? 'text-ink border-yellow'
-                  : 'text-grey-500 hover:text-ink border-transparent'
-              )}
-            >
-              {t(tab.key, tab.label)}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* End access now (§7.1): confirm first, with the existing reason rule. */}
+      {canEndAccess && currentBooking && (
+        <EndAccessDialog
+          open={panel === 'end'}
+          company={renterNameOf(currentBooking) || 'the hirer'}
+          code={asset.code}
+          onCancel={() => setPanel(null)}
+          onConfirm={reason => {
+            const result = endEarly(session, currentBooking.id, reason);
+            if (result.ok) {
+              showAssetToast('ok', result.message ?? t('asset_detail.end_access.done_short', 'Access ended.'));
+              setPanel(null);
+              refreshAsset();
+            }
+            return { ok: result.ok, error: result.error };
+          }}
+        />
+      )}
 
       {trackerToast && (
         <div
+          role="status"
           className={
             trackerToast.kind === 'ok'
-              ? 'bg-green/10 border border-green/30 text-ok-ink text-sm px-4 py-2 rounded-lg'
-              : 'bg-red/10 border border-red/30 text-bad-ink text-sm px-4 py-2 rounded-lg'
+              ? 'bg-ok-tint border border-green/30 text-ok-ink text-sm px-4 py-2 rounded-lg'
+              : 'bg-bad-tint border border-red/30 text-bad-ink text-sm px-4 py-2 rounded-lg'
           }
         >
           {trackerToast.text}
         </div>
       )}
 
+      {/* Tabs (§7.2): SegmentedTabs scroll sideways with an edge fade on phones. */}
+      <SegmentedTabs
+        label={t('asset_page.tabs_label', 'Asset sections')}
+        idPrefix="asset"
+        value={shownTab}
+        onChange={setActiveTab}
+        tabs={visibleTabs.map(tab => ({ id: tab.id, label: t(tab.key, tab.label) }))}
+      />
       {/* Tab content */}
+      <div role="tabpanel" id={`asset-panel-${shownTab}`} aria-labelledby={`asset-tab-${shownTab}`} className="space-y-4">
       {shownTab === 'overview' && (
         <div className="space-y-4">
-          {/* Mini map */}
-          <div className="rounded-xl border border-line bg-paper h-[240px]">
-            {reading ? (
-              <MapContainer
-                center={[reading.lat, reading.lng]}
-                zoom={14}
-                scrollWheelZoom={false}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={[reading.lat, reading.lng]} icon={createMarkerIcon(status)}>
-                  <Popup>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold text-ink">{asset.code}</div>
-                      <div className="text-xs text-grey-500">{t(`common.status.${status}`, status)}</div>
-                      <div className="text-xs text-grey-500 mt-1">
-                        {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
-                      </div>
+          {/* Map 60 % beside a 2×2 metric grid (§7.2); numbers through src/lib/format.ts. */}
+          <AssetOverviewGrid
+            map={reading ? (
+            <MapContainer
+              center={[reading.lat, reading.lng]}
+              zoom={14}
+              scrollWheelZoom={false}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[reading.lat, reading.lng]} icon={createMarkerIcon(status)}>
+                <Popup>
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-ink">{asset.code}</div>
+                    <div className="text-xs text-grey-500">{t(`common.status.${status}`, status)}</div>
+                    <div className="text-xs text-grey-500 mt-1">
+                      {clock.formatDubaiTime(new Date(reading.deviceTime).getTime())}
                     </div>
-                  </Popup>
-                </Marker>
-              </MapContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-sm text-grey-500">{t('asset_detail.overview.no_location', 'No location data yet')}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Status info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.status', 'Status')}</div>
-              <div className="text-lg font-semibold text-ink mt-1 capitalize">{t(`common.status.${status}`, status)}</div>
-              {status === 'offline' && (
-                <div className="text-xs text-bad-ink mt-1">
-                  {t('asset_detail.overview.offline_since', 'Offline since {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })}
-                </div>
-              )}
-            </div>
-            <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.speed', 'Speed')}</div>
-              <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                {reading ? `${Math.round(reading.speedKmh)} km/h` : '—'}
-              </div>
-            </div>
-            <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.history.ignition', 'Ignition')}</div>
-              <div className="text-lg font-semibold mt-1">
-                {reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : '—'}
-              </div>
-            </div>
-            {/* The tracker's own battery. With a Power tile below (vehicle voltage), it is that tile's sub-line instead. */}
-            {(isTier1 || !hasFeature(asset, 'power.status')) && (
-            <div className="bg-surface border border-line rounded-lg p-4">
-              <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.tracker_battery_label', 'Tracker battery')}</div>
-              <div className="text-lg font-semibold mt-1 font-mono">
-                {reading ? `${reading.intBattery.toFixed(1)} V` : '—'}
-              </div>
-            </div>
-            )}
-          </div>
-
-          {/* Today: distance and ignition-on time (spec 11.3 "Overview"). */}
-          {today && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.today_distance', "Today's distance")}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {t('asset_detail.overview.km', '{value} km', { value: today.distanceKm.toFixed(1) })}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">{t('asset_detail.overview.since_midnight', 'Since midnight, Dubai')}</div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.today_ignition', "Today's ignition-on time")}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {t('common.hours_short', '{value} h', { value: today.ignitionHours.toFixed(1) })}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <SourceLabel source={today.source} inline />
-                </div>
-              </div>
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-sm text-grey-500">{t('asset_detail.overview.no_location', 'No location data yet')}</div>
             </div>
           )}
-
-          {/* CAN tiles (only for Tier 2+) */}
-          {!isTier1 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_hours', 'Engine hours')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {`${ecuHoursAt(asset, clock.now()).toFixed(1)} h`}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.adapter === 'ALL-CAN300'
-                    ? t('asset_detail.overview.ecu_today', 'ECU · today')
-                    : t('asset_detail.overview.ecu_partial', 'ECU · partial · today')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.fuel_level', 'Fuel level')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('fuelLevel') && reading?.fuelLevelPct !== undefined
-                    ? `${reading.fuelLevelPct.toFixed(0)}%`
-                    : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('fuelLevel') ? <SourceLabel source="ECU" inline /> : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.engine_rpm', 'Engine RPM')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {reading?.rpm !== undefined ? `${Math.round(reading.rpm)} rpm` : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('rpm') && reading?.rpm !== undefined
-                    ? <SourceLabel source="ECU" inline />
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.power', 'Power')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {reading && hasFeature(asset, 'power.status') ? `${reading.extVoltage.toFixed(1)} V` : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {hasFeature(asset, 'power.status')
-                    ? t('asset_detail.overview.tracker_battery', 'Tracker battery {value}', { value: reading ? `${reading.intBattery.toFixed(1)} V` : '—' })
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.coolant', 'Coolant')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('coolantTemp') && reading?.coolantC !== undefined
-                    ? `${reading.coolantC.toFixed(0)} °C`
-                    : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('coolantTemp')
-                    ? <SourceLabel source="ECU" inline />
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.load', 'Engine load')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('engineLoad') && reading?.engineLoadPct !== undefined
-                    ? `${reading.engineLoadPct.toFixed(0)}%`
-                    : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('engineLoad')
-                    ? <SourceLabel source="ECU" inline />
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.adblue', 'AdBlue')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {asset.canProfile.supported.includes('adBlue') && reading?.adBluePct !== undefined
-                    ? `${reading.adBluePct.toFixed(0)}%`
-                    : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {asset.canProfile.supported.includes('adBlue')
-                    ? <SourceLabel source="ECU" inline />
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-              <div className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs text-grey-500 font-medium uppercase">{t('asset_detail.overview.faults', 'Active faults')}</div>
-                <div className="text-lg font-semibold text-ink mt-1 font-mono">
-                  {hasFeature(asset, 'faults') ? `${reading?.activeDtcs?.length ?? 0}` : t('common.not_measured', 'Not measured')}
-                </div>
-                <div className="text-xs text-grey-500 mt-1">
-                  {hasFeature(asset, 'faults')
-                    ? t('asset_detail.engine.fault_codes', 'Fault codes')
-                    : t('common.not_available', 'Not available')}
-                </div>
-              </div>
-            </div>
-          )}
-
+            primary={[
+              {
+                key: 'status',
+                label: t('asset_detail.overview.status', 'Status'),
+                value: t(`common.status.${status}`, status),
+                tone: status === 'offline' ? 'bad' : 'neutral',
+                context: status === 'offline'
+                  ? t('asset_detail.overview.offline_since', 'Offline since {time}', { time: reading ? clock.formatDubaiTime(new Date(reading.deviceTime).getTime()) : '—' })
+                  : undefined,
+              },
+              {
+                key: 'speed',
+                label: t('asset_detail.history.speed', 'Speed'),
+                value: reading ? measure(reading.speedKmh, 0) : null,
+                unit: t('asset_page.unit.kmh', 'km/h'),
+                source: t('asset_page.source.gps', 'GPS'),
+              },
+              {
+                key: 'ignition',
+                label: t('asset_detail.history.ignition', 'Ignition'),
+                value: reading ? (reading.ignition ? t('common.on', 'On') : t('common.off', 'Off')) : null,
+              },
+              {
+                // One Power tile (§7.2): vehicle voltage, tracker battery as the sub-line.
+                key: 'power',
+                label: t('asset_detail.overview.power', 'Power'),
+                value: reading && hasFeature(asset, 'power.status') ? measure(reading.extVoltage, 1) : null,
+                unit: 'V',
+                source: t('asset_page.source.tracker', 'Tracker'),
+                context: reading
+                  ? t('asset_detail.overview.tracker_battery', 'Tracker battery {value}', { value: `${measure(reading.intBattery, 1) ?? '—'} V` })
+                  : undefined,
+              },
+            ]}
+            more={[
+              ...(today ? [
+                {
+                  key: 'today-distance',
+                  label: t('asset_detail.overview.today_distance', "Today's distance"),
+                  value: measure(today.distanceKm, Math.abs(today.distanceKm) < 10 ? 1 : 0),
+                  unit: t('asset_page.unit.km', 'km'),
+                  context: t('asset_detail.overview.since_midnight', 'Since midnight, Dubai'),
+                  source: t('common.source.gps_distance', 'GPS distance'),
+                },
+                {
+                  key: 'today-ignition',
+                  label: t('asset_detail.overview.today_ignition', "Today's ignition-on time"),
+                  value: measure(today.ignitionHours, 1),
+                  unit: t('asset_page.unit.h', 'h'),
+                  context: <SourceLabel source={today.source} inline />,
+                },
+              ] : []),
+              ...(!isTier1 ? canTiles : []),
+            ]}
+          />
           {/* No tracker state */}
           {status === 'no_tracker' && (
             <div className="bg-surface border border-line rounded-lg p-4">
@@ -1306,6 +1177,7 @@ export default function AssetDetailPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

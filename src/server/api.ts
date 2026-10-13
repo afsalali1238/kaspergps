@@ -216,3 +216,13 @@ export { detectTrips } from './trips';
 export { engineHoursToday, fleetTodayTotals, hoursSourceFor, last7DaysIgnition, todayFor, fuelToday, fuelWeekFor, showsUtilisation, buildIgnitionBreakdown } from './utilisation';
 export type { FleetTodayTotals, HoursSource, IgnitionBreakdown, TodayView, FuelToday, FuelWeek, FuelWeekDay } from './utilisation';
 export { viewAsGroups } from './view-as';
+
+// ── Agent G ──
+export { SEVERITY_ORDER, acknowledgeAlerts, alertKpis, alertSeverity, groupAlertsBySeverity, mayAcknowledge } from './alerts-screen';
+export type { AlertGroup, AlertKpis, AlertSeverity, BulkAcknowledgeResult } from './alerts-screen';
+export { ALERT_DELIVERIES, alertRulesFor, canManageAlertRules, saveAlertRule } from './alert-rules';
+export type { AlertDelivery, AlertRule, AlertRuleView } from './alert-rules';
+
+// ── Agent E ──
+export { fleetEvents, fleetKpis, fleetPanelFor, rentalLineFor, tierOfAsset } from './fleet-panel';
+export type { FleetEvent, FleetKpis, FleetPanel, HealthRow, PanelMetric, RentalLine } from './fleet-panel';
