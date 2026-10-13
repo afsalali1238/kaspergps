@@ -1216,5 +1216,22 @@
     "no_items": "لا توجد عناصر بعد",
     "select": "تحديد",
     "source": "المصدر: {source}"
+  },
+  "asset_page": {
+    "on_hire": "مؤجّرة",
+    "tabs_label": "أقسام المعدّة",
+    "end_access": {
+      "reason": "السبب"
+    },
+    "unit": {
+      "kmh": "كم/س",
+      "km": "كم",
+      "h": "س",
+      "rpm": "دورة/د"
+    },
+    "source": {
+      "gps": "GPS",
+      "tracker": "جهاز التتبع"
+    }
   }
 }

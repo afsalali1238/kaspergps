@@ -56,7 +56,7 @@ test.describe('S27–S28 — playback', () => {
   test('WT-07 opens its Trips tab with real detected trips', async ({ page }) => {
     await demo(page, { email: USERS.omar, scenario: 27 });
     await expect(page).toHaveURL(/\/app\/assets\/a-wt07$/);
-    await page.getByRole('button', { name: 'Trips' }).click();
+    await page.getByRole('tab', { name: 'Trips' }).click();
     await expect(page.getByText('Trips', { exact: true }).first()).toBeVisible();
     // Real trips with the trip rule spelled out under the table.
     await expect(page.getByText('Top speed')).toBeVisible();
