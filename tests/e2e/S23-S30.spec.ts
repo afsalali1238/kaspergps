@@ -79,15 +79,19 @@ test.describe('S29 — the public arrival time', () => {
   });
 });
 
-test.describe('S30 — schedules and downloads', () => {
-  test('Lina can open Schedules and see her downloads', async ({ page }) => {
+test.describe('S30 — schedules and reports', () => {
+  test('Lina can open Schedules and reach her recent reports from the old URL', async ({ page }) => {
     await demo(page, { email: USERS.lina, scenario: 30 });
     await expect(page).toHaveURL(/\/app\/schedules$/);
     await expect(page.getByRole('heading', { name: 'Schedules' })).toBeVisible();
 
+    // H1 folded Downloads into Reports; the old URL redirects to the recently
+    // generated table, which is what S30 was asserting the downloads screen for.
     await goTo(page, '/app/downloads');
-    await expect(page.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-    await expect(page.getByText(/Download again|No downloads|Reports you generate appear here/).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/reports#recent$/);
+    await expect(page.locator('#recent')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    await expect(page.getByText(/Download again|No reports yet|Recently generated/).first()).toBeVisible();
   });
 
   test('the clock preset for the end of EX-04’s rental exists', async ({ page }) => {

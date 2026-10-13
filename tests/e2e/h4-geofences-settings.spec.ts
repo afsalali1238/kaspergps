@@ -22,8 +22,10 @@ test.describe('H4.4 — geofences on assets and reports', () => {
 
   test('the geofence report is offered to a company with a geofence', async ({ page }) => {
     await demo(page, { email: USERS.omar, on: '/app/reports' });
-    const geofenceType = page.getByRole('button', { name: /^Geofence\b/ }).first();
-    await geofenceType.click();
+    // The card opens the run panel at step 2 with the type already picked; Back shows that pick.
+    await page.getByRole('button', { name: /^Geofence\b/ }).first().click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    const geofenceType = page.getByRole('dialog').getByRole('button', { name: /^Geofence\b/ });
     await expect(geofenceType).toHaveAttribute('aria-pressed', 'true');
   });
 });

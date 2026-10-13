@@ -1,407 +1,280 @@
 'use client';
 
-// Reports (spec §11.5): pick a report type (gated by the selected assets'
-// hardware and the demo phase), a scope and a date range; run it to get a PDF or
-// Excel file, recorded in Downloads. Renters' ranges are clipped to their rental
-// windows with a header line. "Schedule this report" creates a §11.13 schedule.
-
-import React, { useState, useMemo } from 'react';
-import clsx from 'clsx';
-import { Button, EmptyState } from '@/components/ui';
-import { useDb, availableReportTypes, reportableAssets, pastRentalLabel, runReport, REPORT_TYPES, type ReportTypeId, createSchedule, type ScheduleFrequency, can, labelIdsByAsset, labelsVisibleTo, viewerSiteId } from '@/server/api';
-import * as clock from '@/lib/clock';
-
-import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useT } from '@/i18n';
-import { useSession, useSwitches } from '@/hooks';
+import { Button, Badge, Panel, Table, KpiStrip, KpiCell, SegmentedTabs } from '@/components/ui';
+import { useSession, useSwitches, useClockOffsetMs } from '@/hooks';
+import { reportableAssets, reportRunsFor, regenerateReport, deleteReportRun, runDueSchedules, schedulesFor, can, availableReportTypes, type ReportTypeId } from '@/server/api';
+import { downloadPdf, downloadXlsx } from '@/lib/export';
+import * as clock from '@/lib/clock';
+import { formatNumber } from '@/lib/format';
+import { RunPanel } from '@/components/reports/RunPanel';
+import { startOfDubaiMonthLocal } from '@/components/reports/timeHelpers';
+import { BarChart3, Clock, Route, MapPin, Timer, Fuel, Gauge, AlertTriangle, Fence } from 'lucide-react';
+import clsx from 'clsx';
 
-const DATE_PRESETS: { key: string; label: string; days: number }[] = [
-  { key: 'last_24h', label: 'Last 24 hours', days: 1 },
-  { key: 'last_7d', label: 'Last 7 days', days: 7 },
-  { key: 'last_30d', label: 'Last 30 days', days: 30 },
-];
+/** Lucide icon per report type. */
+const REPORT_ICONS: Record<ReportTypeId, React.ReactNode> = {
+  trip_mileage: <Route size={20} />,
+  location_history: <MapPin size={20} />,
+  operating_hours: <Timer size={20} />,
+  fuel: <Fuel size={20} />,
+  utilisation: <Gauge size={20} />,
+  driving_events: <AlertTriangle size={20} />,
+  geofence: <Fence size={20} />,
+};
 
-type ScopeType = 'single_asset' | 'multiple_assets' | 'site' | 'label';
+/** Cadence badge per report type (spec §5.2: "cadence badges"). */
+const REPORT_BADGE: Record<ReportTypeId, string> = {
+  trip_mileage: 'Daily',
+  location_history: 'Daily',
+  operating_hours: 'Weekly',
+  fuel: 'Weekly',
+  utilisation: 'Weekly',
+  driving_events: 'Daily',
+  geofence: 'On events',
+};
 
 export default function ReportsPage() {
-  const seed = useDb(s => s);
   const t = useT();
   const session = useSession();
   const { phase } = useSwitches();
+  const [tab, setTab] = useState<'reports' | 'schedules'>('reports');
+  const [runPanelOpen, setRunPanelOpen] = useState(false);
+  const [runPanelType, setRunPanelType] = useState<ReportTypeId | null>(null);
+  // Version counter — bump after Download again / Delete to recompute runs.
+  const [version, setVersion] = useState(0);
 
-  const [selectedReport, setSelectedReport] = useState<ReportTypeId | null>(null);
-  const [scope, setScope] = useState<ScopeType>('multiple_assets');
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
-  const [siteId, setSiteId] = useState<string>('');
-  const [labelId, setLabelId] = useState<string>('');
-  const [format, setFormat] = useState<'xlsx' | 'pdf'>('xlsx');
-  const [dateFrom, setDateFrom] = useState<string>('');
-  const [dateTo, setDateTo] = useState<string>('');
-  const [presetDays, setPresetDays] = useState<number | null>(7);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [clipNotes, setClipNotes] = useState<string[]>([]);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [schedFreq, setSchedFreq] = useState<ScheduleFrequency>('daily');
-  const [schedTime, setSchedTime] = useState('18:00');
-  const [schedWeekday, setSchedWeekday] = useState(1);
-  const [schedMessage, setSchedMessage] = useState<string | null>(null);
+  const clockOffsetMs = useClockOffsetMs();
 
+  // Run every schedule whose time has passed. The clock only moves when its offset
+  // changes, so subscribing to the offset is enough to keep runs current.
+  useEffect(() => {
+    runDueSchedules();
+    setVersion(v => v + 1);
+  }, [clockOffsetMs]);
+
+  // KPI data
   const assets = useMemo(() => (session ? reportableAssets(session) : []), [session]);
+  // Include version in deps so runs re-fetch after Download/Delete/scheduler runs.
+  // ponytail: version counter in deps, not a store subscription — good enough for a demo.
+  const runs = useMemo(() => (session ? reportRunsFor(session) : []), [session, version]);
 
-  // "Assets with label …" (spec §11.11): the scope is the assets this viewer can see that carry the label.
-  const labelOptions = useMemo(() => (session ? labelsVisibleTo(session) : []), [session]);
-  const labelMap = useMemo(() => (session ? labelIdsByAsset(session) : new Map<string, string[]>()), [session]);
+  const schedules = useMemo(() => (session ? schedulesFor(session) : []), [session]);
 
-  const scopeAssetIds = useMemo(() => {
-    if (scope === 'site') return assets.filter(a => session && viewerSiteId(session, a.id) === siteId).map(a => a.id);
-    if (scope === 'label') return assets.filter(a => (labelMap.get(a.id) ?? []).includes(labelId)).map(a => a.id);
-    return selectedAssetIds;
-  }, [scope, siteId, labelId, labelMap, selectedAssetIds, assets, session]);
+  const { generatedThisMonth, nextScheduled } = useMemo(() => {
+    if (!session) return { generatedThisMonth: 0, nextScheduled: null as string | null };
+    const nowMs = clock.now();
+    const monthStart = startOfDubaiMonthLocal(nowMs);
+    const monthlyRuns = runs.filter(r => new Date(String(r.createdAt)).getTime() >= monthStart);
+    const generatedThisMonth = monthlyRuns.length;
 
-  // §11.5: a report type is listed only if at least one selected (or visible)
-  // asset supports it, and the phase allows it.
+    // Next scheduled run time (from schedulesFor — no filler numbers).
+    const nextScheduled: string | null = (() => {
+      const active = schedules.filter(s => s.active).sort((a, b) => Number(a.nextRunAt) - Number(b.nextRunAt));
+      if (active.length === 0) return null;
+      return clock.formatDubaiDateTime(Number(active[0].nextRunAt));
+    })();
+
+    return { generatedThisMonth, nextScheduled };
+  }, [session, runs, schedules]);
+
+  // Report types available for the viewer's assets (for cards).
   const availableReports = useMemo(() => {
-    if (!session) return [];
-    const ids = scopeAssetIds.length ? scopeAssetIds : assets.map(a => a.id);
-    return availableReportTypes(session, ids, phase);
-  }, [session, scopeAssetIds, assets, phase]);
-
-  const effectiveFrom = useMemo(() => {
-    if (dateFrom) return dateFrom;
-    if (presetDays !== null) {
-      return clock.dubaiDateKey(clock.now() - presetDays * 86_400_000);
-    }
-    return '';
-  }, [dateFrom, presetDays]);
-
-  const effectiveTo = useMemo(() => {
-    if (dateTo) return dateTo;
-    return clock.dubaiDateKey(clock.now());
-  }, [dateTo]);
+    if (!session || assets.length === 0) return [];
+    return availableReportTypes(session, assets.map(a => a.id), phase);
+  }, [session, assets, phase]);
 
   const canRunReport = session ? can(session, 'report.run') : false;
   const canSchedule = session ? can(session, 'report.schedule') : false;
+  void canSchedule; // schedules are offered through RunPanel, which re-checks report.schedule there
 
-  if (!session) return null;
+  // Tab definitions
+  const tabs = useMemo(() => [
+    { id: 'reports' as const, label: t('reports_page.tab_reports', 'Reports'), icon: <BarChart3 size={14} /> },
+    { id: 'schedules' as const, label: t('reports_page.tab_schedules', 'Schedules'), icon: <Clock size={14} /> },
+  ], [t]);
 
-  const siteOptions = Array.from(new Set(assets.map(a => viewerSiteId(session, a.id)).filter((id): id is string => Boolean(id)))).map(id => ({
-    id,
-    name: seed.sites.find(s => s.id === id)?.name ?? id,
-  }));
-
-  const toggleAsset = (id: string) => {
-    if (scope === 'single_asset') {
-      setSelectedAssetIds([id]);
-      return;
-    }
-    setSelectedAssetIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
-  };
-
-  const handleRun = () => {
-    setMessage(null);
-    setError(null);
-    setClipNotes([]);
-    if (!selectedReport || scopeAssetIds.length === 0) {
-      setError(t('reports.pick_scope', 'Pick a report type and at least one asset.'));
-      return;
-    }
-    const result = runReport(session, {
-      reportType: selectedReport,
-      assetIds: scopeAssetIds,
-      from: effectiveFrom,
-      to: effectiveTo,
-      format,
-    });
+  const handleDownloadAgain = (runId: string) => {
+    if (!session || !canRunReport) return;
+    const result = regenerateReport(session, runId);
     if (!result.ok || !result.data) {
-      setError(result.error ?? t('reports.failed', 'The report could not be run.'));
+      alert(result.error ?? t('downloads.failed', 'The report could not be rebuilt.'));
       return;
     }
-    const { meta, tables, run, clipNotes: notes } = result.data;
-    if (format === 'pdf') downloadPdf(meta, tables as ExportTable[]);
-    else downloadXlsx(meta, tables as ExportTable[]);
-    setClipNotes(notes);
-    setMessage(`${run.fileName} — saved to Downloads.`);
+    const { meta, tables, run } = result.data;
+    if (run.format === 'pdf') downloadPdf(meta, tables);
+    else downloadXlsx(meta, tables);
+    setVersion(v => v + 1);
   };
 
-  const handleSchedule = () => {
-    setSchedMessage(null);
-    if (!selectedReport || scopeAssetIds.length === 0) return;
-    const label = scopeAssetIds.length === 1
-      ? (assets.find(a => a.id === scopeAssetIds[0])?.code ?? '')
-      : `${scopeAssetIds.length} assets`;
-    const result = createSchedule(session, {
-      reportType: selectedReport,
-      scope: label,
-      assetIds: scopeAssetIds,
-      frequency: schedFreq,
-      runAt: schedTime,
-      weekday: schedFreq === 'weekly' ? schedWeekday : undefined,
-      format,
-    });
-    setSchedMessage(result.ok
-      ? (result.message ?? t('reports.schedule_saved', 'Schedule saved.'))
-      : (result.error ?? t('reports.failed', 'The report could not be run.')));
+  const handleDelete = (runId: string) => {
+    if (!session) return;
+    deleteReportRun(session, runId);
+    setVersion(v => v + 1);
   };
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div>
         <h1 className="text-lg font-semibold text-ink">{t('reports.title', 'Reports')}</h1>
-        <p className="text-sm text-grey-500 mt-1">
-          {t('reports.subtitle', 'Run reports on your assets. Choose a report type, scope, and date range.')}
-        </p>
+        <p className="text-sm text-grey-500 mt-1">{t('reports.subtitle', 'Run reports and view downloads.')}</p>
       </div>
 
-      {/* Report selection */}
-      <div>
-        <div className="text-sm font-medium text-ink mb-2">{t('reports.type', 'Report type')}</div>
-        <div className="grid gap-2">
-          {availableReports.map(report => (
-            <button
-              key={report.id}
-              onClick={() => setSelectedReport(report.id)}
-              aria-pressed={selectedReport === report.id}
-              className={clsx(
-                'text-left px-4 py-3 rounded-lg border transition-colors',
-                selectedReport === report.id
-                  ? 'bg-surface border-ink'
-                  : 'bg-paper border-line hover:border-grey-500'
-              )}
-            >
-              <div className="font-medium text-ink">{t(`reports.types.${report.id}`, report.label)}</div>
-              <div className="text-xs text-grey-500 mt-0.5">{t(`reports.types.${report.id}_desc`, report.description)}</div>
-            </button>
-          ))}
-          {availableReports.length === 0 && (
-            <div className="text-sm text-grey-500 p-4 bg-paper rounded-lg border border-line">
-              {t('reports.none_available', 'No reports available for the current phase.')}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* KPI Strip — real numbers only (D10). */}
+      <KpiStrip label={t('reports_page.kpi_label', 'Summary')}>
+        <KpiCell
+          label={t('reports_page.gen_this_month', 'Generated this month')}
+          value={formatNumber(generatedThisMonth)}
+        />
+        <KpiCell
+          label={t('reports_page.next_scheduled', 'Next scheduled')}
+          value={nextScheduled ?? t('reports_page.none_scheduled', 'None scheduled')}
+        />
+      </KpiStrip>
 
-      {/* Scope selection */}
-      {selectedReport && (
+      {/* Tabs */}
+      <SegmentedTabs
+        label={t('reports_page.tab_label', 'Report tabs')}
+        value={tab}
+        onChange={setTab}
+        tabs={tabs}
+        idPrefix="reports-tabs"
+      />
+
+      <div role="tabpanel" id={`reports-tabs-panel-${tab}`} aria-labelledby={`reports-tabs-tab-${tab}`}>
+
+      {/* Reports Tab */}
+      {tab === 'reports' && (
         <div className="space-y-4">
-          <div className="text-sm font-medium text-ink mb-2">{t('reports.scope', 'Scope')}</div>
-          <div className="flex flex-wrap gap-2">
-            {(['single_asset', 'multiple_assets', 'site', ...(labelOptions.length > 0 ? ['label' as const] : [])] as ScopeType[]).map(s => (
-              <button
-                key={s}
-                onClick={() => setScope(s)}
-                className={clsx(
-                  'px-3 py-2 text-xs rounded-lg border transition-colors',
-                  scope === s ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                )}
-              >
-                {s === 'single_asset' ? t('reports.scope_single', 'Single asset')
-                  : s === 'multiple_assets' ? t('reports.scope_multiple', 'Multiple assets')
-                  : s === 'label' ? t('reports.scope_label', 'Assets with label')
-                  : t('reports.scope_site', 'Site')}
-              </button>
-            ))}
-          </div>
-
-          {scope === 'label' ? (
-            <select
-              aria-label={t('reports.scope_label', 'Assets with label')}
-              value={labelId}
-              onChange={e => setLabelId(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-ink"
-            >
-              <option value="">{t('reports.pick_label', 'Pick a label')}</option>
-              {labelOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          ) : scope === 'site' ? (
-            <select
-              value={siteId}
-              onChange={e => setSiteId(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-line bg-paper text-ink"
-            >
-              <option value="">{t('reports.pick_site', 'Pick a site')}</option>
-              {siteOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {assets.map(asset => {
-                const selected = selectedAssetIds.includes(asset.id);
-                const past = pastRentalLabel(session, asset.id);
-                return (
+          {/* Report cards — click opens the 3-step run panel */}
+          <div>
+            <div className="text-sm font-medium text-ink mb-2">{t('reports_page.type', 'Report type')}</div>
+            {assets.length === 0 ? (
+              <div className="text-sm text-grey-500 p-4 bg-paper rounded-lg border border-line">
+                {t('reports.no_assets', 'No assets available')}
+              </div>
+            ) : availableReports.length === 0 ? (
+              <div className="text-sm text-grey-500 p-4 bg-paper rounded-lg border border-line">
+                {t('reports.none_available', 'No reports available.')}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {availableReports.map(report => (
                   <button
-                    key={asset.id}
-                    onClick={() => toggleAsset(asset.id)}
-                    title={past ?? undefined}
+                    key={report.id}
+                    type="button"
+                    // The name comes first for screen readers; the cadence badge is extra.
+                    aria-label={`${t(`reports.types.${report.id}`, report.label)}, ${REPORT_BADGE[report.id]}`}
+                    aria-describedby={`report-desc-${report.id}`}
+                    onClick={() => {
+                      setRunPanelType(report.id);
+                      setRunPanelOpen(true);
+                    }}
                     className={clsx(
-                      'px-3 py-2 text-xs rounded-lg border transition-colors flex items-center gap-1',
-                      selected ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
+                      'text-left p-3 rounded-lg border border-line bg-surface hover:border-accent transition-colors',
+                      'flex flex-col gap-1.5',
                     )}
                   >
-                    <span className="font-mono font-medium">{asset.code}</span>
-                    <span className={selected ? 'text-white/80' : 'text-grey-500'}>{asset.name}</span>
-                    {past && (
-                      <span className={clsx('px-1.5 py-0.5 rounded border text-[10px]', selected ? 'border-white/40 text-white/90' : 'border-yellow-dark/40 text-yellow-dark')}>
-                        {past}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-accent">{REPORT_ICONS[report.id]}</span>
+                      <Badge tone="neutral">{REPORT_BADGE[report.id]}</Badge>
+                    </div>
+                    <div className="text-sm font-medium text-ink">{t(`reports.types.${report.id}`, report.label)}</div>
+                    <div id={`report-desc-${report.id}`} className="text-xs text-grey-500 leading-snug">{t(`reports.types.${report.id}_desc`, report.description)}</div>
                   </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Date presets */}
-          <div className="space-y-2">
-            <div className="text-xs text-grey-500 font-medium">{t('reports.date_range', 'Date range')}</div>
-            <div className="flex flex-wrap gap-2">
-              {DATE_PRESETS.map(preset => (
-                <button
-                  key={preset.label}
-                  onClick={() => { setPresetDays(preset.days); setDateFrom(''); setDateTo(''); }}
-                  className={clsx(
-                    'px-3 py-2 text-xs rounded-lg border transition-colors',
-                    presetDays === preset.days ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                  )}
-                >
-                  {t(`reports.presets.${preset.key}`, preset.label)}
-                </button>
-              ))}
-              <button
-                onClick={() => setPresetDays(null)}
-                className={clsx(
-                  'px-3 py-2 text-xs rounded-lg border transition-colors',
-                  presetDays === null ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                )}
-              >
-                {t('reports.presets.custom', 'Custom')}
-              </button>
-            </div>
-            {presetDays === null && (
-              <div className="flex gap-2 items-center">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                />
-                <span className="text-grey-500">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
-                />
+                ))}
               </div>
             )}
           </div>
 
-          {/* Format selection */}
-          <div className="space-y-2">
-            <div className="text-xs text-grey-500 font-medium">{t('reports.format', 'Format')}</div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFormat('xlsx')}
-                className={clsx(
-                  'px-3 py-2 text-xs rounded-lg border transition-colors',
-                  format === 'xlsx' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                )}
-              >
-                {t('reports.excel', 'Excel (.xlsx)')}
-              </button>
-              <button
-                onClick={() => setFormat('pdf')}
-                className={clsx(
-                  'px-3 py-2 text-xs rounded-lg border transition-colors',
-                  format === 'pdf' ? 'bg-ink text-white border-ink' : 'bg-paper border-line text-grey-700 hover:border-grey-500'
-                )}
-              >
-                {t('reports.pdf', 'PDF')}
-              </button>
-            </div>
-          </div>
-
-          {/* Run button */}
-          <div className="flex items-center justify-between pt-2 gap-2 flex-wrap">
-            <div className="text-xs text-grey-500">
-              {effectiveFrom && effectiveTo && (
-                <span>{t('reports.range_line', 'From {from} to {to}', { from: effectiveFrom, to: effectiveTo })}</span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {canSchedule && (
-                <Button variant="secondary" onClick={() => setScheduleOpen(v => !v)}>
-                  {t('reports.schedule_this', 'Schedule this report')}
-                </Button>
-              )}
-              {canRunReport && (
-                <Button onClick={handleRun}>{t('reports.run', 'Run report')}</Button>
-              )}
-            </div>
-          </div>
-
-          {/* Schedule form */}
-          {scheduleOpen && canSchedule && (
-            <div className="bg-surface border border-line rounded-lg p-4 space-y-3">
-              <div className="text-sm font-medium text-ink">{t('reports.schedule_this', 'Schedule this report')}</div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <select value={schedFreq} onChange={e => setSchedFreq(e.target.value as ScheduleFrequency)} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper">
-                  <option value="daily">{t('reports.schedule_daily', 'Daily')}</option>
-                  <option value="weekly">{t('reports.schedule_weekly', 'Weekly')}</option>
-                  <option value="monthly">{t('reports.schedule_monthly', 'Monthly (1st)')}</option>
-                </select>
-                {schedFreq === 'weekly' && (
-                  <select value={schedWeekday} onChange={e => setSchedWeekday(Number(e.target.value))} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper">
-                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => (
-                      <option key={d} value={i}>{d}</option>
-                    ))}
-                  </select>
-                )}
-                <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className="px-3 py-2 text-xs rounded-lg border border-line bg-paper" />
-                <Button size="sm" onClick={handleSchedule}>{t('reports.schedule_save', 'Save schedule')}</Button>
+          {/* Recently generated Table — id="recent" for the /app/downloads redirect anchor */}
+          <Panel title={t('reports_page.recent_title', 'Recently generated')} padding="sm">
+            {runs.length === 0 ? (
+              <div id="recent" className="text-center py-8 text-sm text-grey-500">
+                {t('reports_page.empty', 'No reports yet')}
               </div>
-              <div className="text-xs text-grey-500">{t('reports.schedule_note', 'Deliver to: my email (simulated). Runs appear in Downloads and the email outbox.')}</div>
-              {schedMessage && <div className="text-sm text-ink">{schedMessage}</div>}
-            </div>
-          )}
-
-          {/* Result / error states */}
-          {clipNotes.length > 0 && (
-            <div className="bg-yellow/10 border border-yellow-dark/30 rounded-lg px-4 py-3 text-sm text-ink">
-              {clipNotes.map(n => <div key={n}>{n}</div>)}
-            </div>
-          )}
-          {message && (
-            <div className="bg-green/10 border border-green/30 rounded-lg px-4 py-3 text-sm text-green">{message}</div>
-          )}
-          {error && (
-            error === 'Nothing to report for this period' ? (
-              <EmptyState
-                title={t('reports.nothing', 'Nothing to report for this period')}
-                description={t('reports.nothing_hint', 'There is no data available for the selected date range.')}
-              />
             ) : (
-              <div className="bg-red/10 border border-red/30 rounded-lg px-4 py-3 text-sm text-red">
-                {error}
-                <button onClick={handleRun} className="ms-2 underline">{t('common.retry', 'Retry')}</button>
+              <div id="recent">
+                <Table
+                  caption={t('reports_page.recent_caption', 'Recent report runs')}
+                  keyField="id"
+                  rows={runs}
+                  columns={[
+                    { key: 'reportType', header: t('reports_page.col_type', 'Type'), render: r => r.reportType },
+                    { key: 'scope', header: t('reports_page.col_scope', 'Scope'), render: r => r.scope },
+                    { key: 'period', header: t('reports_page.col_period', 'Period'), render: r => `${String(r.from).slice(0, 10)} → ${String(r.to).slice(0, 10)}` },
+                    { key: 'format', header: t('reports_page.col_format', 'Format'), render: r => <Badge variant="grey">{r.format === 'pdf' ? 'PDF' : 'Excel'}</Badge>, numeric: true },
+                    { key: 'generated', header: t('reports_page.col_generated', 'Generated'), render: r => clock.formatDubaiDateTime(clock.isoFromDubai(String(r.createdAt))), numeric: true },
+                    { key: 'source', header: t('reports_page.col_source', 'Source'), render: r => r.scheduleId ? <Badge variant="grey">{t('reports_page.by_schedule', 'Schedule')}</Badge> : <span className="text-xs text-grey-500">{t('reports_page.by_you', 'You')}</span> },
+                  ]}
+                  rowMenu={r => [
+                    {
+                      id: 'download',
+                      label: t('reports_page.download_again', 'Download again'),
+                      onSelect: () => handleDownloadAgain(r.id),
+                    },
+                    {
+                      id: 'delete',
+                      label: t('reports_page.delete', 'Delete'),
+                      onSelect: () => handleDelete(r.id),
+                    },
+                  ]}
+                />
               </div>
-            )
-          )}
+            )}
+          </Panel>
         </div>
       )}
 
-      {/* What this picker offers */}
-      {!selectedReport && assets.length === 0 && (
-        <EmptyState
-          title={t('reports.no_assets', 'No assets yet')}
-          description={t('reports.no_assets_hint', 'Assets appear here when you own them or hold a rental on them.')}
+      {/* Schedules Tab */}
+      {tab === 'schedules' && (
+        <div className="space-y-4">
+          {schedules.length === 0 ? (
+            <div className="bg-surface border border-line rounded-lg p-6 text-center">
+              <p className="text-sm text-grey-500 mb-4">
+                {t('reports_page.schedules_note', 'No schedules yet. Schedule a report from the Reports tab.')}
+              </p>
+              <Button variant="secondary" onClick={() => setTab('reports')}>
+                {t('reports_page.go_to_reports', 'Go to Reports')}
+              </Button>
+            </div>
+          ) : (
+            <Panel title={t('reports_page.schedules_title', 'Schedules')} padding="sm">
+              <Table
+                caption={t('reports_page.schedules_caption', 'Scheduled report runs')}
+                keyField="id"
+                rows={schedules}
+                columns={[
+                  { key: 'reportType', header: t('reports_page.col_type', 'Type'), render: r => r.reportType },
+                  { key: 'scope', header: t('reports_page.col_scope', 'Scope'), render: r => r.scope },
+                  { key: 'frequency', header: t('reports_page.col_frequency', 'Frequency'), render: r => t(`reports.freq_${r.frequency}`, r.frequency) },
+                  { key: 'next_run', header: t('reports_page.col_next_run', 'Next run'), render: r => r.active ? clock.formatDubaiDateTime(Number(r.nextRunAt)) : '—', numeric: true },
+                  { key: 'status', header: t('reports_page.col_status', 'Status'), render: r => <Badge tone={r.active ? 'ok' : 'warn'}>{r.active ? t('reports_page.active', 'Active') : t('reports_page.paused', 'Paused')}</Badge> },
+                ]}
+              />
+            </Panel>
+          )}
+        </div>
+      )}
+      </div>
+
+      {/* Run Panel — 3-step wizard */}
+      {runPanelOpen && (
+        <RunPanel
+          initialReport={runPanelType}
+          onClose={() => {
+            setRunPanelOpen(false);
+            setRunPanelType(null);
+          }}
+          onRunComplete={() => {
+            setRunPanelOpen(false);
+            setRunPanelType(null);
+            setVersion(v => v + 1);
+          }}
         />
       )}
-      <div className="text-xs text-grey-500">
-        {t('reports.types_hint', 'Report types appear here only when your assets can measure them.')}
-        {' '}
-        ({REPORT_TYPES.length} {t('reports.types_total', 'types defined')} —{' '}
-        {availableReports.length} {t('reports.types_available', 'available to you')})
-      </div>
     </div>
   );
 }
