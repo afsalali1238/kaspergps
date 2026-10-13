@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Visual baselines (visual.spec.ts, VISUAL=1 only) are recorded on the CI
+  // runner's Linux Chromium; no per-platform suffix, one set in the repo.
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
   fullyParallel: false,
   // Retries exist so `trace: 'on-first-retry'` produces something to read when
   // a run goes red on a runner; locally the first attempt is still the verdict.
