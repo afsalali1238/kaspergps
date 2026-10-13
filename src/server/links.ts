@@ -12,7 +12,7 @@ import { db, type DbRow } from '@/server/db';
 import { getReadingForAsset, getReadingsForAsset } from '@/server/telemetry/simulator';
 import { averageMovingSpeedKmh, etaSpeedKmh, computeEta, distanceToDestinationM } from '@/domain/eta';
 import type { EtaState } from '@/domain/eta';
-import { STALE_AFTER_SEC } from '@/config/thresholds';
+import { STALE_AFTER_SEC, ETA_ARRIVED_M } from '@/config/thresholds';
 import * as clock from '@/lib/clock';
 
 export interface ResolvedEta {
@@ -119,8 +119,25 @@ export function resolveEtaForLink(
 
   const history = getReadingsForAsset(asset, nowMs - 15 * 60 * 1000, nowMs);
   const speed = etaSpeedKmh(averageMovingSpeedKmh(history, nowMs));
-  const eta = computeEta({ lat: reading.lat, lng: reading.lng }, destination, nowMs, speed);
+  const arrivedAt = arrivedSince(asset, destination, linkStart ?? nowMs - 12 * 3600_000, nowMs);
+  const eta = computeEta({ lat: reading.lat, lng: reading.lng }, destination, nowMs, speed, arrivedAt);
   return { destinationName, etaAt: eta.etaAt, state: eta.state };
+}
+
+/**
+ * When the asset reached the destination and has stayed there since (C1): the first
+ * reading of the unbroken run at the destination that ends at the latest reading. "Arrived"
+ * then shows the real arrival time, not the time the hirer opened the page. Null when the
+ * latest reading is not at the destination.
+ */
+function arrivedSince(asset: DbRow<'assets'>, destination: { lat: number; lng: number }, fromMs: number, nowMs: number): number | null {
+  const readings = getReadingsForAsset(asset, Math.max(fromMs, nowMs - 12 * 3600_000), nowMs);
+  let at: number | null = null;
+  for (let i = readings.length - 1; i >= 0; i--) {
+    if (distanceToDestinationM(readings[i], destination) > ETA_ARRIVED_M) break;
+    at = toMs(readings[i].deviceTime);
+  }
+  return at;
 }
 
 /** Distance helper used by the asset page ("382 km from the destination"). */

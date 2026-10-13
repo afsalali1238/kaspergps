@@ -4,6 +4,7 @@ import { groupTrips } from '@/domain/trips';
 import {
   advancePlayhead,
   buildPins,
+  PIN_TRIP_MAX,
   buildSpans,
   gapAt,
   positionAt,
@@ -333,17 +334,31 @@ describe('event pins (spec 11.15)', () => {
   });
 
   it('a long window full of short trips gets no trip-boundary pins', () => {
-    // An excavator working on one site shuffles about: the trip rule calls each shuffle a
-    // trip, and 30 of them would fill the scrubber with pins that repeat the state colours.
-    const readings = Array.from({ length: 30 }, (_, i) => [
-      reading(i * min(20), { speedKmh: 40 }),
-      reading(i * min(20) + min(6), { speedKmh: 0 }),
+    // A month of a working machine is more trips than PIN_TRIP_MAX: pins for every one
+    // would fill the scrubber with pins that repeat the state colours.
+    const n = PIN_TRIP_MAX + 10;
+    const readings = Array.from({ length: n }, (_, i) => [
+      reading(i * min(10), { speedKmh: 40 }),
+      // Stood still with the engine on for 6 min: each trip ends before the next starts.
+      ...[1, 2, 3, 4, 5, 6].map(k => reading(i * min(10) + min(k), { speedKmh: 0 })),
     ]).flat();
-    const pins = pin({ readings });
+    const pins = buildPins({ readings, tier: 1, fromMs: T0 - min(5), toMs: T0 + min(10 * n), geofenceEvents: [] });
     expect(of(pins, 'trip_start')).toEqual([]);
     expect(of(pins, 'trip_stop')).toEqual([]);
     // The trips themselves are still there for the Trips tab; only the pins are dropped.
-    expect(groupTrips(readings).length).toBeGreaterThan(3);
+    expect(groupTrips(readings).length).toBeGreaterThan(PIN_TRIP_MAX);
+  });
+
+  it('a window with up to PIN_TRIP_MAX trips keeps a pin pair per trip', () => {
+    const n = PIN_TRIP_MAX;
+    const readings = Array.from({ length: n }, (_, i) => [
+      reading(i * min(10), { speedKmh: 40 }),
+      ...[1, 2, 3, 4, 5, 6].map(k => reading(i * min(10) + min(k), { speedKmh: 0 })),
+    ]).flat();
+    const pins = buildPins({ readings, tier: 1, fromMs: T0 - min(5), toMs: T0 + min(10 * n), geofenceEvents: [] });
+    expect(groupTrips(readings).length).toBe(PIN_TRIP_MAX);
+    expect(of(pins, 'trip_start').length).toBe(PIN_TRIP_MAX);
+    expect(of(pins, 'trip_stop').length).toBe(PIN_TRIP_MAX);
   });
 
   it('a trip start and its stop become pins at the trip\'s own times', () => {

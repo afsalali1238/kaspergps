@@ -52,11 +52,15 @@ describe('FB-12 arrives about 30 min after the anchor (owner decision)', () => {
     expect(Math.abs(eta.etaAt - arrived)).toBeLessThanOrEqual(5 * MIN);
   });
 
-  it('stays at the site afterwards, and the link then reads Arrived', () => {
+  it('stays at the site afterwards, and the link reads Arrived at the real arrival time', () => {
+    const arrived = fb12ArrivedAt();
     for (const m of [40, 90, 240]) {
       clock.setOffsetMs(m * MIN);
       expect(kmToDest(getReadingForAsset(asset('FB-12'))!), `+${m} min`).toBeLessThan(0.15);
-      expect(resolveTrackingLink(FB12_TOKEN)!.eta!.state, `+${m} min`).toBe('arrived');
+      const eta = resolveTrackingLink(FB12_TOKEN)!.eta!;
+      expect(eta.state, `+${m} min`).toBe('arrived');
+      // Not the time the page was opened: the time FB-12 got there (within one reading).
+      expect(Math.abs(eta.etaAt - arrived), `+${m} min`).toBeLessThanOrEqual(2 * MIN);
       expect(computeStatus(asset('FB-12'))).toBe('live');
     }
   });

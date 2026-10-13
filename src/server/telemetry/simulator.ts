@@ -305,7 +305,6 @@ function fb12Route(asset: Asset, dayMs: number): Segment[] {
 }
 
 const MOVE_BUCKET_MS = 60 * MIN;
-const MOVE_WINDOW_MS = 90 * 1000;
 const bucketOffsets = new WeakMap<Segment, Map<number, Point>>();
 const fixedOffsets = new WeakMap<Segment, Point>();
 
