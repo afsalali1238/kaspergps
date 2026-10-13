@@ -47,6 +47,17 @@
   --shadow-sm: 0 1px 3px rgba(20, 21, 24, .08), 0 1px 2px rgba(20, 21, 24, .04);
   --shadow-md: 0 4px 12px rgba(20, 21, 24, .1), 0 2px 4px rgba(20, 21, 24, .06);
   --demo-bar-bg: #141518;
+
+  /* Tone inks (B2): text on the 9% tints. The base status colours are too light
+     for small text (green 3.2:1, red 3.9:1, amber 1.9:1 on their tints), so
+     badges, KPI values and alert labels use these darker inks (all >= 5:1 on
+     the tint over white, and >= 4.5:1 over the page background). */
+  --ok-ink: #136B4F;
+  --warn-ink: #7A5C00;
+  --bad-ink: #A83232;
+  --info-ink: #305C80;
+  --stale-ink: #9C2F5F;
+  --accent-tint: rgba(255, 196, 0, .18);
 }
 
 @theme inline {
@@ -84,6 +95,19 @@
   --shadow-panel: var(--shadow-sm);
   --shadow-pop: var(--shadow-md);
   --color-demo-bar-bg: var(--demo-bar-bg);
+
+  /* Semantic tone names used by src/components/ui (B2). */
+  --color-accent: var(--Kasper-yellow);
+  --color-accent-tint: var(--accent-tint);
+  --color-slate: var(--grey-700);
+  --color-ok: var(--green);
+  --color-warn: var(--idle);
+  --color-bad: var(--red);
+  --color-ok-ink: var(--ok-ink);
+  --color-warn-ink: var(--warn-ink);
+  --color-bad-ink: var(--bad-ink);
+  --color-info-ink: var(--info-ink);
+  --color-stale-ink: var(--stale-ink);
 
   --font-heading: "Space Grotesk", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-body: "Hanken Grotesk", "IBM Plex Sans Arabic", system-ui, sans-serif;
