@@ -183,7 +183,7 @@ export default function AlertsPage() {
       </div>
 
       <div className={showRules ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]' : ''}>
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 space-y-5" role="tabpanel" id={`alert-status-panel-${status}`} aria-labelledby={`alert-status-tab-${status}`}>
           {groups.length === 0 ? (
             <EmptyState
               title={t('alerts.none', 'No alerts')}
