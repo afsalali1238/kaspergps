@@ -202,7 +202,7 @@
     "list_tab": "القائمة",
     "map_tab": "الخريطة",
     "kpi": {
-      "engine_hours_today": "ساعات المحرك اليوم (ECU)",
+      "engine_hours_today": "ساعات المحرك اليوم",
       "fuel_used_today": "الوقود المستهلك اليوم",
       "open_alerts": "التنبيهات المفتوحة",
       "litres_short": "{value} ل"
@@ -1232,6 +1232,109 @@
     "source": {
       "gps": "GPS",
       "tracker": "جهاز التتبع"
+    }
+  },
+  "fleet": {
+    "active_filters": "عوامل التصفية النشطة",
+    "chip": {
+      "ending_today": "ينتهي الإيجار اليوم",
+      "with_alerts": "مع تنبيهات مفتوحة"
+    },
+    "filters": {
+      "all": "الكل",
+      "all_types": "كل الأنواع",
+      "ownership": "مملوكة أو مستأجرة",
+      "status": "الحالة:"
+    },
+    "fuel": "الوقود",
+    "fuel_7_days": "الوقود المستهلك، 7 أيام",
+    "fuel_tank": "خزان الوقود",
+    "fuel_used_today": "المستهلك اليوم",
+    "health": {
+      "check": "تحقق",
+      "faults_count": "{count} نشطة",
+      "no_faults": "لا يوجد",
+      "ok": "سليم",
+      "coolant": "سائل التبريد",
+      "voltage": "جهد المركبة",
+      "faults": "رموز الأعطال",
+      "satellites": "الأقمار الصناعية",
+      "last_ping": "آخر إشارة"
+    },
+    "health_title": "الحالة الفنية",
+    "ignition_off": "المحرك مطفأ",
+    "ignition_on": "المحرك يعمل",
+    "kpi": {
+      "alert_split": "{critical} حرجة · {warning} تحذير",
+      "ecu_and_estimated": "ECU + تقديري",
+      "engine_hours_today": "ساعات المحرك اليوم",
+      "fuel_used_today": "الوقود المستهلك اليوم",
+      "incl_stale": "منها {count} متأخرة",
+      "label": "الأسطول اليوم",
+      "open_alerts": "تنبيهات مفتوحة",
+      "rentals_ending": "إيجارات تنتهي اليوم"
+    },
+    "legend": {
+      "zones": "المناطق"
+    },
+    "list": "الأسطول",
+    "litres_of": "{left} لتر من {tank} لتر",
+    "maintenance_due": "صيانة مستحقة",
+    "metric": {
+      "engine_hours": "ساعات المحرك",
+      "fuel_level": "مستوى الوقود",
+      "ignition": "الإشعال",
+      "last_update": "آخر تحديث",
+      "load": "حمل المحرك",
+      "rpm": "دورات المحرك",
+      "speed": "السرعة",
+      "distance_today": "مسافة اليوم"
+    },
+    "next_service": "الصيانة التالية",
+    "on_hire": "مؤجرة",
+    "on_hire_until": "مؤجرة إلى {renter} حتى {when}",
+    "open_alerts_count": "{count} تنبيهات مفتوحة",
+    "open_asset": "فتح صفحة الأصل",
+    "panel_label": "تفاصيل {code}",
+    "remove_filter": "إزالة عامل التصفية {name}",
+    "rented_from_until": "مستأجرة من {owner} حتى {when}",
+    "row": {
+      "fuel": "الوقود {value}",
+      "hours_today": "{hours} من وردية {shift} ساعات اليوم ({source})"
+    },
+    "run_report": "تشغيل تقرير",
+    "search": "البحث في الأصول",
+    "search_placeholder": "الرمز أو الاسم أو اللوحة",
+    "share_link": "مشاركة رابط",
+    "showing": "{shown} من {total} أصول",
+    "sites": "المواقع",
+    "tabs": {
+      "acknowledged": "مُقرّ",
+      "alerts": "تنبيهات نشطة",
+      "asset": "الأصل",
+      "closed": "مغلق",
+      "drop": "انخفاض الوقود والمحرك مطفأ ▼",
+      "event": "الحدث",
+      "fuel": "أحداث الوقود",
+      "hide": "إخفاء",
+      "log": "سجل الأحداث",
+      "no_alerts": "لا توجد تنبيهات مفتوحة على هذه الأصول.",
+      "no_events": "لا توجد أحداث بعد.",
+      "no_fuel": "لا تعبئة ولا انخفاض في آخر 7 أيام.",
+      "open": "مفتوح",
+      "refuel": "تعبئة ▲",
+      "show": "إظهار",
+      "status": "الحالة",
+      "time": "الوقت",
+      "title": "نشاط الأسطول"
+    },
+    "today_at": "اليوم {time}",
+    "class": {
+      "plant": "معدات ثقيلة",
+      "power": "مولدات",
+      "lifting": "رفع",
+      "truck": "شاحنة",
+      "light_vehicle": "مركبة خفيفة"
     }
   }
 }

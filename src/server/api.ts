@@ -222,3 +222,7 @@ export { SEVERITY_ORDER, acknowledgeAlerts, alertKpis, alertSeverity, groupAlert
 export type { AlertGroup, AlertKpis, AlertSeverity, BulkAcknowledgeResult } from './alerts-screen';
 export { ALERT_DELIVERIES, alertRulesFor, canManageAlertRules, saveAlertRule } from './alert-rules';
 export type { AlertDelivery, AlertRule, AlertRuleView } from './alert-rules';
+
+// ── Agent E ──
+export { fleetEvents, fleetKpis, fleetPanelFor, rentalLineFor, tierOfAsset } from './fleet-panel';
+export type { FleetEvent, FleetKpis, FleetPanel, HealthRow, PanelMetric, RentalLine } from './fleet-panel';

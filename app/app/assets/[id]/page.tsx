@@ -246,6 +246,8 @@ export default function AssetDetailPage() {
   const [verifyStates, setVerifyStates] = useState<Record<string, MucVerifyStatus>>({});
   const [requestNote, setRequestNote] = useState('');
   const [panel, setPanel] = useState<'share' | 'end' | 'edit' | null>(null);
+  // Deep link from the fleet map panel (Agent E): ?panel=share opens the share dialog.
+  const [deepLinkPanel] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panel') === 'share' ? 'share' : null));
   const [assetVersion, setAssetVersion] = useState(0);
   const [requestVersion, setRequestVersion] = useState(0);
   const [trackerToast, setTrackerToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -384,6 +386,11 @@ export default function AssetDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [mucs]);
+
+  // ?panel=share (from the fleet map panel) opens the share dialog, if this user may share.
+  React.useEffect(() => {
+    if (deepLinkPanel && session && asset && can(session, 'link.create', asset.id)) setPanel('share');
+  }, [deepLinkPanel, session, asset]);
 
   if (!session) return null;
   if (!asset) return (

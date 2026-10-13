@@ -17,7 +17,10 @@ export interface ClusterMarker {
   lat: number;
   lng: number;
   icon: L.Icon | L.DivIcon;
-  popupHtml: string;
+  /** Shown on click when the page has no onSelect. */
+  popupHtml?: string;
+  /** Accessible name for the marker (keyboard and screen readers). */
+  title?: string;
 }
 
 export function escapeHtml(text: string): string {
@@ -29,21 +32,26 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function ClusterLayer({ markers }: { markers: ClusterMarker[] }) {
+/**
+ * With `onSelect`, a marker click (or Enter on a focused marker) selects the asset
+ * and the page shows its panel (UI-UPGRADE §6); without it the marker opens its popup.
+ */
+export function ClusterLayer({ markers, onSelect }: { markers: ClusterMarker[]; onSelect?: (id: string) => void }) {
   const map = useMap();
 
   useEffect(() => {
     const group = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 });
     for (const m of markers) {
-      const marker = L.marker([m.lat, m.lng], { icon: m.icon, keyboard: true, title: m.id });
-      marker.bindPopup(m.popupHtml);
+      const marker = L.marker([m.lat, m.lng], { icon: m.icon, keyboard: true, title: m.title ?? m.id, alt: m.title ?? m.id });
+      if (onSelect) marker.on('click', () => onSelect(m.id));
+      else if (m.popupHtml) marker.bindPopup(m.popupHtml);
       group.addLayer(marker);
     }
     map.addLayer(group);
     return () => {
       map.removeLayer(group);
     };
-  }, [map, markers]);
+  }, [map, markers, onSelect]);
 
   return null;
 }
