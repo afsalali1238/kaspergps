@@ -153,5 +153,7 @@ describe('one source: fuel level', () => {
       expect(Math.round(today.levelPct!), asset.code).toBe(mapRow);
     }
     expect(checked).toBeGreaterThan(0);
-  });
+    // fuelWeekFor simulates seven days per asset; under v8 coverage on the CI runner this
+    // passes 5 s, so it gets a longer timeout. The assertions are unchanged.
+  }, 30_000);
 });
