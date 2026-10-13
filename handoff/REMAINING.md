@@ -56,6 +56,9 @@ git checkout main && git reset --hard origin/main
 
 ## The queue
 
+### R: role-first entry (owner decision D13; runs now, in parallel)
+The spec and builder prompt are in **`handoff/ROLE-LOGIN.md`**. `/` becomes a role picker with 8 persona cards; Log out returns to `/`; the demo bar gets a role chip and "Switch role" instead of View as. R touches only the sign-out item and the session guard in `AppShell.tsx`.
+
 One chunk per PR, from `origin/main`, on branch `night-<chunk>`. Each chunk is done when:
 - it has a self-check, screenshots at 1440 and 390 px, and its `PROGRESS.md` row;
 - CI is green;
