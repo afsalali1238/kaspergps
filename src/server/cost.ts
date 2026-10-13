@@ -14,8 +14,11 @@ import { fail, ok, type OpResult } from '@/server/result';
 import { ecuHoursAt } from '@/server/muc';
 import { estimatedHoursAt } from '@/server/maintenance';
 import { CLASS_AVG_FUEL_LPH, DIESEL_PRICE_AED_PER_L } from '@/config/pricing';
-// Available shift hours per day for the utilisation figure (spec 11.19).
+// Available shift hours per day for the utilisation figure (spec 11.19). A
+// generator is on hire round the clock, so its available time is the whole day.
 const SHIFT_HOURS_PER_DAY = 10;
+const AVAILABLE_HOURS_PER_DAY: Partial<Record<Asset['behaviour'], number>> = { stationary_24h: 24 };
+const DAY_MS = 86400000;
 
 /** Share of the engine hours spent idling, by how the asset behaves (prototype). */
 const IDLE_SHARE: Record<Asset['behaviour'], number> = {
@@ -28,7 +31,7 @@ const IDLE_SHARE: Record<Asset['behaviour'], number> = {
 import * as clock from '@/lib/clock';
 import { can } from '@/server/capabilities';
 
-export type CostBasis = 'ECU' | 'ECU (ALL-CAN300)' | 'Estimated' | 'From invoices' | 'From service log' | 'Dummy rate' | 'Not measured';
+export type CostBasis = 'ECU' | 'ECU (ALL-CAN300)' | 'Estimated' | 'From invoices' | 'Days on hire' | 'From service log' | 'Dummy rate' | 'Not measured';
 
 export type CostPeriod = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
 
@@ -159,7 +162,21 @@ export function engineHoursIn(asset: Asset, fromMs: number, toMs: number): numbe
  */
 function idleHoursIn(asset: Asset, fromMs: number, toMs: number): number | null {
   if (!isTier3(asset)) return null;
-  return Math.round(engineHoursIn(asset, fromMs, toMs) * IDLE_SHARE[asset.behaviour] * 10) / 10;
+  return Math.round(engineHoursIn(asset, fromMs, toMs) * idleShareFor(asset) * 10) / 10;
+}
+
+/** The asset's own idle share: its behaviour's share, ±20% by machine (C2: no two read alike). */
+function idleShareFor(asset: Asset): number {
+  let h = 0;
+  for (const ch of asset.code) h = (h * 31 + ch.charCodeAt(0)) % 1000;
+  return IDLE_SHARE[asset.behaviour] * (0.8 + (h / 1000) * 0.4);
+}
+
+/** Utilisation: engine hours over the hours the asset was available (shift hours, or 24 h for a generator). */
+function utilisationPct(asset: Asset, engineHours: number, fromMs: number, toMs: number): number {
+  const days = Math.max(1, (toMs - fromMs) / DAY_MS);
+  const available = days * (AVAILABLE_HOURS_PER_DAY[asset.behaviour] ?? SHIFT_HOURS_PER_DAY);
+  return Math.min(100, Math.round((engineHours / available) * 1000) / 10);
 }
 
 function costProfileLine(profile: AssetCostProfile | null, fromMs: number, toMs: number): { amountAed: number | null; note: string } {
@@ -190,6 +207,53 @@ function rentalRevenue(tenantId: string, assetId: string, fromMs: number, toMs: 
     .reduce((sum, inv) => sum + inv.subtotalAed, 0));
 }
 
+function msOf(v: string | number): number {
+  return typeof v === 'number' ? v : new Date(v).getTime();
+}
+
+/** Dubai calendar days a window touches (a hire from 07:00 to 18:00 is one day). */
+function dubaiDaysTouched(fromMs: number, toMs: number): number {
+  if (toMs <= fromMs) return 0;
+  return Math.round((clock.startOfDubaiDay(toMs - 1) - clock.startOfDubaiDay(fromMs)) / DAY_MS) + 1;
+}
+
+export interface BookedRevenue {
+  amountAed: number;
+  /** Bookings that earned in the period but have no invoice yet. */
+  references: string[];
+  days: number;
+}
+
+/**
+ * Revenue a booking earned inside the period while it has no invoice yet
+ * (UI-UPGRADE §9.1: "the current bookings' days in that month"). A daily rate
+ * counts the Dubai days on hire; an hourly rate counts the engine hours, with
+ * the booking's minimum hours a day. A cancelled booking earns nothing, and a
+ * booking whose access the owner ended stops earning then.
+ */
+function uninvoicedBookingRevenue(tenantId: string, asset: Asset, fromMs: number, toMs: number): BookedRevenue {
+  const state = db.getState();
+  const invoiced = new Set(state.invoices.filter(inv => inv.kind === 'rental' && inv.status !== 'void' && inv.bookingId).map(inv => inv.bookingId));
+  const out: BookedRevenue = { amountAed: 0, references: [], days: 0 };
+  for (const b of state.bookings) {
+    if (b.assetId !== asset.id || b.ownerTenantId !== tenantId) continue;
+    if (b.status === 'cancelled' || invoiced.has(b.id)) continue;
+    const override = state.grantOverrides.find(o => o.bookingId === b.id);
+    const endMs = Math.min(msOf(b.end), b.closedAt !== undefined ? msOf(b.closedAt) : Infinity, override ? msOf(override.endedAt) : Infinity);
+    const from = Math.max(fromMs, msOf(b.start));
+    const to = Math.min(toMs, endMs);
+    if (to <= from) continue;
+    const days = dubaiDaysTouched(from, to);
+    const amount = b.rateType === 'daily'
+      ? days * b.rateAed
+      : Math.max(engineHoursIn(asset, from, to), (b.minHoursPerDay ?? 0) * days) * b.rateAed;
+    out.amountAed = n2(out.amountAed + amount);
+    out.references.push(b.reference);
+    out.days += days;
+  }
+  return out;
+}
+
 function maintenanceCost(assetId: string, fromMs: number, toMs: number): number {
   return n2(db.getState().serviceRecords
     .filter(r => r.assetId === assetId)
@@ -213,7 +277,9 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
     const engineHours = Math.round(engineHoursIn(asset, fromMs, toMs) * 10) / 10;
     const idleHours = idleHoursIn(asset, fromMs, toMs);
     const rate = burnRateLph(asset);
-    const revenueAed = rentalRevenue(asset.ownerTenantId ?? '', asset.id, fromMs, toMs);
+    const invoicedAed = rentalRevenue(asset.ownerTenantId ?? '', asset.id, fromMs, toMs);
+    const booked = uninvoicedBookingRevenue(asset.ownerTenantId ?? '', asset, fromMs, toMs);
+    const revenueAed = n2(invoicedAed + booked.amountAed);
     const fuelAed = n2(engineHours * rate * dieselPriceAed);
     const idleAed = idleHours === null ? null : n2(idleHours * rate * dieselPriceAed);
     const maintenanceAed = maintenanceCost(asset.id, fromMs, toMs);
@@ -222,11 +288,15 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
 
     const costAed = n2(fuelAed + (idleAed ?? 0) + maintenanceAed + (fixed.amountAed ?? 0) + (operatorAed ?? 0));
     const marginAed = n2(revenueAed - costAed);
-    const days = Math.max(1, (toMs - fromMs) / 86400000);
-    const shiftHours = days * SHIFT_HOURS_PER_DAY;
 
     const lines: CostLineView[] = [
-      { key: 'revenue', label: 'Revenue', amountAed: revenueAed, basis: 'From invoices', note: 'Rental invoices issued in the period' },
+      {
+        key: 'revenue', label: 'Revenue', amountAed: revenueAed,
+        basis: booked.references.length > 0 ? 'Days on hire' : 'From invoices',
+        note: booked.references.length > 0
+          ? `Rental invoices issued in the period (AED ${invoicedAed.toLocaleString('en-US')}) + ${booked.days} day${booked.days === 1 ? '' : 's'} on hire not invoiced yet (${booked.references.join(', ')}, AED ${booked.amountAed.toLocaleString('en-US')})`
+          : 'Rental invoices issued in the period',
+      },
       {
         key: 'fuel', label: 'Fuel',
         amountAed: fuelAed,
@@ -255,7 +325,7 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
       asset, profile, revenueAed, fuelAed, idleAed, maintenanceAed,
       fixedAed: fixed.amountAed, operatorAed, costAed, marginAed,
       marginPct: revenueAed > 0 ? Math.round((marginAed / revenueAed) * 1000) / 10 : null,
-      utilisationPct: Math.round((engineHours / shiftHours) * 1000) / 10,
+      utilisationPct: utilisationPct(asset, engineHours, fromMs, toMs),
       engineHours, idleHours, lines,
     };
   });
@@ -280,7 +350,8 @@ export function monthlySeries(asset: Asset, months: number, nowMs: number = cloc
       + (costProfileFor(asset.id) ? engineHours * costProfileFor(asset.id)!.operatorCostPerHourAed : 0));
     points.push({
       label: `${MONTH_NAMES[start.month - 1]} ${String(start.year).slice(2)}`,
-      revenueAed: rentalRevenue(asset.ownerTenantId ?? '', asset.id, fromMs, toMs),
+      revenueAed: n2(rentalRevenue(asset.ownerTenantId ?? '', asset.id, fromMs, toMs)
+        + uninvoicedBookingRevenue(asset.ownerTenantId ?? '', asset, fromMs, toMs).amountAed),
       costAed: cost,
     });
   }

@@ -7,6 +7,7 @@
 import type { Asset } from '@/domain/types';
 import { ANCHOR_MS } from '@/server/seed/data';
 import { CLASS_AVG_FUEL_LPH } from '@/config/pricing';
+import { dayLoadFactor } from '@/server/telemetry/ecu';
 
 const MIN = 60 * 1000;
 const STEP_MS = 10 * MIN;
@@ -60,6 +61,9 @@ const ON_FRACTION: Record<Asset['behaviour'], number> = {
   stationary_24h: 0.25,
   light_vehicle_day: 0.3,
 };
+
+/** Assets whose fuel levels are pinned by a seeded alert; their burn stays even. */
+const SCRIPTED_LEVELS = new Set(['GN-01']);
 
 interface Chain {
   originMs: number;
@@ -124,7 +128,10 @@ function buildChain(asset: Asset): Chain {
     level[i] = current;
     used[i] = cumulative;
     const engineOn = !(asset.code === 'GN-01' && stepStart >= GN01_OFF_FROM && stepStart < GN01_OFF_TO);
-    const lph = engineOn ? meanLph * onFraction : 0;
+    // C2: burn follows the day's engine hours (the same day factors as the ECU meter).
+    // GN-01's levels are scripted (§8.7: 20% at 04:37, refuel at 07:00), so it keeps the even burn.
+    const load = SCRIPTED_LEVELS.has(asset.code) ? 1 : dayLoadFactor(asset, stepStart);
+    const lph = engineOn ? meanLph * onFraction * load : 0;
     burnLph[i] = lph;
     const litres = lph * hoursPerStep;
     cumulative += litres;
