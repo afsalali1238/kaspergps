@@ -15,10 +15,15 @@ npm install
 npm run dev
 ```
 
-Sign in at `/sign-in` with any seeded email (e.g. `omar@alnoor.ae`,
-`khalid@emirates.ae`, `sara@kasper.ae`) and any password. The **demo bar** at
-the top of every page is the cast list: View as, Clock, Phase, Scenarios
-(S1–S50), Tools.
+Sign in at `/sign-in` role-first (pick a role, then a person; any password),
+e.g. `omar@alnoor.ae`, `khalid@emiratesearth.ae`, `sara@kasper.ae`. The **demo bar**
+at the top of every page is the cast list: View as, Clock, Features, Sales view,
+Scenarios (S1–S50, S20/S41 retired), Tools. There is no Phase switch.
+
+**Docs:** the spec is [`BUILD_PROMPT.md`](BUILD_PROMPT.md) (its §0a lists the
+owner's current decisions); status is [`HANDOFF.md`](HANDOFF.md); the UI upgrade
+is [`handoff/UI-UPGRADE.md`](handoff/UI-UPGRADE.md); what's left is
+[`handoff/REMAINING.md`](handoff/REMAINING.md).
 
 A 20-minute walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
 The scenario → test map is in [`docs/test-matrix.md`](docs/test-matrix.md).

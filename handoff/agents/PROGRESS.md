@@ -7,15 +7,15 @@ One line per step, with its status, PR, merge commit and date. Hourly runs and t
 | A — bug fixes | merged (branch `arena/21299846-kaspergps`; P14 screenshots added in review) | #29 | see `git log --grep "#29"` | 2026-10-13 |
 | B — design system | **merged**: B1 (fonts, tokens, type scale, brand, colours), B2 (UI kit, `reviews/b2-self-check.md`), B3 (top navigation, demo bar restyle, no raw hex, LIVE pill opens the clock, AA contrast; `reviews/b3-self-check.md`) | B1: #32 · B2: #34 · B3: #33 | see `git log --grep "#33"` | 2026-10-13 |
 | C — data and simulator | **merged**: C1 (FB-12 arrives 10:30 with ETA ±5 min, plant shuffles at walking pace, `PIN_TRIP_MAX` 20; `reviews/C1-self-check.md`), C2 (engine hours vary by day, last month varies, booked-days revenue, MUC hours from the ECU meter, `consistency.test.ts`, `src/lib/format.ts`; `reviews/C2-self-check.md`) | C1: #35 · C2: #36 | see `git log --grep "#36"` | 2026-10-13 |
-| D — test tooling | not started | | | |
-| E — fleet map | not started | | | |
-| F — asset page | not started | | | |
-| G — alerts, fuel, maintenance | not started | | | |
-| H — reports and money | not started | | | |
+| D — test tooling | built, PR open, CI green (axe report mode, no-raw-floats, visual spec off, usability kit, perf, coverage excludes `app/**`; `reviews/D-self-check.md`) | #37 | | 2026-10-13 |
+| E — fleet map | built, **not pushed**: local `night-e` (`6acc248` + `d21471b`). Needs rebase on D/F1/G1, drop its own `alertSeverity` for G1's, `reviews/E-self-check.md` (see `handoff/REMAINING.md` step 0.3) | — | | 2026-10-13 |
+| F — asset page | F1 built, PR open, CI green (header, 2×2 Overview, End-access confirm; `reviews/F1-self-check.md`). F2 not started (local draft of the History timeline parked) | F1: #38 | | 2026-10-13 |
+| G — alerts, fuel, maintenance | G1 built, PR open, CI green (severity groups, KPI, Acknowledge all, rules panel; `reviews/G1-self-check.md`). G2 not started | G1: #39 | | 2026-10-13 |
+| H — reports and money | not started (local draft of the H1 Recently generated table parked; fix list in `handoff/REMAINING.md`) | | | |
 | I — console | not started | | | |
 | J — phone, Arabic, final | not started | | | |
 
-Next: **D** (axe, no-raw-floats, visual spec, usability kit, coverage exclude `app/**`), then E. Wave 2 (E–I) may start: B1–B3 are merged.
+Next: **Step 0 in `handoff/REMAINING.md`** (merge D → G1 → F1, then push and PR E), then F2, G2, H1 → H2, I in parallel; J1 → J2 → J3 last.
 
 ## Notes for the next steps
 - **C2 → everyone:** engine hours now vary by day (`engineHoursOnDay` in `telemetry/ecu.ts`); anchor meter values unchanged. Format numbers with `src/lib/format.ts` (`formatHours`, `formatAed`, `formatPct` …; null → "Not measured"). A MUC's hours are the ECU meter delta. Cost revenue can carry basis **"Days on hire"** (booked days not invoiced yet). **H:** margin % on a part-month booking can be extreme (EX-11 Sep −2,670.9 %); mixed-decimal utilisation. **J3:** J2/J5 Engine & fuel screenshots will differ (fuel levels vary now).

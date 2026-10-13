@@ -6,6 +6,27 @@ Give this file to your coding agent (Claude Code, Codex, Cursor), opened in the 
 
 ---
 
+## 0a. Amendments (13 Oct 2026). These override the sections below
+
+This file is the product spec (PRD). The prototype is built (P1–P14). Since then the owner has made the decisions below, and a UI upgrade is under way to bring every screen to 9/10. Where a section below disagrees with this list, **this list wins**. The UI upgrade's detailed spec is `handoff/UI-UPGRADE.md`; the build plan is `handoff/agents/`; live status is `handoff/agents/PROGRESS.md` and `HANDOFF.md`.
+
+| # | Topic | Decision | Replaces |
+| --- | --- | --- | --- |
+| D1 | Navigation | Pages sit in a **top navigation bar** (like fleetx): up to 4 tabs from 1024 px, 6 from 1280 px, 7 from 1600 px, the rest under **More ▾**; a Settings gear in the bar; phones keep the menu sheet. **No left sidebar** in the app or the console. | §11 "Left navigation", §11.9 console left nav |
+| D2 | Phases | **Gone.** No Phase switch, no Show hidden, no "Day one / Phase 2 / Later" labels anywhere. Every feature is on; hardware and role still gate what shows. Scenarios S20 and S41 are retired. | §6.3 phase column, §10 items 4–5, S20, S41, phase checks in §15 |
+| D3 | Wordmark | **"Kasper"**, from one constant (`src/config/brand.ts`) so a rename is one line. | §4 |
+| D4 | FB-12 | Leaves Jebel Ali 09:55 and **arrives at Al Habtoor about 30 min after the anchor (10:30)**; the tracking page's ETA is within ±5 min of the real arrival; "Arrived" shows the real arrival time. | §8.4 "about 90 minutes", §9, S29 "+90 min" |
+| D5 | Fuel | A **Fuel** screen of its own, in the nav **only** for users whose visible assets have `fuel.level`. | new |
+| D6 | Alert rules | A rules panel on Alerts for Tenant Admins, labelled **"Prototype — no messages are sent"**. | new, §11.4 |
+| D7 | After-hours asset | **GR-01** at Al Quoz. | §8.7 |
+| D8 | Sign-in | **Role-first**: pick one of 5 roles, then a user. Exact error messages in §11.1 still apply. | §11.1 layout |
+| D9 | Fleet map | **Three panes** on desktop: fleet rail (search, list, sites) · map (CARTO Positron, code labels, legend) · asset panel opened by a row or marker (`?asset=`), plus bottom tabs Active alerts / Event log / Fuel events and a KPI strip whose cells filter. One filter bar with removable chips. Phones: Map / List tabs and a bottom sheet. | §11.2 layout |
+| D10 | Reports and Downloads | **One Reports screen**: report cards, a run panel, then a "Recently generated" table (Download again re-checks permission). `/app/downloads` redirects there. | §11.13 Downloads page |
+| D11 | Numbers | Every number has a source label or reads "Not measured"; no raw floats; one formatter (`src/lib/format.ts`); no invented savings, ROI multiples or forecasts. Last month's data varies by asset. | §6.4, §11.19 |
+| D12 | Design system | Self-hosted Space Grotesk / Hanken Grotesk / Space Mono / IBM Plex Sans Arabic; tokens in `app/globals.css`; no raw hex in screens; Lucide icons; secondary text AA (#676B72). | §3, §4 styling |
+
+---
+
 ## 0. How you (the agent) must work
 
 1. Build in the **14 phases** in section 15, in order. After each phase:
@@ -535,7 +556,7 @@ P2 seeds the history window, past bookings, rates, the BK-1011 destination and t
 | BK-0982 | WL-03 | Marina | Dubai Hills | day 5 07:00 → day 25 18:00 | hourly AED 160, min 8 h/day |
 | BK-0983 | CR-02 | Palm | Dubai South | day 10 07:00 → day 28 18:00 | daily AED 3,200 |
 
-Rates for the current bookings: plant hourly AED 150–200 with a minimum of 8 h/day; cranes and telehandlers daily AED 1,200–3,500; trucks daily AED 900–1,400 (TP-21 daily AED 1,100); outside hires daily. BK-1011 (FB-12, outside hirer) has destination **"Al Habtoor site, Al Barsha" (25.1130, 55.2000)**. During the hire, FB-12 drives from Jebel Ali towards it and arrives about 90 minutes after the anchor.
+Rates for the current bookings: plant hourly AED 150–200 with a minimum of 8 h/day; cranes and telehandlers daily AED 1,200–3,500; trucks daily AED 900–1,400 (TP-21 daily AED 1,100); outside hires daily. BK-1011 (FB-12, outside hirer) has destination **"Al Habtoor site, Al Barsha" (25.1130, 55.2000)**. During the hire, FB-12 drives from Jebel Ali towards it and arrives about **30 minutes** after the anchor (10:30; §0a D4).
 
 **Labels:**
 - Al Noor: "Port runs" (FB-12, FB-14, LB-02), "Night shift" (WT-07, WT-08).
@@ -609,7 +630,7 @@ Generate readings **on demand** per tracker per day and cache them (never pre-ge
   - `light_vehicle_day`: 07:00–19:00 trips around the owner's sites.
   - CAN values only from the adapter's fitting time, for the params the CAN check ticked. The PRNG is seeded from the tracker IMEI, so the same set-up gives the same readings.
 - **Scripted movements for the extended features:**
-  - FB-12 drives Jebel Ali → BK-1011's destination, arriving about 90 min after the anchor.
+  - FB-12 drives Jebel Ali → BK-1011's destination, arriving about 30 min after the anchor (§0a D4).
   - WL-06 leaves the Palm Crescent works polygon yesterday 19:10 and returns at 19:55.
   - LB-05's towing event crosses the Al Quoz Yard after-hours fence.
   - BH-05 is carried from Ras Al Khor Yard to Hatta Quarry (24.8128, 56.1175) tomorrow 08:30–10:15, works there until 17:00, and returns.
@@ -663,8 +684,8 @@ A slim bar above the app, ink background, small text:
    - "FB-12 arrives at Al Habtoor site"
    - "Start of last month" / "End of last month"
    - "INV-AN-0098 becomes overdue"
-4. **Phase:** Day one / Phase 2 / Later (default Later, i.e. everything). Each step hides every feature, tab, column, report, alert type and menu item from a later phase (section 6.3).
-5. **Show hidden:** off/on, for reviewers. When on, actions this user can't use (because of their role or relationship to the asset) appear with a dashed outline and a lock. Hovering shows the same reason as the Features panel. When off, they are simply absent, as in the product.
+4. ~~**Phase:**~~ *Removed (§0a D2).* Was: Day one / Phase 2 / Later (default Later, i.e. everything). Each step hides every feature, tab, column, report, alert type and menu item from a later phase (section 6.3).
+5. ~~**Show hidden:**~~ *Removed (§0a D2).* Was: off/on, for reviewers. When on, actions this user can't use (because of their role or relationship to the asset) appear with a dashed outline and a lock. Hovering shows the same reason as the Features panel. When off, they are simply absent, as in the product.
 6. **Sales view:** off/on (section 6.4 rule 6). This is separate from Show hidden: Show hidden explains permissions, Sales view shows hardware upgrades.
 7. **Scenarios ▾ (guided walkthroughs)** — every scenario in section 13 is a short guided walkthrough:
    - **Start** sets the user, clock and page.
@@ -690,7 +711,7 @@ The demo bar is a dev aid: it calls the same API with the chosen user's session 
 
 Global layout for `/app`: demo bar → top bar (Kasper wordmark · company name, or "Viewing: All tenants ▾" for Kasper staff · search · alerts bell · user menu) → page. User menu: name, role in words, Users & sites (if allowed), Console (Kasper), Language (EN/عربي), Sign out.
 
-Left navigation for `/app`. Each item appears only if the user has the capability **and** the current phase allows it **and**, for hardware features, at least one asset in their view supports it:
+Top navigation for `/app` (§0a D1; was a left navigation). Each item appears only if the user has the capability **and**, for hardware features, at least one asset in their view supports it (phases are gone, §0a D2). Order: Map, Alerts, Reports, Fuel (D5), Maintenance, Billing, then under More: Geofences, Certificates, Cost & ROI. Downloads folds into Reports (D10):
 - Map (Day one)
 - Alerts (Day one)
 - Reports (Day one)
@@ -701,7 +722,7 @@ Left navigation for `/app`. Each item appears only if the user has the capabilit
 - Maintenance (Later)
 - Cost & ROI (Later)
 
-On phones these items move into a bottom sheet.
+On phones these items move into a bottom sheet, opened from the top bar.
 
 ### 11.1 Sign-in (`/sign-in`)
 Email + password (any password works for seeded emails). Exact messages:
@@ -713,6 +734,8 @@ Email + password (any password works for seeded emails). Exact messages:
 "Forgot password?" → "We've sent a reset link to your email." Note for Kasper staff: "Kasper staff use two-factor in production."
 
 ### 11.2 Map view (`/app`, landing)
+> **Layout amended (§0a D9):** three panes, see `handoff/UI-UPGRADE.md` §6. The content rules below (what each role sees, states, URL filters) still apply.
+
 - **KPI strip:** fleet counts Live · Idle · Stale · Offline · Unknown · No tracker (each is a filter toggle). From Phase 2, if any visible asset supports them: "Engine hours today (ECU)", "Fuel used today", "Open alerts".
 - **Map:** markers coloured by status, labelled by code on hover; clusters; "Rented" ring on rented-in assets; Unknown and No tracker assets are list-only. Start view: Kasper → all UAE assets; Tenant Admin → fit their assets; Site User → their site(s).
 - **Popup:** code, name, status, last updated, tier chip (T1/T2/T3, quiet), "Open".
@@ -923,7 +946,7 @@ Where they appear:
 - **Asset detail:** a "Geofences" line on Overview: "Inside: Al Quoz Yard" / "Outside all geofences". It shows only the viewer's own tenant's fences.
 
 ### 11.13 Report downloads and schedules
-**Downloads** `/app/downloads` (Day one):
+**Downloads** (now the "Recently generated" table on Reports, §0a D10; `/app/downloads` redirects):
 - Every report the user generates is listed: name, scope, period, format, generated at, "by schedule" or "by you", size.
 - Actions: Download again (regenerated from the same parameters; the deterministic seed makes it identical) and Delete from list.
 - Each user sees only their own runs. Kasper Admin sees everyone's runs in the console (audited).
@@ -1118,7 +1141,7 @@ Placeholders until Task 13: `STALE_AFTER_MIN = 10`, `OFFLINE_AFTER_MIN = 30`, `I
 | S17 | Ravi (Ops) | Console → pair a spare tracker to LD-09 → Send test reading | LD-09 Unknown → Live; audit entry; no Users & sites, no Audit log |
 | S18 | Sara (Admin) | Console → create tenant + asset with ALL-CAN300 | New tenant's admin can sign in; tier shows T3 |
 | S19 | Lina | Settings → invite user → View as them | New user sees only their site |
-| S20 | Any | Phase → Day one | All Phase 2 tabs, tiles, columns, reports and alert types disappear |
+| ~~S20~~ | *Retired (§0a D2)* | Phase → Day one | All Phase 2 tabs, tiles, columns, reports and alert types disappear |
 | S21 | Omar | Sales view on | Locked cards "Needs ALL-CAN300 (Tier 3)" appear on FB-12; off → gone |
 | S22 | Karim | View as | Deactivated message |
 | S23 | John (Business Bay + JVC Villas) | Map, Site filter, Reports | Site filter lists his two sites; sees CR-02, PU-52, VN-01; TP-21 as "Past rental"; nothing from Dubai Hills |
@@ -1127,7 +1150,7 @@ Placeholders until Task 13: `STALE_AFTER_MIN = 10`, `OFFLINE_AFTER_MIN = 30`, `I
 | S26 | Khalid | Draw a 300 m circle "Hatta Quarry — gate" with enter alert → Jump +1 d | BH-05 enter event about 10:15 and an alert in the bell; events visible in the geofence report |
 | S27 | Omar | WT-07 → Trips → yesterday's trip → Play at 60× | Over-speed pin at 104 km/h; gap banner where data is missing; no fuel/RPM in readout |
 | S28 | Lina | EX-04 → History → Play this period | Scrubber starts at rental start; RPM/load in readout; AdBlue "Not measured" |
-| S29 | Outside hirer | Open FB-12 link | "Arriving about … (in … min)"; Jump +90 min → "Arrived"; no route, no history |
+| S29 | Outside hirer | Open FB-12 link | "Arriving about … (in … min)"; Jump +30 min → "Arrived" (§0a D4); no route, no history |
 | S30 | Lina | Reports → schedule daily Location history for EX-04 → Jump to "EX-04 rental ends" + 2 d | Runs appear in Downloads until the end, then "Skipped — you no longer have access…"; schedule paused after 2 skips |
 | S31 | Khalid | Certificates → issue last month for BD-02 → Reissue | Sealed; reissue has the same seal; verify page "Valid" |
 | S32 | Khalid | Tools → Tamper with a stored certificate → open verify link | "Does not match its seal — contact Kasper." |
@@ -1148,7 +1171,7 @@ Placeholders until Task 13: `STALE_AFTER_MIN = 10`, `OFFLINE_AFTER_MIN = 30`, `I
 | S48 | Khalid | Settings → Assets → Add asset "EX-15", then Retire EX-07 | EX-15 No tracker with "Request a tracker"; EX-07 refused (booking tomorrow) |
 | S49 | Lina | Settings → Sites → add "Al Furjan Villas" → invite a Site User there → View as them | Empty map with "No assets yet"; after Ravi books an asset to that site, it appears |
 | S50 | Sara | Kasper team → add an Ops user → View as them; try to remove the last Kasper Admin | New Ops user works in the console; removal refused |
-| S41 | Any | Phase → Phase 2, then Day one | Phase 2: Maintenance and Cost & ROI disappear. Day one: also geofences, labels, playback, ETA, MUC, billing, schedules (Downloads stays) |
+| ~~S41~~ | *Retired (§0a D2)* | Phase → Phase 2, then Day one | Phase 2: Maintenance and Cost & ROI disappear. Day one: also geofences, labels, playback, ETA, MUC, billing, schedules (Downloads stays) |
 
 ---
 
