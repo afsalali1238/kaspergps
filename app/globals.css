@@ -36,7 +36,7 @@
   --text-secondary: #5B5F66;
   --text-muted: #676B72;
 
-  /* Status tints (9%), from the fleetx reference */
+  /* Status tints (9%) */
   --ok-tint: rgba(31, 154, 109, .09);
   --warn-tint: rgba(230, 175, 0, .09);
   --bad-tint: rgba(214, 69, 69, .09);

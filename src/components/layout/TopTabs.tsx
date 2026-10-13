@@ -1,6 +1,6 @@
 'use client';
 
-// Top navigation tabs, like fleetx (owner decision, 13 Oct; UI-UPGRADE.md §5.1).
+// Top navigation tabs, no left sidebar (owner decision, 13 Oct; UI-UPGRADE.md §5.1).
 // Pages sit in the top bar; there is no left sidebar. The bar shows 4 tabs from
 // 1024 px, 6 from 1280 px and 7 from 1600 px; the rest are under "More".
 // The split is pure CSS (no measuring), so the bar never jumps on load.

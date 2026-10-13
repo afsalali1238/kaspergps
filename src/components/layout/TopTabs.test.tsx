@@ -1,4 +1,4 @@
-// B3: top navigation tabs (owner decision, 13 Oct: top bar like fleetx, no sidebar).
+// B3: top navigation tabs (owner decision, 13 Oct: pages in a top bar, no sidebar).
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { TopTabs, type TopTab } from './TopTabs';
