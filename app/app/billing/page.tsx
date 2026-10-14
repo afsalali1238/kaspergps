@@ -6,7 +6,7 @@
 
 import React, { useMemo, useState } from 'react';
 import {
-  Badge, Button, EmptyState, KpiStrip, KpiCell,
+  Badge, Button, ConfirmDialog, EmptyState, KpiStrip, KpiCell, Table, type RowMenuItem,
 } from '@/components/ui';
 import { useDb, type InvoiceView, aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice, receivedInvoices, recordPayment, statementsFor, voidInvoice, can } from '@/server/api';
 
@@ -86,6 +86,7 @@ export default function BillingPage() {
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]['id']>('bank_transfer');
   const [reference, setReference] = useState('');
   const [voidReason, setVoidReason] = useState('');
+  const [voidTarget, setVoidTarget] = useState<InvoiceView | null>(null);
 
   // Create-invoice form
   const [createOpen, setCreateOpen] = useState(false);
@@ -163,6 +164,8 @@ export default function BillingPage() {
     tierCounts[3] * GPS_SUBSCRIPTION_PER_MONTH.tier3;
 
   const summary = billingSummary(session, clock.now() - 30 * 86400000, clock.now());
+  // Outstanding and overdue count every open invoice, not just the last 30 days'.
+  const allTime = billingSummary(session, 0, clock.now());
   const ageing = agedReceivables(session);
 
   const invoiceExport = (): ExportTable => ({
@@ -221,13 +224,49 @@ export default function BillingPage() {
     bump();
   };
 
-  const submitVoid = (invoiceId: string) => {
-    const result = voidInvoice(session, invoiceId, voidReason);
+  const submitVoid = () => {
+    if (!voidTarget) return;
+    const result = voidInvoice(session, voidTarget.id, voidReason);
     showToast(result.ok ? 'ok' : 'error', result.ok ? result.message! : result.error!);
     if (result.ok) {
       setVoidReason('');
+      setVoidTarget(null);
       bump();
     }
+  };
+
+  const downloadInvoicePdf = (inv: InvoiceView) => {
+    const booking = seed.bookings.find(b => b.id === inv.bookingId);
+    downloadPdf({ fileName: `kasper-${inv.number}`, subtitle: `${inv.number} · ${inv.customerName}` }, [{
+      title: inv.number,
+      columns: ['Field', 'Value'],
+      rows: [
+        ['Customer', inv.customerName],
+        ['Booking', booking?.reference ?? '—'],
+        ['Basis', basisLabel(inv, t)],
+        ['Total', aed(inv.totalAed)],
+        ['Paid', aed(inv.paidAed)],
+        ['Balance', aed(inv.balanceAed)],
+        ['Due', formatDay(inv.dueAt)],
+        ['Status', invoiceStatusLabel(inv.displayStatus)],
+      ],
+    }]);
+  };
+
+  const issuedMenu = (inv: InvoiceView): RowMenuItem[] => {
+    const isOpen = inv.displayStatus !== 'paid' && inv.displayStatus !== 'void';
+    const items: RowMenuItem[] = [];
+    if (isOpen && canRecordPayment(session, inv)) {
+      items.push({
+        id: 'pay', label: t('billing.actions.record_payment', 'Record payment'),
+        onSelect: () => { setPaymentFor(inv.id); setAmount(inv.balanceAed.toFixed(2)); setReference(''); },
+      });
+    }
+    items.push({ id: 'pdf', label: t('billing.actions.download_pdf', 'Download PDF'), onSelect: () => downloadInvoicePdf(inv) });
+    if (isOpen && canRecordPayment(session, inv)) {
+      items.push({ id: 'void', label: t('billing.actions.void_invoice', 'Void'), destructive: true, onSelect: () => { setVoidReason(''); setVoidTarget(inv); } });
+    }
+    return items;
   };
 
   const submitCreate = () => {
@@ -387,98 +426,60 @@ export default function BillingPage() {
             </div>
           )}
 
-          <KpiStrip label="Last 30 days">
-            <KpiCell label="Issued" value={aed(summary.issuedAed)} source="From invoices" />
-            <KpiCell label="Paid" value={aed(summary.paidAed)} source="From payments" />
-            <KpiCell label="Outstanding" value={aed(summary.outstandingAed)} tone="bad" source="From invoices" />
-            <KpiCell label="Overdue" value={aed(summary.overdueAed)} tone="bad" source="From invoices" />
+          <KpiStrip label={t('billing.kpi_label', 'Issued invoices')}>
+            <KpiCell label={t('billing.kpi.issued_30', 'Issued, last 30 days')} value={aed(summary.issuedAed)} source={t('billing.kpi.src_invoices', 'From invoices')} />
+            <KpiCell label={t('billing.kpi.paid_30', 'Paid, last 30 days')} value={aed(summary.paidAed)} source={t('billing.kpi.src_payments', 'From payments')} />
+            <KpiCell label={t('billing.kpi.outstanding', 'Outstanding')} value={aed(allTime.outstandingAed)} tone={allTime.outstandingAed > 0 ? 'warn' : undefined} source={t('billing.kpi.src_invoices', 'From invoices')} />
+            <KpiCell label={t('billing.kpi.overdue', 'Overdue')} value={aed(allTime.overdueAed)} tone={allTime.overdueAed > 0 ? 'bad' : undefined} source={t('billing.kpi.src_invoices', 'From invoices')} />
           </KpiStrip>
 
           {filteredIssued.length === 0 ? (
             <EmptyState title={t('billing.no_invoices', 'No invoices')} description={t('billing.nothing_matches', 'Nothing matches those filters yet.')} />
           ) : (
-            <div className="bg-surface border border-line rounded-lg overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-paper-2 text-grey-500">
-                    {[
-                      ['billing.columns.number', 'Invoice'],
-                      ['billing.columns.customer', 'Customer'],
-                      ['billing.columns.asset', 'Asset'],
-                      ['billing.columns.booking', 'Booking'],
-                      ['billing.columns.basis', 'Basis'],
-                      ['billing.columns.total', 'Total'],
-                      ['billing.columns.due', 'Due'],
-                      ['billing.columns.status', 'Status'],
-                      ['billing.columns.actions', 'Actions'],
-                    ].map(([key, label]) => (
-                      <th key={key} className="px-3 py-2 text-left font-medium whitespace-nowrap">{t(key, label)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredIssued.map(inv => {
-                    const booking = seed.bookings.find(b => b.id === inv.bookingId);
-                    const asset = seed.assets.find(a => a.id === booking?.assetId);
-                    const isOpen = inv.displayStatus !== 'paid' && inv.displayStatus !== 'void';
-                    return (
-                      <tr key={inv.id} className="bg-paper hover:bg-paper-2 align-top">
-                        <td className="px-3 py-2 border-b border-line font-mono text-grey-700 whitespace-nowrap">{inv.number}</td>
-                        <td className="px-3 py-2 border-b border-line text-grey-700">{inv.customerName}</td>
-                        <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{asset?.code ?? '—'}</td>
-                        <td className="px-3 py-2 border-b border-line font-mono text-grey-500">
-                          {inv.bookingId ? (
-                            <a className="underline" href={`/app/bookings`}>{booking?.reference ?? inv.bookingId}</a>
-                          ) : '—'}
-                        </td>
-                        <td className="px-3 py-2 border-b border-line text-grey-700">{basisLabel(inv, t)}</td>
-                        <td className="px-3 py-2 border-b border-line font-mono text-ink">
-                          {aed(inv.totalAed)}
-                          {inv.paidAed > 0 && inv.balanceAed > 0 && (
-                            <div className="text-grey-500">{t('billing.outstanding_line', '{amount} outstanding', { amount: aed(inv.balanceAed) })}</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 border-b border-line font-mono text-grey-500 whitespace-nowrap">{formatDay(inv.dueAt)}</td>
-                        <td className="px-3 py-2 border-b border-line">{statusBadge(inv.displayStatus, t)}</td>
-                        <td className="px-3 py-2 border-b border-line">
-                          <div className="flex flex-col gap-1">
-                            {isOpen && canRecordPayment(session, inv) && (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setPaymentFor(paymentFor === inv.id ? null : inv.id);
-                                  setAmount(inv.balanceAed.toFixed(2));
-                                  setReference('');
-                                }}
-                              >
-                                {t('billing.actions.record_payment', 'Record payment')}
-                              </Button>
-                            )}
-                            {isOpen && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  const reason = window.prompt(`Why is ${inv.number} being voided?`);
-                                  if (reason === null) return;
-                                  setVoidReason(reason);
-                                  submitVoid(inv.id);
-                                }}
-                              >
-                                {t('billing.actions.void_invoice', 'Void')}
-                              </Button>
-                            )}
-                            {inv.status === 'paid' && <span className="text-grey-400">{t('billing.settled', 'Settled')}</span>}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              caption={t('billing.issued_caption', 'Invoices you issued')}
+              keyField="id"
+              rows={filteredIssued}
+              dense
+              rowMenu={issuedMenu}
+              rowMenuLabel={inv => t('billing.actions_for', 'Actions for {number}', { number: inv.number })}
+              columns={[
+                { key: 'number', header: t('billing.columns.number', 'Invoice'), mono: true, render: inv => inv.number },
+                { key: 'customer', header: t('billing.columns.customer', 'Customer'), render: inv => inv.customerName },
+                { key: 'asset', header: t('billing.columns.asset', 'Asset'), mono: true, render: inv => seed.assets.find(a => a.id === seed.bookings.find(b => b.id === inv.bookingId)?.assetId)?.code ?? '—' },
+                { key: 'booking', header: t('billing.columns.booking', 'Booking'), mono: true, render: inv => {
+                  const booking = seed.bookings.find(b => b.id === inv.bookingId);
+                  return inv.bookingId ? <a className="underline" href="/app/bookings">{booking?.reference ?? inv.bookingId}</a> : '—';
+                } },
+                { key: 'basis', header: t('billing.columns.basis', 'Basis'), render: inv => basisLabel(inv, t) },
+                { key: 'total', header: t('billing.columns.total', 'Total'), numeric: true, render: inv => (
+                  <>
+                    {aed(inv.totalAed)}
+                    {inv.paidAed > 0 && inv.balanceAed > 0 && (
+                      <div className="text-grey-500">{t('billing.outstanding_line', '{amount} outstanding', { amount: aed(inv.balanceAed) })}</div>
+                    )}
+                  </>
+                ) },
+                { key: 'due', header: t('billing.columns.due', 'Due'), mono: true, render: inv => formatDay(inv.dueAt) },
+                { key: 'status', header: t('billing.columns.status', 'Status'), render: inv => statusBadge(inv.displayStatus, t) },
+              ]}
+            />
           )}
+
+          <ConfirmDialog
+            open={voidTarget !== null}
+            destructive
+            title={t('billing.void_title', 'Void {number}?', { number: voidTarget?.number ?? '' })}
+            confirmLabel={t('billing.actions.void_invoice', 'Void')}
+            body={
+              <label className="block text-xs text-grey-500">
+                {t('billing.void_reason', 'Reason (at least 10 characters)')}
+                <textarea value={voidReason} onChange={e => setVoidReason(e.target.value)} rows={3} className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink" />
+              </label>
+            }
+            onConfirm={submitVoid}
+            onCancel={() => { setVoidTarget(null); setVoidReason(''); }}
+          />
 
           {paymentInvoice && (
             <div className="bg-surface border border-line rounded-lg p-4 space-y-3">

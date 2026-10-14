@@ -668,7 +668,8 @@
       "total": "الإجمالي",
       "due": "الاستحقاق",
       "status": "الحالة",
-      "paid": "المدفوع"
+      "paid": "المدفوع",
+      "booking": "الحجز"
     },
     "status": {
       "paid": "مدفوعة",
@@ -695,7 +696,8 @@
       "export_pdf": "PDF",
       "export_excel": "Excel",
       "download_both": "تنزيل PDF و Excel",
-      "check_muc": "تحقق من الساعات في الشهادة"
+      "check_muc": "تحقق من الساعات في الشهادة",
+      "download_pdf": "تنزيل PDF"
     },
     "pay": {
       "title": "دفع هذه الفاتورة؟",
@@ -738,7 +740,20 @@
       "customer": "العميل",
       "issued": "تاريخ الإصدار",
       "outstanding": "المبلغ المتبقي"
-    }
+    },
+    "kpi_label": "الفواتير الصادرة",
+    "kpi": {
+      "issued_30": "صادرة، آخر 30 يومًا",
+      "src_invoices": "من الفواتير",
+      "paid_30": "مدفوعة، آخر 30 يومًا",
+      "src_payments": "من المدفوعات",
+      "outstanding": "المستحق",
+      "overdue": "المتأخر"
+    },
+    "issued_caption": "الفواتير التي أصدرتها",
+    "actions_for": "إجراءات {number}",
+    "void_title": "إلغاء {number}؟",
+    "void_reason": "السبب (10 أحرف على الأقل)"
   },
   "certificates": {
     "title": "الشهادات",
@@ -749,7 +764,8 @@
       "period": "الفترة",
       "hours": "الساعات",
       "status": "الحالة",
-      "actions": "إجراءات"
+      "actions": "إجراءات",
+      "view": "عرض"
     },
     "status": {
       "sealed": "مختومة",
@@ -767,7 +783,8 @@
       "void_named": "إلغاء {number}",
       "reissue_named": "إعادة إصدار {number}",
       "void_certificate": "إلغاء الشهادة",
-      "reissue_certificate": "إعادة إصدار الشهادة"
+      "reissue_certificate": "إعادة إصدار الشهادة",
+      "verify_link": "رابط التحقق"
     },
     "issue": {
       "title": "إصدار شهادة",
@@ -807,7 +824,18 @@
     "void_note": "يلزم سبب من 10 أحرف على الأقل للإلغاء. تبقى الشهادة مدرجة كملغاة.",
     "reissue_note": "ينسخ إعادة الإصدار الفترة إلى شهادة جديدة -02 بختم جديد ومدخل في سجل التدقيق.",
     "download_pdf": "تنزيل PDF",
-    "open_verify": "فتح صفحة التحقق العامة"
+    "open_verify": "فتح صفحة التحقق العامة",
+    "kpi_label": "الشهادات",
+    "kpi": {
+      "total": "الشهادات",
+      "src": "الشهادات الصادرة",
+      "sealed": "مختومة",
+      "voided": "ملغاة",
+      "last_month": "التالية للتوثيق",
+      "last_month_ctx": "الشهر الميلادي الماضي"
+    },
+    "caption": "شهادات الاستخدام الشهرية",
+    "actions_for": "إجراءات {number}"
   },
   "verify": {
     "title": "التحقق من الشهادة",
@@ -891,7 +919,13 @@
         "resend": "إعادة إرسال الدعوة",
         "save": "حفظ"
       },
-      "edit_sites": "المواقع الخاصة بـ {name}"
+      "edit_sites": "المواقع الخاصة بـ {name}",
+      "caption": "المستخدمون في شركتك",
+      "empty": "لا يوجد مستخدمون بعد. ادعُ أول مسؤول.",
+      "confirm_deactivate": "إيقاف {name}؟",
+      "confirm_reactivate": "إعادة تفعيل {name}؟",
+      "confirm_deactivate_body": "يفقد الوصول فورًا. يمكنك إعادة تفعيله لاحقًا.",
+      "confirm_reactivate_body": "يستعيد وصوله بنفس الدور والمواقع."
     },
     "sites": {
       "title": "المواقع",
@@ -989,6 +1023,14 @@
       "assets": "الأصول",
       "confirm_delete": "إزالة “{name}” من {count} أصل؟",
       "empty": "لا توجد وسوم بعد. أضف وسماً من صفحة الأصل."
+    },
+    "kpi_label": "شركتك",
+    "kpi": {
+      "users": "المستخدمون النشطون",
+      "of_total": "من {n}",
+      "sites": "المواقع",
+      "assets": "الأصول في الخدمة",
+      "labels": "التصنيفات"
     }
   },
   "geofences": {
@@ -1206,7 +1248,17 @@
     "roi_profile_operator": "تكلفة المشغل في الساعة (درهم إماراتي)",
     "roi_profile_save": "حفظ ملف التكلفة",
     "roi_profile_saved": "تم حفظ ملف التكلفة.",
-    "part_month": "n/a — part month"
+    "part_month": "n/a — part month",
+    "kpi_label": "إجماليات الأسطول",
+    "kpi": {
+      "revenue": "الإيرادات",
+      "revenue_src": "الفواتير وأيام الإيجار",
+      "cost": "التكلفة",
+      "cost_src": "أسعار تجريبية",
+      "margin": "الهامش",
+      "of_revenue": "من الإيرادات",
+      "margin_src": "الإيرادات − التكلفة"
+    }
   },
   "ui": {
     "actions": "الإجراءات",

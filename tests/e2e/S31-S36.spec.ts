@@ -3,7 +3,7 @@
 // owner records a part-payment, Kasper issues statements).
 
 import { expect, test } from '@playwright/test';
-import { demo, goTo, tamperWithCertificate, USERS } from './helpers';
+import { demo, goTo, tamperWithCertificate, USERS, rowAction } from './helpers';
 
 test.describe('S31 — Khalid issues and reissues a MUC', () => {
   test('the certificates screen lists the seeded September certificate', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('S35 — Omar records a part-payment', () => {
     await page.getByRole('button', { name: 'Issued', exact: true }).click();
     const row = page.getByRole('row', { name: /INV-AN-0098/ });
     await expect(row.getByText('Days on hire')).toBeVisible();
-    await row.getByRole('button', { name: 'Record payment' }).click();
+    await rowAction(row, 'Record payment');
     await expect(page.getByText(/^Record a payment on INV-AN-0098$/)).toBeVisible();
     await expect(page.getByText(/A payment over the balance is refused/)).toBeVisible();
   });

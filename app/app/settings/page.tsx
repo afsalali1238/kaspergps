@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import {
-  Button, Badge, EmptyState, Tabs, KpiStrip, KpiCell,
+  Button, Badge, ConfirmDialog, EmptyState, Tabs, KpiStrip, KpiCell, Table,
 } from '@/components/ui';
 import { useDb, hasRole, computeStatus, createUser, updateUserSites, deactivateUser, reactivateUser, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
 import { searchPlaces } from '@/domain/places';
+import { formatNumber } from '@/lib/format';
 import { renameLabel, deleteLabel, labelUsage, labelsVisibleTo } from '@/server/api';
 import { useT, useHref } from '@/i18n';
 import * as clock from '@/lib/clock';
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   const session = useSession();
   const { phase } = useSwitches();
 
+  const [statusConfirm, setStatusConfirm] = useState<{ userId: string; name: string; next: 'deactivated' | 'active' } | null>(null);
   const [activeTab, setActiveTab] = useState('users');
   const [showInvite, setShowInvite] = useState(false);
   const [editing, setEditing] = useState<{ userId: string; siteIds: string[] } | null>(null);
@@ -239,11 +241,11 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <KpiStrip label="Organization">
-        <KpiCell label="Users" value={myUsers.length} />
-        <KpiCell label="Sites" value={mySites.length} />
-        <KpiCell label="Assets" value={myAssets.length} />
-        <KpiCell label="Labels" value={visibleLabels.length} />
+      <KpiStrip label={t('settings.kpi_label', 'Your company')}>
+        <KpiCell label={t('settings.kpi.users', 'Active users')} value={formatNumber(myUsers.filter(u => u.status === 'active').length)} context={t('settings.kpi.of_total', 'of {n}', { n: formatNumber(myUsers.length) })} />
+        <KpiCell label={t('settings.kpi.sites', 'Sites')} value={formatNumber(mySites.length)} />
+        <KpiCell label={t('settings.kpi.assets', 'Assets in service')} value={formatNumber(myAssets.filter(a => !a.retiredAt).length)} />
+        <KpiCell label={t('settings.kpi.labels', 'Labels')} value={formatNumber(visibleLabels.length)} />
       </KpiStrip>
 
       <Tabs
@@ -348,79 +350,61 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-paper-2 text-grey-500">
-                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.name', 'Name')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.email', 'Email')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.role', 'Role')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.sites', 'Sites')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('settings.users.columns.status', 'Status')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('settings.users.columns.actions', 'Actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myUsers.map(u => (
-                  <tr key={u.id} data-user-id={u.id} className="bg-paper hover:bg-paper-2">
-                    <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{u.name}</td>
-                    <td className="px-3 py-2 border-b border-line font-mono text-grey-500">{u.email}</td>
-                    <td className="px-3 py-2 border-b border-line">{roleBadge(u.role, t)}</td>
-                    <td className="px-3 py-2 border-b border-line text-grey-700 text-xs">
-                      {u.siteIds.map(sid => {
-                        const s = seed.sites.find(si => si.id === sid);
-                        return s?.name ?? sid;
-                      }).join(', ') || '—'}
-                    </td>
-                    <td className="px-3 py-2 border-b border-line">{userStatusBadge(u.status, t)}</td>
-                    <td className="px-3 py-2 text-right border-b border-line">
-                      <div className="flex gap-1 justify-end">
-                        {hasRole(u, 'site_user') && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => { setEditing({ userId: u.id, siteIds: [...u.siteIds] }); setEditError(null); }}
-                          >
-                            {t('common.edit', 'Edit')}
-                          </Button>
-                        )}
-                        {/* You can't deactivate yourself: the button is absent on
-                            your own row, and team.ts refuses it anyway. */}
-                        {u.status === 'active' ? (
-                          u.id === session.userId ? (
-                            <span className="text-xs text-grey-400">—</span>
-                          ) : (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleUserStatus(u.id, 'deactivated')}
-                            >
-                              {t('settings.users.actions.deactivate', 'Deactivate')}
-                            </Button>
-                          )
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleUserStatus(u.id, 'active')}
-                          >
-                            {t('settings.users.actions.reactivate', 'Reactivate')}
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {myUsers.length === 0 && (
-                  <tr className="bg-paper">
-                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-grey-500">
-                      No users yet. Invite the first admin.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            caption={t('settings.users.caption', 'Users in your company')}
+            keyField="id"
+            rows={myUsers}
+            dense
+            emptyMessage={t('settings.users.empty', 'No users yet. Invite the first admin.')}
+            rowAttrs={u => ({ 'data-user-id': u.id })}
+            columns={[
+              { key: 'name', header: t('settings.users.columns.name', 'Name'), render: u => <span className="font-medium">{u.name}</span> },
+              { key: 'email', header: t('settings.users.columns.email', 'Email'), mono: true, render: u => u.email },
+              { key: 'role', header: t('settings.users.columns.role', 'Role'), render: u => roleBadge(u.role, t) },
+              { key: 'sites', header: t('settings.users.columns.sites', 'Sites'), render: u => u.siteIds.map(sid => seed.sites.find(si => si.id === sid)?.name ?? sid).join(', ') || '—' },
+              { key: 'status', header: t('settings.users.columns.status', 'Status'), render: u => userStatusBadge(u.status, t) },
+              { key: 'actions', header: t('settings.users.columns.actions', 'Actions'), align: 'right', render: u => (
+                <div className="flex gap-1 justify-end">
+                  {hasRole(u, 'site_user') && (
+                    <Button variant="secondary" size="sm" onClick={() => { setEditing({ userId: u.id, siteIds: [...u.siteIds] }); setEditError(null); }}>
+                      {t('common.edit', 'Edit')}
+                    </Button>
+                  )}
+                  {/* You can't deactivate yourself: the button is absent on your own
+                      row, and team.ts refuses it anyway. Both changes ask first. */}
+                  {u.status === 'active' ? (
+                    u.id === session.userId ? (
+                      <span className="text-xs text-grey-400">—</span>
+                    ) : (
+                      <Button variant="danger" size="sm" onClick={() => setStatusConfirm({ userId: u.id, name: u.name, next: 'deactivated' })}>
+                        {t('settings.users.actions.deactivate', 'Deactivate')}
+                      </Button>
+                    )
+                  ) : (
+                    <Button variant="secondary" size="sm" onClick={() => setStatusConfirm({ userId: u.id, name: u.name, next: 'active' })}>
+                      {t('settings.users.actions.reactivate', 'Reactivate')}
+                    </Button>
+                  )}
+                </div>
+              ) },
+            ]}
+          />
+
+          <ConfirmDialog
+            open={statusConfirm !== null}
+            destructive={statusConfirm?.next === 'deactivated'}
+            title={statusConfirm?.next === 'deactivated'
+              ? t('settings.users.confirm_deactivate', 'Deactivate {name}?', { name: statusConfirm?.name ?? '' })
+              : t('settings.users.confirm_reactivate', 'Reactivate {name}?', { name: statusConfirm?.name ?? '' })}
+            body={statusConfirm?.next === 'deactivated'
+              ? t('settings.users.confirm_deactivate_body', 'They lose access straight away. You can reactivate them later.')
+              : t('settings.users.confirm_reactivate_body', 'They get their access back with the same role and sites.')}
+            confirmLabel={statusConfirm?.next === 'deactivated'
+              ? t('settings.users.actions.deactivate', 'Deactivate')
+              : t('settings.users.actions.reactivate', 'Reactivate')}
+            onConfirm={() => { if (statusConfirm) handleUserStatus(statusConfirm.userId, statusConfirm.next); setStatusConfirm(null); }}
+            onCancel={() => setStatusConfirm(null)}
+          />
 
           {editing && (() => {
             const target = myUsers.find(u => u.id === editing.userId);
@@ -568,13 +552,13 @@ export default function SettingsPage() {
               <tbody>
                 {sitesWithCounts.map(s => (
                   <tr key={s.id} className="bg-paper hover:bg-paper-2">
-                    <td className="px-3 py-2 border-b border-line text-grey-700 font-medium">{s.name}</td>
-                    <td className="px-3 py-2 border-b border-line font-mono text-grey-500">
+                    <td className="px-3 py-1.5 border-b border-line text-grey-700 font-medium">{s.name}</td>
+                    <td className="px-3 py-1.5 border-b border-line font-mono text-grey-500">
                       {s.center.lat.toFixed(4)}, {s.center.lng.toFixed(4)}
                     </td>
-                    <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{s.radiusM}m</td>
-                    <td className="px-3 py-2 border-b border-line text-right">{s.assetCount}</td>
-                    <td className="px-3 py-2 border-b border-line text-grey-700 text-xs">
+                    <td className="px-3 py-1.5 border-b border-line text-right font-mono text-grey-700">{s.radiusM}m</td>
+                    <td className="px-3 py-1.5 border-b border-line text-right">{s.assetCount}</td>
+                    <td className="px-3 py-1.5 border-b border-line text-grey-700 text-xs">
                       {myUsers.filter(u => u.siteIds.includes(s.id)).map(u => u.name).join(', ') || '—'}
                     </td>
                     <td className="px-3 py-2 text-right border-b border-line">
@@ -712,11 +696,11 @@ export default function SettingsPage() {
                   );
                   return (
                     <tr key={a.id} className="bg-paper hover:bg-paper-2">
-                      <td className="px-3 py-2 border-b border-line font-mono text-ink font-medium">{a.code}</td>
-                      <td className="px-3 py-2 border-b border-line text-grey-700">{a.name}</td>
-                      <td className="px-3 py-2 border-b border-line text-grey-500">{a.assetClass}</td>
-                      <td className="px-3 py-2 border-b border-line text-grey-700">{site?.name ?? '—'}</td>
-                      <td className="px-3 py-2 border-b border-line">
+                      <td className="px-3 py-1.5 border-b border-line font-mono text-ink font-medium">{a.code}</td>
+                      <td className="px-3 py-1.5 border-b border-line text-grey-700">{a.name}</td>
+                      <td className="px-3 py-1.5 border-b border-line text-grey-500">{a.assetClass}</td>
+                      <td className="px-3 py-1.5 border-b border-line text-grey-700">{site?.name ?? '—'}</td>
+                      <td className="px-3 py-1.5 border-b border-line">
                         {/* Customers never see IMEIs or SIMs (spec §5): only whether one is fitted. */}
                         {tracker ? (
                           <span className="text-xs text-grey-700">{t('settings.assets.tracker_fitted', 'Fitted')}</span>
@@ -724,7 +708,7 @@ export default function SettingsPage() {
                           <span className="text-grey-400 text-xs">{t('settings.assets.no_tracker', 'No tracker')}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 border-b border-line">
+                      <td className="px-3 py-1.5 border-b border-line">
                         {a.retiredAt ? (
                           <Badge variant="grey">{t('settings.assets.retired', 'Retired')}</Badge>
                         ) : (
@@ -795,7 +779,7 @@ export default function SettingsPage() {
                   const draft = labelDrafts[l.id] ?? l.name;
                   return (
                     <tr key={l.id} className="bg-paper hover:bg-paper-2">
-                      <td className="px-3 py-2 border-b border-line">
+                      <td className="px-3 py-1.5 border-b border-line">
                         <input
                           aria-label={`Name for ${l.name}`}
                           value={draft}
@@ -803,8 +787,8 @@ export default function SettingsPage() {
                           className="w-full max-w-xs px-2 py-1 text-xs rounded-lg border border-line bg-paper text-grey-700 focus:outline-none focus:border-ink"
                         />
                       </td>
-                      <td className="px-3 py-2 border-b border-line text-right font-mono">{used}</td>
-                      <td className="px-3 py-2 border-b border-line text-right">
+                      <td className="px-3 py-1.5 border-b border-line text-right font-mono">{used}</td>
+                      <td className="px-3 py-1.5 border-b border-line text-right">
                         <div className="flex gap-1 justify-end items-center">
                           {draft.trim() !== l.name && (
                             <Button size="sm" variant="secondary" onClick={() => {

@@ -7,6 +7,7 @@ import {
   Button, Badge, EmptyState, Sheet, SourceLabel, KpiStrip, KpiCell,
 } from '@/components/ui';
 import { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice, type AssetCostRow, type CostPeriod } from '@/server/api';
+import { formatAed, formatPct } from '@/lib/format';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
@@ -173,13 +174,17 @@ export default function CostPage() {
         </div>
       )}
 
-      {/* KPI hero */}
-      <KpiStrip label="Fleet">
-        <KpiCell label="Revenue" value={money(totals.revenue)} tone="ok" source="From invoices / days on hire" />
-        <KpiCell label="Cost" value={money(totals.cost)} tone="bad" source="Dummy rates" />
-        <KpiCell label="Margin" value={money(totals.revenue - totals.cost)}
-          tone={totals.revenue - totals.cost < 0 ? "bad" : "ok"}
-          context={totals.revenue > 0 ? `${Math.round(((totals.revenue - totals.cost) / totals.revenue) * 1000) / 10}% of revenue` : undefined} />
+      {/* KPI strip: fleet totals for the period, each with its source (D10). */}
+      <KpiStrip label={t('cost.kpi_label', 'Fleet totals')}>
+        <KpiCell label={t('cost.kpi.revenue', 'Revenue')} value={formatAed(totals.revenue)} source={t('cost.kpi.revenue_src', 'Invoices and days on hire')} />
+        <KpiCell label={t('cost.kpi.cost', 'Cost')} value={formatAed(totals.cost)} source={t('cost.kpi.cost_src', 'Dummy rates')} />
+        <KpiCell
+          label={t('cost.kpi.margin', 'Margin')}
+          value={formatAed(totals.revenue - totals.cost)}
+          tone={totals.revenue - totals.cost < 0 ? 'bad' : 'ok'}
+          context={totals.revenue > 0 ? `${formatPct(((totals.revenue - totals.cost) / totals.revenue) * 100, 1)} ${t('cost.kpi.of_revenue', 'of revenue')}` : undefined}
+          source={t('cost.kpi.margin_src', 'Revenue − cost')}
+        />
       </KpiStrip>
 
       {/* Fleet view */}

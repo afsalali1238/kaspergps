@@ -23,8 +23,9 @@ test.describe('U0.1 — Billing opens on a tab that has something in it', () => 
     await expect(page.locator('button[aria-current="true"]')).toHaveText('Issued');
     // The empty Received state is not what greets him.
     await expect(page.getByText('Nothing received')).toHaveCount(0);
-    // ...and the Issued table is.
-    await expect(page.getByRole('button', { name: 'Record payment' }).first()).toBeVisible();
+    // ...and the Issued table is: its first row offers Record payment.
+    await page.getByRole('button', { name: /^Actions for INV-/ }).first().click();
+    await expect(page.getByRole('menuitem', { name: 'Record payment' })).toBeVisible();
   });
 
   test('Lina (renter with received invoices) lands on Received', async ({ page }) => {
@@ -76,6 +77,8 @@ test.describe('U0.2 — you can’t deactivate yourself', () => {
 
     const row = page.locator('tr[data-user-id="u-hessa"]');
     await row.getByRole('button', { name: 'Deactivate' }).click();
+    // Deactivate asks first (H2: ConfirmDialog).
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Deactivate' }).click();
     await expect(page.getByRole('status').filter({ hasText: /deactivated/ })).toBeVisible();
     // The row flips to Reactivate, and your own row is untouched.
     await expect(page.locator('tr[data-user-id="u-hessa"]').getByRole('button', { name: 'Reactivate' })).toBeVisible();
@@ -112,15 +115,15 @@ test.describe('U0.4 — one Actions cell per certificate', () => {
     await expect(page.locator('table td[colspan]')).toHaveCount(0);
   });
 
-  test('View, the management action and Verify share one cell', async ({ page }) => {
+  test('View sits in the row; Void and the Verify link are in its row menu', async ({ page }) => {
     await signIn(page, USERS.khalid);
     await page.goto('/app/certificates');
 
     const row = page.locator('tr[data-muc-number="MUC-2026-09-EX-04-01"]');
-    const actions = row.locator('td').last();
-    await expect(actions.getByRole('button', { name: 'View' })).toBeVisible();
-    await expect(actions.getByRole('button', { name: 'Void' })).toBeVisible();
-    await expect(actions.getByRole('link', { name: 'Verify' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'View' })).toBeVisible();
+    await row.getByRole('button', { name: /^Actions for MUC-2026-09-EX-04-01/ }).click();
+    await expect(page.getByRole('menuitem', { name: 'Void' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Verify link' })).toBeVisible();
   });
 
   test('a voided certificate says Voided once, and offers Reissue', async ({ page }) => {
@@ -131,7 +134,8 @@ test.describe('U0.4 — one Actions cell per certificate', () => {
     await expect(row).toBeVisible();
     // Status only — the Actions cell used to repeat it.
     await expect(row.getByText('Voided', { exact: true })).toHaveCount(1);
-    await expect(row.locator('td').last().getByRole('button', { name: 'Reissue' })).toBeVisible();
-    await expect(row.locator('td').last().getByRole('button', { name: 'View' })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: 'View' })).toHaveCount(0);
+    await row.getByRole('button', { name: /^Actions for / }).click();
+    await expect(page.getByRole('menuitem', { name: 'Reissue' })).toBeVisible();
   });
 });

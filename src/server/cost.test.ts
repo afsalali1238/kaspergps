@@ -1,7 +1,7 @@
 // Cost & ROI (spec 11.19): period maths, every cost line's basis, the ROI and
 // payback figures, visibility and the editable inputs.
 import { describe, it, expect } from 'vitest';
-import {
+import { PART_MONTH_NOTE,
   canViewCost, costProfileFor, costRows, getDieselPrice, monthlySeries, periodRange, roiFor,
   saveCostProfile, setDieselPrice,
 } from './cost';
@@ -61,7 +61,7 @@ describe('cost — the fleet view', () => {
   it('prices fuel, idle, maintenance, fixed and operator costs with a labelled basis', () => {
     const { fromMs, toMs } = lastMonth();
     const ex04 = costRows(khalid(), fromMs, toMs).find(r => r.asset.id === 'a-ex04')!;
-    expect(ex04.revenueAed).toBe(83250);           // Sep rental invoices
+    expect(ex04.revenueAed).toBe(43919);           // Sep rental invoice: 237.4 h on the ECU meter × AED 185
     // C2: the ECU meter's September hours, which now vary day to day (Fridays mostly off).
     expect(ex04.engineHours).toBe(Math.round((ecuHoursAt(asset('a-ex04'), toMs) - ecuHoursAt(asset('a-ex04'), fromMs)) * 10) / 10);
     expect(ex04.engineHours).toBe(237.4);
@@ -101,7 +101,7 @@ describe('cost — the fleet view', () => {
     const series = monthlySeries(asset('a-ex04'), 6);
     expect(series).toHaveLength(6);
     expect(series.map(p => p.label)).toEqual(['May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26']);
-    expect(series[4].revenueAed).toBe(83250);
+    expect(series[4].revenueAed).toBe(43919);     // INV-EE-0412: 237.4 h × AED 185
     expect(series[5].costAed).toBeGreaterThan(0); // the current month so far
     expect(series.every(p => p.costAed >= 0)).toBe(true);
   });
@@ -198,14 +198,12 @@ describe('cost — last month varies (UI-UPGRADE §9.1, C2)', () => {
     // EX-11: BK-1010 is hourly with an 8 h daily minimum, so its one September day earns at least 8 h × AED 175.
     const ex11 = rows.find(r => r.asset.id === 'a-ex11')!;
     expect(ex11.revenueAed).toBeGreaterThanOrEqual(8 * 175);
-    // The September window is full, so EX-11's marginPct is a real number with no part-month note.
-    expect(ex11.marginPct).not.toBeNull();
-    expect(ex11.marginNote).toBeUndefined();
-    // A 'this_month' window (Oct 1–9 at the anchor) is part-month: revenue>0 rows read "n/a — part month".
-    const thisMonth = periodRange('this_month');
-    const ex11Now = costRows(sara(), thisMonth.fromMs, thisMonth.toMs).find(r => r.asset.id === 'a-ex11')!;
-    expect(ex11Now.marginPct).toBeNull();
-    expect(ex11Now.marginNote).toBe('n/a — part month');
+    // One booked day in September: the margin % reads "n/a — part month" (owner finding 2).
+    expect(ex11.marginPct).toBeNull();
+    expect(ex11.marginNote).toBe(PART_MONTH_NOTE);
+    // CR-02 was on hire for the month (BK-0983), so its margin stays a number.
+    expect(cr02.marginPct).not.toBeNull();
+    expect(cr02.marginNote).toBeUndefined();
     // A cancelled booking earns nothing (CR-05, BK-1009).
     expect(costRows(sara(), periodRange('this_month').fromMs, periodRange('this_month').toMs)
       .find(r => r.asset.id === 'a-cr05')!.revenueAed).toBe(0);
