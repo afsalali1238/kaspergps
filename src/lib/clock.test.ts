@@ -112,4 +112,31 @@ describe('Dubai time helpers', () => {
   it('exposes the Dubai zone name', () => {
     expect(clock.DUBAI_TZ).toBe('Asia/Dubai');
   });
+})
+describe('startOfDubaiMonth', () => {
+  it('returns first of month for mid-October', () => {
+    // 2026-10-15 12:00 Dubai
+    const ms = Date.parse('2026-10-15T12:00:00+04:00');
+    expect(clock.startOfDubaiMonth(ms)).toBe(Date.parse('2026-10-01T00:00:00+04:00'));
+  });
+
+  it('returns October 1st for 1 Oct 00:30 Dubai', () => {
+    const ms = Date.parse('2026-10-01T00:30:00+04:00');
+    expect(clock.startOfDubaiMonth(ms)).toBe(Date.parse('2026-10-01T00:00:00+04:00'));
+  });
+
+  it('returns September 1st for 30 Sep 23:30 Dubai', () => {
+    const ms = Date.parse('2026-09-30T23:30:00+04:00');
+    expect(clock.startOfDubaiMonth(ms)).toBe(Date.parse('2026-09-01T00:00:00+04:00'));
+  });
+});
+
+describe('lastMonthPeriod', () => {
+  it('returns September 2026 at the October anchor', () => {
+    // Anchor: 2026-10-09 19:00 Dubai
+    const result = clock.lastMonthPeriod(NINE_OCT_19H_DUBAI);
+    expect(result.label).toBe('September 2026');
+    expect(result.from).toBe(Date.parse('2026-09-01T00:00:00+04:00'));
+    expect(result.to).toBe(Date.parse('2026-10-01T00:00:00+04:00') - 60000);
+  });
 });

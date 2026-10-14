@@ -30,9 +30,9 @@ function formatDateOnly(ts: string | number): string {
 
 /** The previous calendar month in Dubai, e.g. 1–30 Sep 2026 at the anchor. */
 function lastMonthPeriod(nowMs: number): { label: string; from: number; to: number } {
-  const d = new Date(new Date(nowMs).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' }));
-  const from = new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
-  const to = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0).getTime() - 60000;
+  const first = clock.startOfDubaiMonth(nowMs);
+  const from = clock.startOfDubaiMonth(first - 1);
+  const to = first - 60000;
   const label = new Date(from).toLocaleDateString('en-AE', { month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
   return { label, from, to };
 }

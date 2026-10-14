@@ -16,7 +16,7 @@ One row per chunk. The builder updates its row in its PR; the supervisor marks i
 | F2 — asset page part 2 | not started | |
 | G2 — Fuel and Maintenance | not started | |
 | I — Kasper console | not started | |
-| H2 — money and Settings (after H1) | not started | |
+| H2 — money and Settings (after H1) | in_progress | |
 | J1 — phone and Arabic | not started | |
 | J2 — demo tools | not started | |
 | J3 — strict gates, scorecard, final handoff | not started | |
