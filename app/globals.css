@@ -148,6 +148,11 @@ code, pre, .mono {
 }
 
 /* Leaflet overrides */
+/* Fleet map: OSM tiles toned down to a light grey so the markers carry the colour. */
+.kasper-tiles {
+  filter: grayscale(0.9) brightness(1.04) contrast(0.92);
+}
+
 .leaflet-container {
   font-family: var(--font-body);
   background: var(--paper);
