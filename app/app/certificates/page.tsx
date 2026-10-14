@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Button, Badge, EmptyState, Table, RowMenu, KpiStrip, KpiCell, ConfirmDialog,
+  Button, Badge, EmptyState, KpiStrip, KpiCell,
 } from '@/components/ui';
 import { useDb, hasRole, getMucVerifyStatus, issueMuc, reissueMuc, voidMuc, type MucVerifyStatus } from '@/server/api';
 import { downloadMucPdf } from '@/lib/muc-pdf';
@@ -12,29 +12,18 @@ import * as clock from '@/lib/clock';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
+function toMs(ts: string | number): number {
+  return typeof ts === 'string' ? clock.isoFromDubai(ts) : ts;
+}
+
 function formatTs(ts: string | number): string {
-  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  return new Date(t).toLocaleString('en-AE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    timeZone: 'Asia/Dubai',
-  });
+  return clock.formatDubaiDateTime(toMs(ts));
 }
 
-function formatDateOnly(ts: string | number): string {
-  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  return new Date(t).toLocaleDateString('en-AE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    timeZone: 'Asia/Dubai',
-  });
-}
-
-/** The previous calendar month in Dubai, e.g. 1–30 Sep 2026 at the anchor. */
-function lastMonthPeriod(nowMs: number): { label: string; from: number; to: number } {
-  const first = clock.startOfDubaiMonth(nowMs);
-  const from = clock.startOfDubaiMonth(first - 1);
-  const to = first - 60000;
-  const label = new Date(from).toLocaleDateString('en-AE', { month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
-  return { label, from, to };
+/** Date with its year — certificate periods can sit next to another month's, so
+ * a bare "d MMM" reads ambiguously (and can't be told apart from the neighbour). */
+function formatDateY(ts: string | number): string {
+  return clock.formatDubaiDateY(toMs(ts));
 }
 
 function MucRow({ muc, canView, canManage, verifyState, onView, onVoid, onReissue }: {
@@ -57,7 +46,7 @@ function MucRow({ muc, canView, canManage, verifyState, onView, onVoid, onReissu
       <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{asset?.code ?? '—'}</td>
       <td className="px-3 py-2 border-b border-line text-grey-700">{owner?.name ?? '—'}</td>
       <td className="px-3 py-2 border-b border-line text-grey-500 text-xs">
-        {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
+        {formatDateY(muc.periodFrom)} – {formatDateY(muc.periodTo)}
       </td>
       <td className="px-3 py-2 border-b border-line text-right font-mono text-ink font-medium">
         {muc.payload.billableHours.toFixed(1)} h
@@ -176,7 +165,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         <div className="flex justify-between">
           <span className="text-grey-500">{t('certificates.detail.period', 'Period')}</span>
           <span className="text-ink text-xs font-mono">
-            {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
+            {formatDateY(muc.periodFrom)} – {formatDateY(muc.periodTo)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -228,7 +217,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         {muc.status === 'voided' && (
           <>
             <div className="flex justify-between">
-              <span className="text-grey-500">{t('certificates.status.voided', 'Voided')}</span>
+              <span className="text-grey-500">{t('certificates.detail.voided_at', 'Voided at')}</span>
               <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt) : '—'}</span>
             </div>
             <div className="flex justify-between gap-3">
@@ -299,7 +288,7 @@ export default function CertificatesPage() {
   const [showIssue, setShowIssue] = useState(false);
   const [version, setVersion] = useState(0);
   const [issueAssetId, setIssueAssetId] = useState('');
-  const [issuePeriod, setIssuePeriod] = useState<'last-month' | 'booking'>('last-month');
+  const [issuePeriod, setIssuePeriod] = useState<string>('last-month');
   const [gapOverride, setGapOverride] = useState('');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [actionNumber, setActionNumber] = useState<string | null>(null);
@@ -354,7 +343,7 @@ export default function CertificatesPage() {
     : [];
 
   const nowMs = clock.now();
-  const lastMonth = lastMonthPeriod(nowMs);
+  const lastMonth = clock.lastMonthPeriod(nowMs);
 
   if (phase === 'day_one') {
     return (
@@ -371,12 +360,10 @@ export default function CertificatesPage() {
 
   const handleIssue = async () => {
     if (!selectedAsset) return;
-    const bookingId = issuePeriod === 'booking' ? selectedAssetBookings[0]?.id : undefined;
-    const period = issuePeriod === 'booking' && selectedAssetBookings[0]
-      ? {
-          from: new Date(selectedAssetBookings[0].start).getTime(),
-          to: new Date(selectedAssetBookings[0].end).getTime(),
-        }
+    const selectedBooking = selectedAssetBookings.find(b => b.id === issuePeriod);
+    const bookingId = selectedBooking?.id;
+    const period = selectedBooking
+      ? { from: toMs(selectedBooking.start), to: toMs(selectedBooking.end) }
       : { from: lastMonth.from, to: lastMonth.to };
 
     const result = await issueMuc(session, {
@@ -424,6 +411,9 @@ export default function CertificatesPage() {
     }
   };
 
+  const sealedCount = myMucs.filter(m => m.status === 'sealed').length;
+  const voidedCount = myMucs.filter(m => m.status === 'voided').length;
+
   return (
     <div className="space-y-4 p-4">
       <div>
@@ -432,6 +422,13 @@ export default function CertificatesPage() {
           {t('certificates.subtitle', 'Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.')}
         </p>
       </div>
+
+      <KpiStrip label="Certificates">
+        <KpiCell label="Total" value={myMucs.length} />
+        <KpiCell label="Sealed" value={sealedCount} tone="ok" />
+        <KpiCell label="Voided" value={voidedCount} tone="bad" />
+        <KpiCell label="Last month" value={lastMonth.label} />
+      </KpiStrip>
 
       {banner && (
         <div
@@ -470,8 +467,8 @@ export default function CertificatesPage() {
               >
                 <option value="last-month">Last month ({lastMonth.label})</option>
                 {selectedAssetBookings.map(b => (
-                  <option key={b.id} value="booking">
-                    Booking {b.reference} ({formatDateOnly(b.start)} – {formatDateOnly(b.end)})
+                  <option key={b.id} value={b.id}>
+                    Booking {b.reference} ({formatDateY(b.start)} – {formatDateY(b.end)})
                   </option>
                 ))}
               </select>

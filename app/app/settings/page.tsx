@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import {
-  Button, Badge, EmptyState, Tabs,
+  Button, Badge, EmptyState, Tabs, KpiStrip, KpiCell,
 } from '@/components/ui';
 import { useDb, hasRole, computeStatus, createUser, updateUserSites, deactivateUser, reactivateUser, createAsset, retireAsset, reinstateAsset, createSite, updateSite, deleteSite, createSiteGeofence } from '@/server/api';
 import { searchPlaces } from '@/domain/places';
@@ -101,6 +101,7 @@ export default function SettingsPage() {
   const myUsers = seed.users.filter(u => u.tenantId === myTenantId);
   const mySites = seed.sites.filter(s => s.tenantId === myTenantId);
   const myAssets = seed.assets.filter(a => a.ownerTenantId === myTenantId);
+  const visibleLabels = labelsVisibleTo(session);
 
   // Sites with asset counts
   const sitesWithCounts = mySites.map(s => ({
@@ -237,6 +238,13 @@ export default function SettingsPage() {
           {t('settings.subtitle', "Manage your company's users, sites, and assets.")}
         </p>
       </div>
+
+      <KpiStrip label="Organization">
+        <KpiCell label="Users" value={myUsers.length} />
+        <KpiCell label="Sites" value={mySites.length} />
+        <KpiCell label="Assets" value={myAssets.length} />
+        <KpiCell label="Labels" value={visibleLabels.length} />
+      </KpiStrip>
 
       <Tabs
         tabs={[

@@ -198,6 +198,14 @@ describe('cost — last month varies (UI-UPGRADE §9.1, C2)', () => {
     // EX-11: BK-1010 is hourly with an 8 h daily minimum, so its one September day earns at least 8 h × AED 175.
     const ex11 = rows.find(r => r.asset.id === 'a-ex11')!;
     expect(ex11.revenueAed).toBeGreaterThanOrEqual(8 * 175);
+    // The September window is full, so EX-11's marginPct is a real number with no part-month note.
+    expect(ex11.marginPct).not.toBeNull();
+    expect(ex11.marginNote).toBeUndefined();
+    // A 'this_month' window (Oct 1–9 at the anchor) is part-month: revenue>0 rows read "n/a — part month".
+    const thisMonth = periodRange('this_month');
+    const ex11Now = costRows(sara(), thisMonth.fromMs, thisMonth.toMs).find(r => r.asset.id === 'a-ex11')!;
+    expect(ex11Now.marginPct).toBeNull();
+    expect(ex11Now.marginNote).toBe('n/a — part month');
     // A cancelled booking earns nothing (CR-05, BK-1009).
     expect(costRows(sara(), periodRange('this_month').fromMs, periodRange('this_month').toMs)
       .find(r => r.asset.id === 'a-cr05')!.revenueAed).toBe(0);

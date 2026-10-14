@@ -61,6 +61,8 @@ export interface AssetCostRow {
   costAed: number;
   marginAed: number;
   marginPct: number | null;
+  /** Why marginPct is null, when it is — e.g. 'n/a — part month'. */
+  marginNote?: string;
   utilisationPct: number;
   engineHours: number;
   idleHours: number | null;
@@ -217,6 +219,18 @@ function dubaiDaysTouched(fromMs: number, toMs: number): number {
   return Math.round((clock.startOfDubaiDay(toMs - 1) - clock.startOfDubaiDay(fromMs)) / DAY_MS) + 1;
 }
 
+/** A window is a full calendar month only when it starts on day 1 of a Dubai month
+ * (1–30 Sep, 1–31 Oct, …). "This month so far" and multi-month windows that don't
+ * line up on a day-1 boundary are part-month: their margin % reads "n/a". */
+function isFullMonthWindow(fromMs: number, toMs: number): boolean {
+  if (toMs <= fromMs) return false;
+  const fromStart = clock.startOfDubaiMonth(fromMs);
+  const nextMonthStart = clock.startOfDubaiMonth(fromStart + 32 * 86400000);
+  // Full month: fromMs is day 1 of month M, toMs is the start of M+1 (exclusive boundary).
+  // periodRange('last_month') returns toMs = startOfDubaiMonth(now) (i.e., Oct 1 at the Oct anchor).
+  return fromMs === fromStart && toMs === nextMonthStart;
+}
+
 export interface BookedRevenue {
   amountAed: number;
   /** Bookings that earned in the period but have no invoice yet. */
@@ -324,7 +338,8 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
     return {
       asset, profile, revenueAed, fuelAed, idleAed, maintenanceAed,
       fixedAed: fixed.amountAed, operatorAed, costAed, marginAed,
-      marginPct: revenueAed > 0 ? Math.round((marginAed / revenueAed) * 1000) / 10 : null,
+      marginPct: revenueAed > 0 && isFullMonthWindow(fromMs, toMs) ? Math.round((marginAed / revenueAed) * 1000) / 10 : null,
+      marginNote: revenueAed > 0 && !isFullMonthWindow(fromMs, toMs) ? 'n/a — part month' : undefined,
       utilisationPct: utilisationPct(asset, engineHours, fromMs, toMs),
       engineHours, idleHours, lines,
     };

@@ -87,6 +87,12 @@ export function formatDubaiDate(ms: number): string {
   return formatInTimeZone(new Date(ms), DUBAI_TZ, 'd MMM');
 }
 
+/** Date with the year: for ranges that can sit beside another month's. */
+export function formatDubaiDateY(ms: number): string {
+  return formatInTimeZone(new Date(ms), DUBAI_TZ, 'd MMM yyyy');
+}
+
+
 /** Machine-readable Dubai calendar day (YYYY-MM-DD) — use this for keys, never formatDubaiDate. */
 export function dubaiDateKey(ms: number): string {
   const d = toZonedTime(new Date(ms), DUBAI_TZ);

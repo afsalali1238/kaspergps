@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import Link from 'next/link';
 import {
-  Button, Badge, EmptyState, Sheet, SourceLabel,
+  Button, Badge, EmptyState, Sheet, SourceLabel, KpiStrip, KpiCell,
 } from '@/components/ui';
 import { canViewCost, costRows, getDieselPrice, monthlySeries, periodRange, roiFor, saveCostProfile, setDieselPrice, type AssetCostRow, type CostPeriod } from '@/server/api';
 import { downloadPdf, downloadXlsx, type ExportTable } from '@/lib/export';
@@ -111,7 +111,7 @@ export default function CostPage() {
       r.asset.code, money(r.revenueAed) ?? 'Not measured', money(r.fuelAed) ?? 'Not measured',
       money(r.idleAed) ?? 'Not measured', money(r.maintenanceAed) ?? '0', money(r.fixedAed) ?? 'Not measured',
       money(r.operatorAed) ?? 'Not measured', money(r.costAed) ?? '0', money(r.marginAed) ?? '0',
-      r.marginPct === null ? '—' : r.marginPct, r.utilisationPct,
+      r.marginPct === null ? (r.marginNote ? t('cost.part_month', 'n/a — part month') : '—') : r.marginPct, r.utilisationPct,
     ]),
   };
   const fleetMeta = { fileName: 'kasper-cost-roi', subtitle: `Fleet view · ${range.label} · dummy rates` };
@@ -173,6 +173,15 @@ export default function CostPage() {
         </div>
       )}
 
+      {/* KPI hero */}
+      <KpiStrip label="Fleet">
+        <KpiCell label="Revenue" value={money(totals.revenue)} tone="ok" source="From invoices / days on hire" />
+        <KpiCell label="Cost" value={money(totals.cost)} tone="bad" source="Dummy rates" />
+        <KpiCell label="Margin" value={money(totals.revenue - totals.cost)}
+          tone={totals.revenue - totals.cost < 0 ? "bad" : "ok"}
+          context={totals.revenue > 0 ? `${Math.round(((totals.revenue - totals.cost) / totals.revenue) * 1000) / 10}% of revenue` : undefined} />
+      </KpiStrip>
+
       {/* Fleet view */}
       <div className="bg-surface border border-line rounded-lg overflow-x-auto">
         <table className="w-full text-xs">
@@ -233,7 +242,7 @@ export default function CostPage() {
                   {money(r.marginAed)}
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">
-                  {r.marginPct === null ? '—' : `${r.marginPct}%`}
+                  {r.marginPct === null ? (r.marginNote ? t('cost.part_month', 'n/a — part month') : '—') : `${r.marginPct}%`}
                 </td>
                 <td className="px-3 py-2 border-b border-line text-right font-mono text-grey-700">{r.utilisationPct}%</td>
               </tr>
@@ -377,7 +386,7 @@ function AssetCostSheet({ row, session, onClose, onResult }: {
                   {money(row.marginAed)}
                 </td>
                 <td className="px-3 py-2 text-grey-500" colSpan={2}>
-                  {row.marginPct === null ? 'No revenue in this period' : `${row.marginPct}% of revenue`}
+                  {row.marginPct === null ? (row.marginNote ? t('cost.part_month', 'n/a — part month') : 'No revenue in this period') : `${row.marginPct}% of revenue`}
                   {' · '}utilisation {row.utilisationPct}%
                 </td>
               </tr>

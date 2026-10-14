@@ -6,7 +6,7 @@
 
 import React, { useMemo, useState } from 'react';
 import {
-  Badge, Button, EmptyState,
+  Badge, Button, EmptyState, KpiStrip, KpiCell,
 } from '@/components/ui';
 import { useDb, type InvoiceView, aed, agedReceivables, billingSummary, canPay, canRecordPayment, createInvoiceFromBooking, invoiceById, invoiceStatusLabel, invoiceView, issuedInvoices, mucForInvoice, payInvoice, receivedInvoices, recordPayment, statementsFor, voidInvoice, can } from '@/server/api';
 
@@ -386,6 +386,13 @@ export default function BillingPage() {
               </p>
             </div>
           )}
+
+          <KpiStrip label="Last 30 days">
+            <KpiCell label="Issued" value={aed(summary.issuedAed)} source="From invoices" />
+            <KpiCell label="Paid" value={aed(summary.paidAed)} source="From payments" />
+            <KpiCell label="Outstanding" value={aed(summary.outstandingAed)} tone="bad" source="From invoices" />
+            <KpiCell label="Overdue" value={aed(summary.overdueAed)} tone="bad" source="From invoices" />
+          </KpiStrip>
 
           {filteredIssued.length === 0 ? (
             <EmptyState title={t('billing.no_invoices', 'No invoices')} description={t('billing.nothing_matches', 'Nothing matches those filters yet.')} />
