@@ -149,15 +149,11 @@ function useIsDesktop(): boolean {
   return desktop;
 }
 
+// CARTO now requires an API key (its free tiles come back watermarked), so the
+// fleet map uses OpenStreetMap, softened to a light grey by .kasper-tiles.
 const TILES = {
-  carto: {
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
-  osm: {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  },
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 } as const;
 
 export default function MapPage() {
@@ -188,9 +184,7 @@ export default function MapPage() {
   const [showGeofences, setShowGeofences] = useState(false);
   // Phones show one of the map or the list (spec §11.2). Desktop shows both.
   const [phoneView, setPhoneView] = useState<'map' | 'list'>('list');
-  // Tiles: CARTO Positron first, OSM if it fails; after OSM fails too the map steps
-  // aside so the list takes the screen. Retry starts over.
-  const [tileProvider, setTileProvider] = useState<'carto' | 'osm'>('carto');
+  // If the tiles keep failing, the map steps aside so the list takes the screen.
   const [tilesFailed, setTilesFailed] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const tileErrors = useRef(0);
@@ -751,7 +745,7 @@ export default function MapPage() {
               {tilesFailed && (
                 <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bad-ink/40 bg-bad-tint px-3 py-2 text-xs text-ink">
                   <span>{t('map.tiles_failed', 'The map could not load. Every asset is still in the list below.')}</span>
-                  <Button size="sm" variant="secondary" onClick={() => { tileErrors.current = 0; setTileProvider('carto'); setTilesFailed(false); setMapKey(k => k + 1); }}>
+                  <Button size="sm" variant="secondary" onClick={() => { tileErrors.current = 0; setTilesFailed(false); setMapKey(k => k + 1); }}>
                     {t('common.retry', 'Retry')}
                   </Button>
                 </div>
@@ -759,16 +753,15 @@ export default function MapPage() {
               <div className={clsx('relative isolate h-[60dvh] overflow-hidden rounded-lg border border-line bg-paper lg:h-full', tilesFailed && 'hidden')}>
                 <MapContainer key={mapKey} center={[25.2048, 55.2708]} zoom={10} scrollWheelZoom zoomControl={false} style={{ height: '100%', width: '100%' }}>
                   <TileLayer
-                    key={tileProvider}
-                    attribution={TILES[tileProvider].attribution}
-                    url={TILES[tileProvider].url}
+                    className="kasper-tiles"
+                    attribution={TILES.attribution}
+                    url={TILES.url}
                     eventHandlers={{
                       tileerror: () => {
                         tileErrors.current += 1;
                         if (tileErrors.current < 3) return;
                         tileErrors.current = 0;
-                        if (tileProvider === 'carto') setTileProvider('osm');
-                        else setTilesFailed(true);
+                        setTilesFailed(true);
                       },
                       tileload: () => { tileErrors.current = 0; },
                     }}
