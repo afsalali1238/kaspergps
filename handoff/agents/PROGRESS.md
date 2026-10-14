@@ -16,7 +16,7 @@ One row per chunk. The builder updates its row in its PR; the supervisor marks i
 | F2 — asset page part 2 | not started | |
 | G2 — Fuel and Maintenance | not started | |
 | I — Kasper console | not started | |
-| H2 — money and Settings (after H1) | PR open | #47 |
+| H2 — money and Settings | merged | #49 |
 | J1 — phone and Arabic | not started | |
 | J2 — demo tools | not started | |
 | J3 — strict gates, scorecard, final handoff | not started | |
@@ -36,4 +36,5 @@ One row per chunk. The builder updates its row in its PR; the supervisor marks i
   - `a11y.spec.ts` fails on a new critical axe violation versus `reviews/a11y-baseline.md`. Lower the counts there when you fix one; never raise them.
   - `no-raw-floats.spec.ts` fails on long decimals.
 - **Unit tests:** the timeout is 30 s, because simulation-heavy tests exceed 5 s under coverage on CI.
-- **Open owner findings** (`HANDOFF.md` §7): the certificate "Last month" bug (H2) and EX-11's part-month margin (H2). ⌘K was unbound by R; J2 makes it product search.
+- **Open owner findings** (`HANDOFF.md` §7): ⌘K was unbound by R; J2 makes it product search.
+- **Row actions:** tables use the kit `Table` with `rowMenu`; e2e reaches them with `rowAction(row, name)` from `helpers.ts`. `Table` takes `rowAttrs` for `data-*` hooks.

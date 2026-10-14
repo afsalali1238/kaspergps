@@ -23,8 +23,8 @@ test.describe('U0.1 — Billing opens on a tab that has something in it', () => 
     await expect(page.locator('button[aria-current="true"]')).toHaveText('Issued');
     // The empty Received state is not what greets him.
     await expect(page.getByText('Nothing received')).toHaveCount(0);
-    // ...and the Issued table is: its first row offers Record payment.
-    await page.getByRole('button', { name: /^Actions for INV-/ }).first().click();
+    // ...and the Issued table is: his open invoice offers Record payment.
+    await page.getByRole('button', { name: 'Actions for INV-EE-0415' }).click();
     await expect(page.getByRole('menuitem', { name: 'Record payment' })).toBeVisible();
   });
 
