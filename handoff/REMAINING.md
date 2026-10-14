@@ -31,7 +31,7 @@ Status: **13 Oct 2026, 19:45 Dubai.**
 | **F2** | Asset page: History = playback, Engine & fuel tank and drop card, Share dialog (A4) | not started |
 | **G2** | New Fuel screen and Maintenance schedule table (A7, A8) | not started |
 | **I** | Kasper console (A10) | not started |
-| **H2** | Cost & ROI, Billing, Certificates, Settings (A9, A10). **After H1.** | **merged** (#49) |
+| **H2** | Cost & ROI, Billing, Certificates, Settings (A9, A10). **After H1.** | **merged** (#47) |
 | **J1 → J2 → J3** | Phone + Arabic, demo tools, strict gates + scorecard + final handoff. **After every PR above.** | not started |
 
 H1, F2, G2 and I don't share files, so they can be built in parallel.
@@ -140,7 +140,7 @@ If a check times out only in CI, read the check-run annotations: `gh api repos/a
 > - **The rest:** restyle with `Table`, `Panel` and `Badge`.
 > - **Role rules unchanged:** Ops has no Billing, Kasper team or Audit log, and customers get "Page not found". The console is desktop only (≥ 900 px).
 
-### H2: money and Settings (merged, #49)
+### H2: money and Settings (merged, #47)
 > Done: KPI strips on Cost & ROI, Billing, Certificates and Settings; Billing and Certificates row menus; Void (billing) behind a reason dialog; Deactivate/Reactivate behind ConfirmDialog; `startOfDubaiMonth` and `lastMonthPeriod` in `clock.ts`; part-month margin under 7 booked days; September certificates reseeded from `ecuHoursAt` with a guard test.
 
 ### J1: phone and Arabic (after every chunk above is merged)
