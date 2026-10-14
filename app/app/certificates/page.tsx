@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Button, Badge, EmptyState,
+  Button, Badge, EmptyState, Table, RowMenu, KpiStrip, ConfirmDialog,
 } from '@/components/ui';
 import { useDb, hasRole, getMucVerifyStatus, issueMuc, reissueMuc, voidMuc, type MucVerifyStatus } from '@/server/api';
 import { downloadMucPdf } from '@/lib/muc-pdf';
@@ -358,8 +358,12 @@ export default function CertificatesPage() {
 
   if (phase === 'day_one') {
     return (
-      <div className="p-4">
-        <h1 className="text-lg font-semibold text-ink mb-4">{t('asset_detail.certificates_tab.title', 'Monthly Utilisation Certificates')}</h1>
+      <div className="p-4 space-y-4">
+        <KpiStrip
+          total={myMucs.length}
+          label="Certificates"
+          subtitle="Available in Phase 2"
+        />
         <EmptyState title={t('common.not_available', 'Not available')} description={t('certificates.phase_gate', 'Certificates are available in Phase 2. Tier 3 assets with ECU engine hours only.')} />
       </div>
     );
