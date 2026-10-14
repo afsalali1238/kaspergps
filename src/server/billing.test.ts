@@ -169,8 +169,9 @@ describe('billing — invoices from bookings', () => {
     const invoice = result.data!;
     expect(invoice.mucId).toBe('muc-ex04-sep');
     expect(invoice.lines[0].basis).toBe('ECU');
-    expect(invoice.lines[0].quantity).toBe(450);
-    expect(invoice.subtotalAed).toBe(83250);
+    // MUC-2026-09-EX-04-01 carries the meter's September hours (237.4 h).
+    expect(invoice.lines[0].quantity).toBe(237.4);
+    expect(invoice.subtotalAed).toBe(43919);
     // 19 days on hire need 152 h minimum — the ECU hours already beat it, so no top-up line.
     expect(invoice.lines).toHaveLength(1);
     expect(MIN_HOURS_PER_DAY).toBe(8);

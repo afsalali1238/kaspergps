@@ -208,6 +208,12 @@ export async function openMore(page: Page): Promise<void> {
   if ((await more.count()) && (await more.isVisible()) && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
 }
 
+/** Opens a table row's RowMenu ("Actions for …") and picks one item. */
+export async function rowAction(row: Locator, name: string | RegExp): Promise<void> {
+  await row.getByRole('button', { name: /^Actions for / }).click();
+  await row.page().getByRole('menuitem', { name }).click();
+}
+
 /**
  * The five test roles of the usability kit (UI-UPGRADE §11), plus Kasper Admin.
  * Each maps to one seeded account; sign-in is by email, so this never depends

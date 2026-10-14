@@ -31,7 +31,7 @@ Status: **13 Oct 2026, 19:45 Dubai.**
 | **F2** | Asset page: History = playback, Engine & fuel tank and drop card, Share dialog (A4) | not started |
 | **G2** | New Fuel screen and Maintenance schedule table (A7, A8) | not started |
 | **I** | Kasper console (A10) | not started |
-| **H2** | Cost & ROI, Billing, Certificates, Settings (A9, A10). **After H1.** | not started |
+| **H2** | Cost & ROI, Billing, Certificates, Settings (A9, A10). **After H1.** | **merged** (#47) |
 | **J1 → J2 → J3** | Phone + Arabic, demo tools, strict gates + scorecard + final handoff. **After every PR above.** | not started |
 
 H1, F2, G2 and I don't share files, so they can be built in parallel.
@@ -104,7 +104,7 @@ If a check times out only in CI, read the check-run annotations: `gh api repos/a
 
 ### H1: Reports + Downloads (merged, #46)
 > Done. The report card opens the run panel at step 2 (type already picked); the panel is a labelled modal dialog; `/app/downloads` redirects to `/app/reports#recent`.
-> **Carried to H2:** move `startOfDubaiMonthLocal` from `src/components/reports/timeHelpers.ts` into `src/lib/clock.ts` as `startOfDubaiMonth`. The current helper builds a local `Date` and calls `toISOString()`, so the month start depends on the machine's time zone. Add a unit test that passes under both `TZ=UTC` and `TZ=Asia/Dubai`.
+> **Carried to H2:** done in H2 (`startOfDubaiMonth` in `clock.ts`, tested under UTC and Dubai).
 
 ### F2: asset page part 2
 > Chunk **F2**, `handoff/agents/F-asset-page.md` items 3–5, scorecard A4.
@@ -140,28 +140,8 @@ If a check times out only in CI, read the check-run annotations: `gh api repos/a
 > - **The rest:** restyle with `Table`, `Panel` and `Badge`.
 > - **Role rules unchanged:** Ops has no Billing, Kasper team or Audit log, and customers get "Page not found". The console is desktop only (≥ 900 px).
 
-### H2: money and Settings (H1 is merged; start now)
-> - First, the H1 carry-over above (`startOfDubaiMonth` in `clock.ts`).
-> Chunk **H2**, `handoff/agents/H-reports-money.md` items 2–5, scorecard A9, and A10 for Settings.
->
-> **KPI strips** on Cost & ROI, Billing, Certificates and Settings.
->
-> **Cost & ROI:**
-> - real revenue, cost and margin with sources;
-> - a part-month margin below 7 booked days reads "n/a — part month".
->
-> **Billing:** an invoice `Table` with status badges and a `RowMenu` (Record payment, Download PDF). It opens on the first tab with content.
->
-> **Certificates:**
-> - a `Table` with View plus a `RowMenu` (Void, Reissue, Verify link);
-> - **fix `lastMonthPeriod()`**: it parses en-AE dates as month/day and shows May at the October anchor;
-> - make booking periods issue for the right booking, not `bookings[0]`;
-> - reseed the September certificates (EX-04, WL-03) from `ecuHoursAt`;
-> - remove the duplicated "Voided" in the detail modal (`voided_at` key).
->
-> **Settings:** dense tables, Deactivate/Reactivate behind `ConfirmDialog`, no self-deactivate.
->
-> **Usability task O5** (certify September for EX-04) must pass.
+### H2: money and Settings (merged, #47)
+> Done: KPI strips on Cost & ROI, Billing, Certificates and Settings; Billing and Certificates row menus; Void (billing) behind a reason dialog; Deactivate/Reactivate behind ConfirmDialog; `startOfDubaiMonth` and `lastMonthPeriod` in `clock.ts`; part-month margin under 7 booked days; September certificates reseeded from `ecuHoursAt` with a guard test.
 
 ### J1: phone and Arabic (after every chunk above is merged)
 > Chunk **J1**, `handoff/agents/J-phone-arabic-final.md` items 1–2, scorecard A11 and A12.

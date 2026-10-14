@@ -1,6 +1,6 @@
 # Kasper GPS — Project Handoff
 
-Status: **13 Oct 2026, 23:30 Dubai.**
+Status: **14 Oct 2026, 15:00 Dubai.**
 
 | Doc | What it is |
 | --- | --- |
@@ -22,9 +22,11 @@ Status: **13 Oct 2026, 23:30 Dubai.**
 - the asset page header;
 - the three-pane fleet map;
 - the role-first login;
-- Reports + Downloads as one screen (`/app/downloads` redirects to `/app/reports#recent`).
+- Reports + Downloads as one screen (`/app/downloads` redirects to `/app/reports#recent`);
+- money and Settings (H2): KPI strips, row menus, part-month margin, certificates reseeded from the ECU meter;
+- the fleet map on OpenStreetMap tiles (CARTO now needs an API key).
 
-**Not started:** F2, G2, I, H2, J1–J3. See `handoff/REMAINING.md`.
+**Not started:** F2, G2, I, J1–J3. See `handoff/REMAINING.md`.
 
 ## 2. How the demo works
 
@@ -91,14 +93,12 @@ Check runs with `gh api repos/afsalali1238/kaspergps/commits/<sha>/check-runs`. 
 
 ## 7. Open findings for the owner
 
-1. **Certificates "Last month"** reads May 2026 at the October anchor (`lastMonthPeriod()` parses en-AE as month/day). September for EX-04 can't be certified. **H2 fixes it.**
-2. **EX-11's September margin** reads −2,670.9 % (one booked day). **H2:** show "n/a — part month" below 7 booked days.
-3. **Seeded September certificates** (EX-04, WL-03) don't match the simulated meter. **H2 reseeds them.**
-4. **⌘K** is unbound since R. **J2** makes it product search.
-5. **G1 defaults to confirm:**
+1. **⌘K** is unbound since R. **J2** makes it product search.
+2. **G1 defaults to confirm:**
    - unlisted alert types count as info;
    - rule defaults: critical → Instant, the rest → In-app only;
    - the rules panel is hidden from Kasper staff.
+3. **H2 changed seeded money:** the September certificates now carry the simulated meter's hours, so INV-EE-0412 is AED 46,114.95 (was 87,412.50) and INV-EE-0415 AED 44,436 (was 102,480). Fixed in H2: "Last month" reads September; EX-11's one-day September margin reads "n/a — part month" (rule: under 7 booked days).
 
 ## 8. Files to know
 

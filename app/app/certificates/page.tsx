@@ -2,115 +2,29 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Button, Badge, EmptyState,
+  Button, Badge, EmptyState, KpiStrip, KpiCell, Table, type RowMenuItem,
 } from '@/components/ui';
 import { useDb, hasRole, getMucVerifyStatus, issueMuc, reissueMuc, voidMuc, type MucVerifyStatus } from '@/server/api';
 import { downloadMucPdf } from '@/lib/muc-pdf';
 import type { Muc } from '@/domain/types';
 import { hasFeature } from '@/domain/features';
 import * as clock from '@/lib/clock';
+import { formatHours, formatNumber } from '@/lib/format';
 import { useT } from '@/i18n';
 import { useSession, useSwitches } from '@/hooks';
 
+function toMs(ts: string | number): number {
+  return typeof ts === 'string' ? clock.isoFromDubai(ts) : ts;
+}
+
 function formatTs(ts: string | number): string {
-  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  return new Date(t).toLocaleString('en-AE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    timeZone: 'Asia/Dubai',
-  });
+  return clock.formatDubaiDateTime(toMs(ts));
 }
 
-function formatDateOnly(ts: string | number): string {
-  const t = typeof ts === 'string' ? new Date(ts).getTime() : ts;
-  return new Date(t).toLocaleDateString('en-AE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    timeZone: 'Asia/Dubai',
-  });
-}
-
-/** The previous calendar month in Dubai, e.g. 1–30 Sep 2026 at the anchor. */
-function lastMonthPeriod(nowMs: number): { label: string; from: number; to: number } {
-  const d = new Date(new Date(nowMs).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' }));
-  const from = new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
-  const to = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0).getTime() - 60000;
-  const label = new Date(from).toLocaleDateString('en-AE', { month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
-  return { label, from, to };
-}
-
-function MucRow({ muc, canView, canManage, verifyState, onView, onVoid, onReissue }: {
-  muc: Muc;
-  canView: boolean;
-  canManage: boolean;
-  verifyState: MucVerifyStatus | 'checking';
-  onView: (number: string) => void;
-  onVoid: (number: string) => void;
-  onReissue: (number: string) => void;
-}) {
-  const seed = useDb(s => s);
-  const t = useT();
-  const asset = seed.assets.find(a => a.id === muc.assetId);
-  const owner = seed.tenants.find(t => t.id === muc.ownerTenantId);
-
-  return (
-    <tr className="bg-paper hover:bg-paper-2" data-muc-number={muc.number}>
-      <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{muc.number}</td>
-      <td className="px-3 py-2 border-b border-line font-mono text-grey-700">{asset?.code ?? '—'}</td>
-      <td className="px-3 py-2 border-b border-line text-grey-700">{owner?.name ?? '—'}</td>
-      <td className="px-3 py-2 border-b border-line text-grey-500 text-xs">
-        {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
-      </td>
-      <td className="px-3 py-2 border-b border-line text-right font-mono text-ink font-medium">
-        {muc.payload.billableHours.toFixed(1)} h
-      </td>
-      <td className="px-3 py-2 border-b border-line text-center">
-        {verifyState === 'tampered' ? (
-          <Badge variant="red">{t('certificates.status.seal_broken', 'Seal broken')}</Badge>
-        ) : muc.status === 'sealed' ? (
-          <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
-        ) : (
-          <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge>
-        )}
-      </td>
-      {/* One Actions cell: View as a button, then the management actions and
-          Verify inline. No second row, and "Voided" lives only in Status. */}
-      <td className="px-3 py-2 text-right border-b border-line">
-        <div className="flex flex-wrap items-center justify-end gap-1">
-          {muc.status === 'sealed' && canView && (
-            <Button size="sm" onClick={() => onView(muc.number)}>{t('certificates.actions.view', 'View')}</Button>
-          )}
-          {canManage && muc.status === 'sealed' && (
-            <button
-              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-              onClick={() => onVoid(muc.number)}
-            >
-              {t('certificates.actions.void', 'Void')}
-            </button>
-          )}
-          {canManage && muc.status === 'voided' && (
-            <button
-              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-              onClick={() => onReissue(muc.number)}
-            >
-              {t('certificates.actions.reissue', 'Reissue')}
-            </button>
-          )}
-          {canManage && (
-            <a
-              className="text-xs px-2 py-1 rounded bg-paper border border-line text-grey-700 hover:border-ink"
-              href={`/verify/${encodeURIComponent(muc.number)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t('certificates.actions.verify', 'Verify')}
-            </a>
-          )}
-          {!(muc.status === 'sealed' && canView) && !canManage && (
-            <span className="text-xs text-grey-400">—</span>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
+/** Date with its year — certificate periods can sit next to another month's, so
+ * a bare "d MMM" reads ambiguously (and can't be told apart from the neighbour). */
+function formatDateY(ts: string | number): string {
+  return clock.formatDubaiDateY(toMs(ts));
 }
 
 function CertificateVerify({ number, onClose }: { number: string; onClose: () => void }) {
@@ -176,7 +90,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         <div className="flex justify-between">
           <span className="text-grey-500">{t('certificates.detail.period', 'Period')}</span>
           <span className="text-ink text-xs font-mono">
-            {formatDateOnly(muc.periodFrom)} – {formatDateOnly(muc.periodTo)}
+            {formatDateY(muc.periodFrom)} – {formatDateY(muc.periodTo)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -228,7 +142,7 @@ function CertificateVerify({ number, onClose }: { number: string; onClose: () =>
         {muc.status === 'voided' && (
           <>
             <div className="flex justify-between">
-              <span className="text-grey-500">{t('certificates.status.voided', 'Voided')}</span>
+              <span className="text-grey-500">{t('certificates.detail.voided_at', 'Voided at')}</span>
               <span className="text-ink">{muc.voidedAt ? formatTs(muc.voidedAt) : '—'}</span>
             </div>
             <div className="flex justify-between gap-3">
@@ -299,7 +213,7 @@ export default function CertificatesPage() {
   const [showIssue, setShowIssue] = useState(false);
   const [version, setVersion] = useState(0);
   const [issueAssetId, setIssueAssetId] = useState('');
-  const [issuePeriod, setIssuePeriod] = useState<'last-month' | 'booking'>('last-month');
+  const [issuePeriod, setIssuePeriod] = useState<string>('last-month');
   const [gapOverride, setGapOverride] = useState('');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [actionNumber, setActionNumber] = useState<string | null>(null);
@@ -354,7 +268,7 @@ export default function CertificatesPage() {
     : [];
 
   const nowMs = clock.now();
-  const lastMonth = lastMonthPeriod(nowMs);
+  const lastMonth = clock.lastMonthPeriod(nowMs);
 
   if (phase === 'day_one') {
     return (
@@ -369,12 +283,10 @@ export default function CertificatesPage() {
 
   const handleIssue = async () => {
     if (!selectedAsset) return;
-    const bookingId = issuePeriod === 'booking' ? selectedAssetBookings[0]?.id : undefined;
-    const period = issuePeriod === 'booking' && selectedAssetBookings[0]
-      ? {
-          from: new Date(selectedAssetBookings[0].start).getTime(),
-          to: new Date(selectedAssetBookings[0].end).getTime(),
-        }
+    const selectedBooking = selectedAssetBookings.find(b => b.id === issuePeriod);
+    const bookingId = selectedBooking?.id;
+    const period = selectedBooking
+      ? { from: toMs(selectedBooking.start), to: toMs(selectedBooking.end) }
       : { from: lastMonth.from, to: lastMonth.to };
 
     const result = await issueMuc(session, {
@@ -422,6 +334,21 @@ export default function CertificatesPage() {
     }
   };
 
+  const sealedCount = myMucs.filter(m => m.status === 'sealed').length;
+  const voidedCount = myMucs.filter(m => m.status === 'voided').length;
+  const canViewMuc = isTenantAdmin || session.isKasper;
+  const mucMenu = (muc: Muc): RowMenuItem[] => {
+    if (!(canIssue && muc.ownerTenantId === session.tenantId)) return [];
+    const items: RowMenuItem[] = [];
+    if (muc.status === 'sealed') {
+      items.push({ id: 'void', label: t('certificates.actions.void', 'Void'), destructive: true, onSelect: () => { setActionNumber(muc.number); setActionKind('void'); setActionReason(''); } });
+    } else {
+      items.push({ id: 'reissue', label: t('certificates.actions.reissue', 'Reissue'), onSelect: () => { setActionNumber(muc.number); setActionKind('reissue'); setActionReason(''); } });
+    }
+    items.push({ id: 'verify', label: t('certificates.actions.verify_link', 'Verify link'), onSelect: () => { window.open(`/verify/${encodeURIComponent(muc.number)}`, '_blank', 'noreferrer'); } });
+    return items;
+  };
+
   return (
     <div className="space-y-4 p-4">
       <div>
@@ -430,6 +357,13 @@ export default function CertificatesPage() {
           {t('certificates.subtitle', 'Sealed certificates of engine hours for Tier 3 assets. Sealed at issue — to correct one, void it and reissue.')}
         </p>
       </div>
+
+      <KpiStrip label={t('certificates.kpi_label', 'Certificates')}>
+        <KpiCell label={t('certificates.kpi.total', 'Certificates')} value={formatNumber(myMucs.length)} source={t('certificates.kpi.src', 'Issued certificates')} />
+        <KpiCell label={t('certificates.kpi.sealed', 'Sealed')} value={formatNumber(sealedCount)} tone={sealedCount > 0 ? 'ok' : undefined} />
+        <KpiCell label={t('certificates.kpi.voided', 'Voided')} value={formatNumber(voidedCount)} tone={voidedCount > 0 ? 'warn' : undefined} />
+        <KpiCell label={t('certificates.kpi.last_month', 'Next to certify')} value={lastMonth.label} context={t('certificates.kpi.last_month_ctx', 'Last calendar month')} />
+      </KpiStrip>
 
       {banner && (
         <div
@@ -468,8 +402,8 @@ export default function CertificatesPage() {
               >
                 <option value="last-month">Last month ({lastMonth.label})</option>
                 {selectedAssetBookings.map(b => (
-                  <option key={b.id} value="booking">
-                    Booking {b.reference} ({formatDateOnly(b.start)} – {formatDateOnly(b.end)})
+                  <option key={b.id} value={b.id}>
+                    Booking {b.reference} ({formatDateY(b.start)} – {formatDateY(b.end)})
                   </option>
                 ))}
               </select>
@@ -542,33 +476,30 @@ export default function CertificatesPage() {
         {myMucs.length === 0 ? (
           <div className="p-6 text-center text-sm text-grey-500">{t('certificates.none', 'No certificates yet.')}</div>
         ) : (
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-paper-2 text-grey-500">
-                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.certificate', 'Certificate')}</th>
-                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.asset', 'Asset')}</th>
-                <th className="px-3 py-2 text-left font-medium">{t('certificates.detail.owner', 'Owner')}</th>
-                <th className="px-3 py-2 text-left font-medium">{t('certificates.columns.period', 'Period')}</th>
-                <th className="px-3 py-2 text-right font-medium">{t('certificates.columns.hours', 'Hours')}</th>
-                <th className="px-3 py-2 text-center font-medium">{t('certificates.columns.status', 'Status')}</th>
-                <th className="px-3 py-2 text-right font-medium">{t('certificates.columns.actions', 'Actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myMucs.map(muc => (
-                <MucRow
-                  key={muc.id}
-                  muc={muc}
-                  canView={isTenantAdmin || session.isKasper}
-                  canManage={canIssue && muc.ownerTenantId === session.tenantId}
-                  verifyState={verifyStates[muc.id] ?? 'checking'}
-                  onView={setSelectedMuc}
-                  onVoid={number => { setActionNumber(number); setActionKind('void'); setActionReason(''); }}
-                  onReissue={number => { setActionNumber(number); setActionKind('reissue'); setActionReason(''); }}
-                />
-              ))}
-            </tbody>
-          </table>
+          <Table
+            caption={t('certificates.caption', 'Monthly utilisation certificates')}
+            keyField="id"
+            rows={myMucs}
+            dense
+            rowAttrs={muc => ({ 'data-muc-number': muc.number })}
+            rowMenu={mucMenu}
+            rowMenuLabel={muc => t('certificates.actions_for', 'Actions for {number}', { number: muc.number })}
+            columns={[
+              { key: 'number', header: t('certificates.columns.certificate', 'Certificate'), mono: true, render: muc => muc.number },
+              { key: 'asset', header: t('certificates.columns.asset', 'Asset'), mono: true, render: muc => seed.assets.find(a => a.id === muc.assetId)?.code ?? '—' },
+              { key: 'owner', header: t('certificates.detail.owner', 'Owner'), render: muc => seed.tenants.find(x => x.id === muc.ownerTenantId)?.name ?? '—' },
+              { key: 'period', header: t('certificates.columns.period', 'Period'), render: muc => `${formatDateY(muc.periodFrom)} – ${formatDateY(muc.periodTo)}` },
+              { key: 'hours', header: t('certificates.columns.hours', 'Hours'), numeric: true, render: muc => formatHours(muc.payload.billableHours) },
+              { key: 'status', header: t('certificates.columns.status', 'Status'), render: muc => (verifyStates[muc.id] ?? 'checking') === 'tampered'
+                ? <Badge variant="red">{t('certificates.status.seal_broken', 'Seal broken')}</Badge>
+                : muc.status === 'sealed'
+                  ? <Badge variant="green">{t('certificates.status.sealed', 'Sealed')}</Badge>
+                  : <Badge variant="yellow">{t('certificates.status.voided', 'Voided')}</Badge> },
+              { key: 'view', header: t('certificates.columns.view', 'View'), render: muc => muc.status === 'sealed' && canViewMuc
+                ? <Button size="sm" onClick={() => setSelectedMuc(muc.number)}>{t('certificates.actions.view', 'View')}</Button>
+                : <span className="text-grey-400">—</span> },
+            ]}
+          />
         )}
       </div>
 

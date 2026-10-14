@@ -3,7 +3,7 @@
 // per-tenant GPS statements with Ops locked out.
 
 import { expect, test } from '@playwright/test';
-import { signIn, USERS } from './helpers';
+import { rowAction, signIn, USERS } from './helpers';
 
 test.describe('S35 — the owner records a part-payment', () => {
   test('AED 500 on INV-AN-0098 leaves it part-paid and refuses more than the balance', async ({ page }) => {
@@ -13,7 +13,7 @@ test.describe('S35 — the owner records a part-payment', () => {
 
     const row = page.getByRole('row', { name: /INV-AN-0098/ });
     await expect(row.getByText('Unpaid')).toBeVisible();
-    await row.getByRole('button', { name: 'Record payment' }).click();
+    await rowAction(row, 'Record payment');
 
     await page.getByLabel('Amount (AED)').fill('500');
     await page.getByLabel('Reference').fill('Cash — Marina');
@@ -22,7 +22,7 @@ test.describe('S35 — the owner records a part-payment', () => {
     await expect(page.getByText(/AED 6,430\.00 still owed/)).toBeVisible();
 
     // Over-payment is refused with the money still owed.
-    await row.getByRole('button', { name: 'Record payment' }).click();
+    await rowAction(row, 'Record payment');
     await page.getByLabel('Amount (AED)').fill('7000');
     await page.getByRole('button', { name: 'Save payment' }).click();
     await expect(page.getByText('This is more than the AED 6,430.00 still owed.')).toBeVisible();

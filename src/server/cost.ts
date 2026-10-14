@@ -61,6 +61,8 @@ export interface AssetCostRow {
   costAed: number;
   marginAed: number;
   marginPct: number | null;
+  /** Why marginPct is null, when it is — e.g. 'n/a — part month'. */
+  marginNote?: string;
   utilisationPct: number;
   engineHours: number;
   idleHours: number | null;
@@ -217,6 +219,27 @@ function dubaiDaysTouched(fromMs: number, toMs: number): number {
   return Math.round((clock.startOfDubaiDay(toMs - 1) - clock.startOfDubaiDay(fromMs)) / DAY_MS) + 1;
 }
 
+/** Below this many booked days a margin % says more about the calendar than the
+ * machine (EX-11: one September day read −2,670.9 %), so it reads "n/a — part month". */
+export const MIN_BOOKED_DAYS_FOR_MARGIN = 7;
+export const PART_MONTH_NOTE = 'n/a — part month';
+
+/** Dubai days in the window the asset was on a non-cancelled booking of its owner. */
+function bookedDaysIn(tenantId: string, assetId: string, fromMs: number, toMs: number): number {
+  const state = db.getState();
+  const days = new Set<number>();
+  for (const b of state.bookings) {
+    if (b.assetId !== assetId || b.ownerTenantId !== tenantId || b.status === 'cancelled') continue;
+    const override = state.grantOverrides.find(o => o.bookingId === b.id);
+    const endMs = Math.min(msOf(b.end), b.closedAt !== undefined ? msOf(b.closedAt) : Infinity, override ? msOf(override.endedAt) : Infinity);
+    const from = Math.max(fromMs, msOf(b.start));
+    const to = Math.min(toMs, endMs);
+    if (to <= from) continue;
+    for (let d = clock.startOfDubaiDay(from); d < to; d = clock.startOfDubaiDay(d + DAY_MS + 3_600_000)) days.add(d);
+  }
+  return days.size;
+}
+
 export interface BookedRevenue {
   amountAed: number;
   /** Bookings that earned in the period but have no invoice yet. */
@@ -321,10 +344,12 @@ export function costRows(session: Session, fromMs: number, toMs: number): AssetC
       },
     ];
 
+    const partMonth = revenueAed > 0 && bookedDaysIn(asset.ownerTenantId ?? '', asset.id, fromMs, toMs) < MIN_BOOKED_DAYS_FOR_MARGIN;
     return {
       asset, profile, revenueAed, fuelAed, idleAed, maintenanceAed,
       fixedAed: fixed.amountAed, operatorAed, costAed, marginAed,
-      marginPct: revenueAed > 0 ? Math.round((marginAed / revenueAed) * 1000) / 10 : null,
+      marginPct: revenueAed > 0 && !partMonth ? Math.round((marginAed / revenueAed) * 1000) / 10 : null,
+      marginNote: partMonth ? PART_MONTH_NOTE : undefined,
       utilisationPct: utilisationPct(asset, engineHours, fromMs, toMs),
       engineHours, idleHours, lines,
     };

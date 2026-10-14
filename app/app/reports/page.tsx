@@ -6,10 +6,9 @@ import { Button, Badge, Panel, Table, KpiStrip, KpiCell, SegmentedTabs } from '@
 import { useSession, useSwitches, useClockOffsetMs } from '@/hooks';
 import { reportableAssets, reportRunsFor, regenerateReport, deleteReportRun, runDueSchedules, schedulesFor, can, availableReportTypes, type ReportTypeId } from '@/server/api';
 import { downloadPdf, downloadXlsx } from '@/lib/export';
-import * as clock from '@/lib/clock';
 import { formatNumber } from '@/lib/format';
+import * as clock from '@/lib/clock';
 import { RunPanel } from '@/components/reports/RunPanel';
-import { startOfDubaiMonthLocal } from '@/components/reports/timeHelpers';
 import { BarChart3, Clock, Route, MapPin, Timer, Fuel, Gauge, AlertTriangle, Fence } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -65,7 +64,7 @@ export default function ReportsPage() {
   const { generatedThisMonth, nextScheduled } = useMemo(() => {
     if (!session) return { generatedThisMonth: 0, nextScheduled: null as string | null };
     const nowMs = clock.now();
-    const monthStart = startOfDubaiMonthLocal(nowMs);
+    const monthStart = clock.startOfDubaiMonth(nowMs);
     const monthlyRuns = runs.filter(r => new Date(String(r.createdAt)).getTime() >= monthStart);
     const generatedThisMonth = monthlyRuns.length;
 

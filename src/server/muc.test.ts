@@ -5,6 +5,7 @@ import {
   issueMuc, nextMucNumber, reissueMuc, sealMucPayload, tamperWithMuc, verifyMucSeal, voidMuc,
 } from './muc';
 import { db } from '@/server/db';
+import { mucs as seededMucs } from '@/server/seed/data';
 import { hasFeature } from '@/domain/features';
 import type { MucPayload, Session } from '@/domain/types';
 import * as clock from '@/lib/clock';
@@ -218,5 +219,21 @@ describe('muc — ECU hours model', () => {
     const t = clock.now();
     expect(ecuHoursAt(asset, t)).toBe(ecuHoursAt(asset, t));
     expect(ecuHoursAt(asset, t + 86400000)).toBeGreaterThan(ecuHoursAt(asset, t));
+  });
+});
+
+describe('seeded certificates match the ECU meter (owner finding 3)', () => {
+  it('every seeded certificate reads its opening and closing hours off the simulated meter', async () => {
+    const state = db.getState();
+    const seededIds = new Set(seededMucs.map(m => m.id));
+    for (const muc of state.mucs.filter(m => seededIds.has(m.id))) {
+      const asset = state.assets.find(a => a.id === muc.assetId)!;
+      const from = new Date(muc.periodFrom).getTime();
+      const to = new Date(muc.periodTo).getTime();
+      expect(muc.payload.openingHoursEcu, muc.number).toBe(ecuHoursAt(asset, from));
+      expect(muc.payload.closingHoursEcu, muc.number).toBe(ecuHoursAt(asset, to));
+      expect(muc.payload.billableHours, muc.number).toBe(Math.round((muc.payload.closingHoursEcu - muc.payload.openingHoursEcu) * 10) / 10);
+      expect(await verifyMucSeal(muc), muc.number).toBe(true);
+    }
   });
 });

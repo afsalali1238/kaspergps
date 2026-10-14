@@ -2,7 +2,7 @@
 // All time must come from here. Date.now() and new Date() without args are banned elsewhere.
 // Architecture rule 9.
 
-import { startOfDay, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
+import { startOfDay, startOfMonth, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { ANCHOR_MS } from '@/server/seed/data';
 
@@ -87,6 +87,12 @@ export function formatDubaiDate(ms: number): string {
   return formatInTimeZone(new Date(ms), DUBAI_TZ, 'd MMM');
 }
 
+/** Date with the year: for ranges that can sit beside another month's. */
+export function formatDubaiDateY(ms: number): string {
+  return formatInTimeZone(new Date(ms), DUBAI_TZ, 'd MMM yyyy');
+}
+
+
 /** Machine-readable Dubai calendar day (YYYY-MM-DD) — use this for keys, never formatDubaiDate. */
 export function dubaiDateKey(ms: number): string {
   const d = toZonedTime(new Date(ms), DUBAI_TZ);
@@ -115,6 +121,19 @@ export function isoFromDubai(iso: string): number {
 export function startOfDubaiDay(ms: number): number {
   return fromZonedTime(startOfDay(toZonedTime(new Date(ms), DUBAI_TZ)), DUBAI_TZ).getTime();
 }
+
+export function startOfDubaiMonth(ms: number): number {
+  return fromZonedTime(startOfMonth(toZonedTime(new Date(ms), DUBAI_TZ)), DUBAI_TZ).getTime();
+}
+/** Get the previous calendar month in Dubai for certificate/billing periods. */
+export function lastMonthPeriod(nowMs: number): { label: string; from: number; to: number } {
+  const first = startOfDubaiMonth(nowMs);
+  const from = startOfDubaiMonth(first - 1);
+  const to = first - 60000;
+  const label = new Date(from).toLocaleDateString('en-AE', { month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
+  return { label, from, to };
+}
+
 
 export function hoursSinceDubai(ms: number): number {
   return differenceInHours(now(), ms);

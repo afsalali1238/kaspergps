@@ -57,6 +57,8 @@ interface TableProps<T> {
   rowMenu?: (row: T) => RowMenuItem[];
   /** Accessible name of each row's ⋯ button. */
   rowMenuLabel?: (row: T) => string;
+  /** Extra attributes for each row's <tr>, e.g. a data-* hook. */
+  rowAttrs?: (row: T) => Record<`data-${string}`, string>;
   dense?: boolean;
 }
 
@@ -81,6 +83,7 @@ export function Table<T>({
   maxHeight,
   rowMenu,
   rowMenuLabel,
+  rowAttrs,
   dense = false,
 }: TableProps<T>) {
   const t = useT();
@@ -145,6 +148,7 @@ export function Table<T>({
                   selectedKeys?.has(key) && 'bg-accent-tint'
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                {...rowAttrs?.(row)}
               >
                 {selectable && (
                   <td className="p-3">
